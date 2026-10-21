@@ -17,7 +17,7 @@ Current original-file coverage: **0/1,345 verified**. The bounded public/local s
 
 ## Active implementation backlog
 
-- Finish manual-program fidelity: icon selection, exact cycle/apply-scope sheets, advanced sets and calendar placement. The local editor/library/activation and program-targeted session foundation is implemented; full source parity remains open.
+- Finish manual-program fidelity: icon selection, exact cycle/apply-scope sheets, circular set/RIR controls, descriptive rest controls and source rest pictogram, advanced sets and calendar placement. The local editor/library/activation and program-targeted session foundation is implemented; full source parity remains open.
 - Exact smart-generation, deload and progression behavior; recovery is partial.
 - Source logger keypad, metric-specific layouts, targets/warm-up, complete set types and rest sheet.
 - Body metrics, charts, records, import/export, integrations and localization.
