@@ -96,6 +96,7 @@ data class AppData(
     val gyms: List<GymProfile> = emptyList(),
     val programs: List<TrainingProgram> = emptyList(),
     val programDraft: TrainingProgram? = null,
+    val onboarding: OnboardingState = OnboardingState(),
 )
 
 fun newId() = UUID.randomUUID().toString()
@@ -222,6 +223,7 @@ object DataCodec {
             .put("activeProgramId", d.activeProgramId)
             .put("programs", JSONArray(d.programs.map { ProgramCodec.encode(it) }))
             .put("programDraft", d.programDraft?.let { ProgramCodec.encode(it) })
+            .put("onboarding", d.onboarding.json())
             .put("gyms", JSONArray(d.gyms.map { GymCodec.encode(it) }))
             .put("active", d.active?.json())
             .put("history", JSONArray(d.history.map { it.json() }))
@@ -337,6 +339,7 @@ object DataCodec {
             j.array("gyms").objects().map { GymCodec.decode(it) },
             programs,
             j.optJSONObject("programDraft")?.let { ProgramCodec.decode(it) },
+            OnboardingState.decode(j.optJSONObject("onboarding")),
         )
     }
 
@@ -444,6 +447,61 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         val next = block(_data.value)
         store.save(next)
         _data.value = next
+    }
+
+    fun editOnboarding(block: (OnboardingState) -> OnboardingState) = update {
+        it.copy(onboarding = block(it.onboarding))
+    }
+
+    fun restartOnboarding() = update { d ->
+        val setup =
+            if (d.onboarding.completed)
+                d.onboarding.copy(
+                    step = 0,
+                    completed = false,
+                    name = d.preferences.displayName,
+                    pounds = d.preferences.pounds,
+                    preset = "current",
+                    gymName = d.gyms.firstOrNull()?.name ?: "Everything Gym",
+                    gymId = null,
+                )
+            else d.onboarding
+        d.copy(onboarding = setup.copy(deferred = false))
+    }
+
+    fun applyOnboardingBasics() = update { d ->
+        if (!d.onboarding.validBasics()) d
+        else
+            d.copy(
+                preferences =
+                    d.preferences.copy(
+                        displayName = d.onboarding.name.trim(),
+                        pounds = d.onboarding.pounds,
+                    )
+            )
+    }
+
+    fun applyOnboardingGym() = update { d ->
+        val s = d.onboarding
+        val existing =
+            if (s.preset == "current") d.gyms.firstOrNull() else d.gyms.find { it.id == s.gymId }
+        val gym =
+            if (s.preset == "current" && existing != null) existing.copy(name = s.gymName.trim())
+            else
+                GymProfile(
+                    id = existing?.id ?: newId(),
+                    name = s.gymName.trim(),
+                    equipmentIds =
+                        if (s.preset == "blank") emptySet() else equipmentCatalog.prefill(s.preset),
+                )
+        d.copy(
+            gyms = listOf(gym) + d.gyms.filterNot { it.id == gym.id },
+            onboarding = s.copy(gymId = gym.id),
+        )
+    }
+
+    fun finishOnboarding() = update {
+        it.copy(onboarding = it.onboarding.copy(completed = true, deferred = false))
     }
 
     fun start(name: String = "Workout", ids: List<String> = emptyList()) {

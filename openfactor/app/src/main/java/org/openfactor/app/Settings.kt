@@ -77,7 +77,7 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .background(Color(0xFF0D0D0D))
             .padding(horizontal = 18.dp)
-            .padding(top = 42.dp, bottom = 28.dp)
+            .padding(top = 42.dp, bottom = 112.dp)
     ) {
         Text(
             "Settings",
@@ -88,6 +88,13 @@ fun SettingsScreen(
             letterSpacing = (-1).sp,
         )
         SettingsSection("PROFILE") {
+            SettingsRow(
+                Icons.Rounded.Checklist,
+                "Set up Open Factor",
+                "Basics, gym equipment and program",
+            ) {
+                vm.restartOnboarding()
+            }
             SettingsRow(Icons.Rounded.AccountCircle, "Profile", p.displayName) {
                 dialog = "profile"
             }

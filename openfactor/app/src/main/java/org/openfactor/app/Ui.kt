@@ -1,7 +1,9 @@
 package org.openfactor.app
 
 import android.graphics.Typeface
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -18,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -110,7 +113,12 @@ fun OpenFactorTheme(content: @Composable () -> Unit) {
  * Nuvio contributors; modifications Open Factor contributors. GPL-3.0.
  */
 @Composable
-fun NuvioWorkoutNavigation(selected: Int, onSelect: (Int) -> Unit) {
+fun NuvioWorkoutNavigation(
+    selected: Int,
+    scrollEnergy: Float,
+    modifier: Modifier = Modifier,
+    onSelect: (Int) -> Unit,
+) {
     val labels = listOf("Dashboard", "Workout", "Exercises", "Settings")
     val icons =
         listOf(
@@ -119,37 +127,60 @@ fun NuvioWorkoutNavigation(selected: Int, onSelect: (Int) -> Unit) {
             Icons.Rounded.Search,
             Icons.Rounded.AccountCircle,
         )
+    val drift by
+        animateFloatAsState(
+            scrollEnergy,
+            tween(180, easing = FastOutSlowInEasing),
+            label = "navigation scroll depth",
+        )
     Box(
-        Modifier.fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(start = 28.dp, end = 28.dp, bottom = 14.dp),
+        modifier.fillMaxWidth().padding(start = 28.dp, end = 28.dp, bottom = 14.dp),
         contentAlignment = Alignment.BottomCenter,
     ) {
         BoxWithConstraints(
-            Modifier.widthIn(max = 440.dp)
-                .fillMaxWidth()
-                .height(66.dp)
-                .clip(RoundedCornerShape(50))
-                .background(Color(0xFF1C1C1E))
-                .border(
-                    1.dp,
-                    Brush.verticalGradient(listOf(Color(0xFF9B786E), Color(0xFF2E2929))),
-                    RoundedCornerShape(50),
-                )
-                .selectableGroup()
+            Modifier.widthIn(max = 440.dp).fillMaxWidth().height(66.dp).selectableGroup()
         ) {
             val slot = (maxWidth - 8.dp) / 4
             val offset by
-                animateDpAsState(4.dp + slot * selected, tween(300), label = "navigation pill")
+                animateDpAsState(
+                    4.dp + slot * selected,
+                    tween(280, easing = FastOutSlowInEasing),
+                    label = "navigation pill",
+                )
+            // Only the material responds to scroll. The four touch targets stay at their fixed
+            // anchor.
             Box(
-                Modifier.offset(x = offset, y = 4.dp)
-                    .width(slot)
-                    .height(58.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(Color(0xFF393939))
-            )
+                Modifier.fillMaxSize()
+                    .graphicsLayer {
+                        translationY = drift * 2.dp.toPx()
+                        scaleX = 1f - kotlin.math.abs(drift) * .008f
+                        shadowElevation = (6.dp.toPx() + kotlin.math.abs(drift) * 3.dp.toPx())
+                        shape = RoundedCornerShape(50)
+                        clip = true
+                    }
+                    .background(Color(0xFF1C1C1E))
+                    .border(
+                        1.dp,
+                        Brush.verticalGradient(listOf(Color(0xFF9B786E), Color(0xFF2E2929))),
+                        RoundedCornerShape(50),
+                    )
+            ) {
+                Box(
+                    Modifier.offset(x = offset, y = 4.dp)
+                        .width(slot)
+                        .height(58.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0xFF393939))
+                )
+            }
             Row(Modifier.fillMaxSize().padding(4.dp)) {
                 labels.forEachIndexed { i, label ->
+                    val iconScale by
+                        animateFloatAsState(
+                            if (i == selected) 1.04f else 1f,
+                            tween(180),
+                            label = "navigation icon",
+                        )
                     Column(
                         Modifier.weight(1f)
                             .fillMaxHeight()
@@ -161,7 +192,10 @@ fun NuvioWorkoutNavigation(selected: Int, onSelect: (Int) -> Unit) {
                         Icon(
                             icons[i],
                             null,
-                            Modifier.size(26.dp),
+                            Modifier.size(26.dp).graphicsLayer {
+                                scaleX = iconScale
+                                scaleY = iconScale
+                            },
                             tint = if (i == selected) Color.White else Color(0xFF92969C),
                         )
                         Text(

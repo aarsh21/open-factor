@@ -238,7 +238,13 @@ fun ExerciseLibrary(
         }
         LazyColumn(
             Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 2.dp),
+            contentPadding =
+                PaddingValues(
+                    start = 18.dp,
+                    end = 18.dp,
+                    top = 2.dp,
+                    bottom = if (onBack == null) 104.dp else 18.dp,
+                ),
         ) {
             if (filtered.isEmpty())
                 item {

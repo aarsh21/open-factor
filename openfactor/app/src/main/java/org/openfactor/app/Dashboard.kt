@@ -60,7 +60,7 @@ fun DashboardScreen(
     val muscles = exercises.filter { it.id in exerciseIds }.flatMap { it.muscles }.toSet().size
     val targetSets =
         if (data.activeProgramId != null) data.routines.sumOf { it.exerciseIds.size * 3 } else 0
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 20.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 108.dp)) {
         item {
             PageHeading(
                 "Dashboard",
@@ -309,7 +309,7 @@ fun WorkoutScreen(
 ) {
     var selectedDay by remember { mutableStateOf(LocalDate.now()) }
     var delete by remember { mutableStateOf<Routine?>(null) }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 20.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 108.dp)) {
         item {
             PageHeading(
                 "Workout",
