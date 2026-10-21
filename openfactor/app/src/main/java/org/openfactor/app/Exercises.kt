@@ -106,241 +106,11 @@ fun ExerciseLibrary(
                         .thenBy { order.indexOf(it.first) }
                 )
         }
-    Column(Modifier.fillMaxSize()) {
-        PageHeading(
-            if (picking) "Add Exercise" else "Exercises",
-            onBack,
-            actions = { RoundAction(Icons.Rounded.Add, "Create custom exercise", onCustom) },
-        )
+    val searchField: @Composable (Modifier) -> Unit = { searchModifier ->
         Row(
-            Modifier.fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Box {
-                FilterChip(
-                    true,
-                    { gymMenu = true },
-                    label = { Text(gym?.name ?: "Everything Gym") },
-                    leadingIcon = { Icon(Icons.Rounded.Warehouse, null, Modifier.size(18.dp)) },
-                    trailingIcon = { Icon(Icons.Rounded.ExpandMore, null) },
-                )
-                DropdownMenu(gymMenu, { gymMenu = false }) {
-                    gyms.forEach { g ->
-                        DropdownMenuItem(
-                            text = { Text(g.name) },
-                            onClick = {
-                                gymId = g.id
-                                gymMenu = false
-                            },
-                        )
-                    }
-                }
-            }
-            FilterChooser(
-                "Type",
-                listOf("All types") +
-                    exercises.mapNotNull { it.properties["Type"] }.distinct().sorted(),
-                type,
-            ) {
-                type = it
-            }
-            FilterChooser(
-                "Laterality",
-                listOf("All lateralities") +
-                    exercises.mapNotNull { it.properties["Laterality"] }.distinct().sorted(),
-                laterality,
-            ) {
-                laterality = it
-            }
-            FilterChip(
-                filter || equipment != "All equipment",
-                { filter = !filter },
-                label = { Text("Filters") },
-                leadingIcon = { Icon(Icons.Rounded.Tune, null, Modifier.size(18.dp)) },
-            )
-            FilterChip(
-                onlyFavorites,
-                { onlyFavorites = !onlyFavorites },
-                label = { Text("Favorites") },
-                leadingIcon = { Icon(Icons.Rounded.Star, null, Modifier.size(18.dp)) },
-            )
-            if (muscle != "All muscles")
-                InputChip(
-                    true,
-                    { muscle = "All muscles" },
-                    label = { Text("Clear $muscle") },
-                    trailingIcon = { Icon(Icons.Rounded.Close, null, Modifier.size(14.dp)) },
-                )
-        }
-        if (filter)
-            Column(Modifier.padding(horizontal = 18.dp)) {
-                FilterChooser(
-                    "Muscle group",
-                    listOf("All muscles") + exercises.flatMap { it.muscles }.distinct().sorted(),
-                    muscle,
-                ) {
-                    muscle = it
-                }
-                FilterChooser(
-                    "Equipment",
-                    listOf("All equipment") + exercises.map { it.equipment }.distinct().sorted(),
-                    equipment,
-                ) {
-                    equipment = it
-                }
-            }
-        Row(
-            Modifier.horizontalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            val muscles =
-                listOf(
-                    "Chest",
-                    "Quads",
-                    "Upper Back",
-                    "Glutes",
-                    "Lats",
-                    "Biceps",
-                    "Triceps",
-                    "Hamstrings",
-                    "Abs",
-                    "Calves",
-                    "Side Delts",
-                )
-            muscles.forEach { m ->
-                Column(
-                    Modifier.width(72.dp).clickable {
-                        muscle = if (muscle == m) "All muscles" else m
-                    },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Box(
-                        Modifier.border(
-                            if (muscle == m) 2.dp else 1.dp,
-                            if (muscle == m) Color.White else OF.line,
-                            RoundedCornerShape(10.dp),
-                        )
-                    ) {
-                        MuscleImage(m, Modifier.size(72.dp))
-                    }
-                    Text(
-                        m,
-                        Modifier.padding(top = 4.dp),
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        color = if (muscle == m) Color.White else OF.muted,
-                    )
-                }
-            }
-        }
-        LazyColumn(
-            Modifier.weight(1f),
-            contentPadding =
-                PaddingValues(
-                    start = 18.dp,
-                    end = 18.dp,
-                    top = 2.dp,
-                    bottom = if (onBack == null) 104.dp else 18.dp,
-                ),
-        ) {
-            if (filtered.isEmpty())
-                item {
-                    EmptyContent(
-                        Icons.Rounded.SearchOff,
-                        "No exercises found",
-                        "Try a different name or clear your filters.",
-                        "Clear Filters",
-                        {
-                            query = ""
-                            muscle = "All muscles"
-                            equipment = "All equipment"
-                            onlyFavorites = false
-                            type = "All types"
-                            laterality = "All lateralities"
-                        },
-                    )
-                }
-            groups.forEach { (group, entries) ->
-                item(key = "group-$group") {
-                    Row(
-                        Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            group,
-                            Modifier.weight(1f),
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Medium,
-                        )
-                        if (entries.size > 8)
-                            TextButton({
-                                expandedGroups =
-                                    if (group in expandedGroups) expandedGroups - group
-                                    else expandedGroups + group
-                            }) {
-                                Text(
-                                    if (group in expandedGroups) "See Less"
-                                    else "See ${entries.size - 5} More",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                            }
-                    }
-                }
-                items(
-                    if (entries.size > 8 && group !in expandedGroups) entries.take(5) else entries,
-                    key = { "$group-${it.id}" },
-                ) { e ->
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .clickable { onDetail(e.id) }
-                            .padding(vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    ) {
-                        ExerciseImage(e, Modifier.width(46.dp).height(62.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                e.title,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                e.muscles.joinToString(", ") +
-                                    if (e.secondary.isNotEmpty())
-                                        " • " + e.secondary.joinToString(", ")
-                                    else "",
-                                color = OF.muted,
-                                fontSize = 14.sp,
-                                lineHeight = 21.sp,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        RoundAction(
-                            if (picking) Icons.Rounded.Add
-                            else if (e.id in favorites) Icons.Rounded.Star
-                            else Icons.Rounded.StarOutline,
-                            if (picking) "Add ${e.name}" else "Favorite ${e.name}",
-                        ) {
-                            if (picking && onPick != null) onPick(e.id) else onFavorite(e.id)
-                        }
-                    }
-                    HorizontalDivider(
-                        Modifier.padding(start = 60.dp),
-                        color = OF.line.copy(alpha = 0.5f),
-                    )
-                }
-            }
-        }
-        Row(
-            Modifier.fillMaxWidth()
-                .padding(bottom = if (onBack == null) 88.dp else 0.dp)
-                .background(OF.top)
+            searchModifier
+                .fillMaxWidth()
+                .then(if (onBack != null) Modifier.background(OF.top) else Modifier)
                 .imePadding()
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -349,7 +119,7 @@ fun ExerciseLibrary(
             OutlinedTextField(
                 query,
                 { query = it },
-                Modifier.weight(1f),
+                Modifier.weight(1f).background(OF.top, RoundedCornerShape(50)),
                 placeholder = { Text("Search exercises") },
                 leadingIcon = { Icon(Icons.Rounded.Search, null) },
                 trailingIcon = {
@@ -362,6 +132,250 @@ fun ExerciseLibrary(
             if (picking && onBack != null)
                 Button(onBack, shape = RoundedCornerShape(50)) { Text("Done") }
         }
+    }
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            PageHeading(
+                if (picking) "Add Exercise" else "Exercises",
+                onBack,
+                actions = { RoundAction(Icons.Rounded.Add, "Create custom exercise", onCustom) },
+            )
+            Row(
+                Modifier.fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 18.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box {
+                    FilterChip(
+                        true,
+                        { gymMenu = true },
+                        label = { Text(gym?.name ?: "Everything Gym") },
+                        leadingIcon = { Icon(Icons.Rounded.Warehouse, null, Modifier.size(18.dp)) },
+                        trailingIcon = { Icon(Icons.Rounded.ExpandMore, null) },
+                    )
+                    DropdownMenu(gymMenu, { gymMenu = false }) {
+                        gyms.forEach { g ->
+                            DropdownMenuItem(
+                                text = { Text(g.name) },
+                                onClick = {
+                                    gymId = g.id
+                                    gymMenu = false
+                                },
+                            )
+                        }
+                    }
+                }
+                FilterChooser(
+                    "Type",
+                    listOf("All types") +
+                        exercises.mapNotNull { it.properties["Type"] }.distinct().sorted(),
+                    type,
+                ) {
+                    type = it
+                }
+                FilterChooser(
+                    "Laterality",
+                    listOf("All lateralities") +
+                        exercises.mapNotNull { it.properties["Laterality"] }.distinct().sorted(),
+                    laterality,
+                ) {
+                    laterality = it
+                }
+                FilterChip(
+                    filter || equipment != "All equipment",
+                    { filter = !filter },
+                    label = { Text("Filters") },
+                    leadingIcon = { Icon(Icons.Rounded.Tune, null, Modifier.size(18.dp)) },
+                )
+                FilterChip(
+                    onlyFavorites,
+                    { onlyFavorites = !onlyFavorites },
+                    label = { Text("Favorites") },
+                    leadingIcon = { Icon(Icons.Rounded.Star, null, Modifier.size(18.dp)) },
+                )
+                if (muscle != "All muscles")
+                    InputChip(
+                        true,
+                        { muscle = "All muscles" },
+                        label = { Text("Clear $muscle") },
+                        trailingIcon = { Icon(Icons.Rounded.Close, null, Modifier.size(14.dp)) },
+                    )
+            }
+            if (filter)
+                Column(Modifier.padding(horizontal = 18.dp)) {
+                    FilterChooser(
+                        "Muscle group",
+                        listOf("All muscles") +
+                            exercises.flatMap { it.muscles }.distinct().sorted(),
+                        muscle,
+                    ) {
+                        muscle = it
+                    }
+                    FilterChooser(
+                        "Equipment",
+                        listOf("All equipment") +
+                            exercises.map { it.equipment }.distinct().sorted(),
+                        equipment,
+                    ) {
+                        equipment = it
+                    }
+                }
+            Row(
+                Modifier.horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                val muscles =
+                    listOf(
+                        "Chest",
+                        "Quads",
+                        "Upper Back",
+                        "Glutes",
+                        "Lats",
+                        "Biceps",
+                        "Triceps",
+                        "Hamstrings",
+                        "Abs",
+                        "Calves",
+                        "Side Delts",
+                    )
+                muscles.forEach { m ->
+                    Column(
+                        Modifier.width(72.dp).clickable {
+                            muscle = if (muscle == m) "All muscles" else m
+                        },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Box(
+                            Modifier.border(
+                                if (muscle == m) 2.dp else 1.dp,
+                                if (muscle == m) Color.White else OF.line,
+                                RoundedCornerShape(10.dp),
+                            )
+                        ) {
+                            MuscleImage(m, Modifier.size(72.dp))
+                        }
+                        Text(
+                            m,
+                            Modifier.padding(top = 4.dp),
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            color = if (muscle == m) Color.White else OF.muted,
+                        )
+                    }
+                }
+            }
+            LazyColumn(
+                Modifier.weight(1f),
+                contentPadding =
+                    PaddingValues(
+                        start = 18.dp,
+                        end = 18.dp,
+                        top = 2.dp,
+                        bottom = if (onBack == null) 192.dp else 18.dp,
+                    ),
+            ) {
+                if (filtered.isEmpty())
+                    item {
+                        EmptyContent(
+                            Icons.Rounded.SearchOff,
+                            "No exercises found",
+                            "Try a different name or clear your filters.",
+                            "Clear Filters",
+                            {
+                                query = ""
+                                muscle = "All muscles"
+                                equipment = "All equipment"
+                                onlyFavorites = false
+                                type = "All types"
+                                laterality = "All lateralities"
+                            },
+                        )
+                    }
+                groups.forEach { (group, entries) ->
+                    item(key = "group-$group") {
+                        Row(
+                            Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                group,
+                                Modifier.weight(1f),
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            if (entries.size > 8)
+                                TextButton({
+                                    expandedGroups =
+                                        if (group in expandedGroups) expandedGroups - group
+                                        else expandedGroups + group
+                                }) {
+                                    Text(
+                                        if (group in expandedGroups) "See Less"
+                                        else "See ${entries.size - 5} More",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                }
+                        }
+                    }
+                    items(
+                        if (entries.size > 8 && group !in expandedGroups) entries.take(5)
+                        else entries,
+                        key = { "$group-${it.id}" },
+                    ) { e ->
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .clickable { onDetail(e.id) }
+                                .padding(vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        ) {
+                            ExerciseImage(e, Modifier.width(46.dp).height(62.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    e.title,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    e.muscles.joinToString(", ") +
+                                        if (e.secondary.isNotEmpty())
+                                            " • " + e.secondary.joinToString(", ")
+                                        else "",
+                                    color = OF.muted,
+                                    fontSize = 14.sp,
+                                    lineHeight = 21.sp,
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            RoundAction(
+                                if (picking) Icons.Rounded.Add
+                                else if (e.id in favorites) Icons.Rounded.Star
+                                else Icons.Rounded.StarOutline,
+                                if (picking) "Add ${e.name}" else "Favorite ${e.name}",
+                            ) {
+                                if (picking && onPick != null) onPick(e.id) else onFavorite(e.id)
+                            }
+                        }
+                        HorizontalDivider(
+                            Modifier.padding(start = 60.dp),
+                            color = OF.line.copy(alpha = 0.5f),
+                        )
+                    }
+                }
+            }
+            if (onBack != null) searchField(Modifier)
+        }
+        if (onBack == null)
+            searchField(
+                Modifier.align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 88.dp)
+            )
     }
 }
 

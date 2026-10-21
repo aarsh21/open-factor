@@ -116,11 +116,14 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
             SnackbarHost(snackbar, Modifier.padding(bottom = if (route.isBlank()) 94.dp else 0.dp))
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
+        Box(Modifier.fillMaxSize()) {
             Column(
                 Modifier.fillMaxSize()
                     .nestedScroll(rootScroll)
-                    .padding(top = padding.calculateTopPadding(), bottom = 0.dp)
+                    .padding(
+                        top = padding.calculateTopPadding(),
+                        bottom = if (route.isBlank()) 0.dp else padding.calculateBottomPadding(),
+                    )
                     .background(OF.background)
             ) {
                 when (route) {
@@ -345,7 +348,12 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                 }
             }
             if (route.isBlank())
-                NuvioWorkoutNavigation(tab, scrollEnergy, Modifier.align(Alignment.BottomCenter)) {
+                NuvioWorkoutNavigation(
+                    tab,
+                    scrollEnergy,
+                    Modifier.align(Alignment.BottomCenter)
+                        .padding(bottom = padding.calculateBottomPadding()),
+                ) {
                     tab = it
                 }
         }
