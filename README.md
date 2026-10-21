@@ -4,6 +4,10 @@ An open source Android workout tracker built in a GPLv3 fork of [NuvioMobile](ht
 
 **Development status:** a working training foundation, not yet a complete one-to-one replacement. Original exercise-video acquisition is deferred to a future phone-assisted pass; automated programming, body metrics and complete visual/interaction parity remain unfinished. Gym profiles and Levels have partial local implementations. See [the investigation ledger](docs/open-factor/INVESTIGATION.md).
 
+## Test on Android
+
+Download the installable APK from [Open Factor 0.1.0-alpha.1](https://github.com/aarsh21/open-factor/releases/tag/v0.1.0-alpha.1). Android 8.0 or newer is required. This debug-signed testing prerelease excludes the private reference-media pack; read the [release notes and known limits](docs/open-factor/releases/v0.1.0-alpha.1.md).
+
 ## Build
 
 Open Factor is the independent Android project in `openfactor/`. It does not need Nuvio's media engines or service keys. Use JDK 17 and Android SDK 35.
