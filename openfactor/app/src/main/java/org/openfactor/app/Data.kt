@@ -30,6 +30,7 @@ data class Exercise(
     val bodyweight: Double = 0.0,
     val searchBoost: Double = 0.0,
     val clips: List<String> = emptyList(),
+    val browseCategories: List<String> = emptyList(),
 )
 
 data class LoggedSet(
@@ -272,6 +273,7 @@ object DataCodec {
                 e.optDouble("bodyweight", 0.0),
                 e.optDouble("searchBoost", 0.0),
                 e.array("clips").strings(),
+                e.array("browseCategories").strings(),
             )
         }
 }

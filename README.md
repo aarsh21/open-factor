@@ -2,7 +2,7 @@
 
 An open source Android workout tracker built in a GPLv3 fork of [NuvioMobile](https://github.com/NuvioMedia/NuvioMobile). Open Factor takes its floating navigation and grouped settings from Nuvio. Workout screens and behavior are being reconstructed from an explicitly supplied reference application.
 
-**Development status:** a working training foundation, not yet a complete one-to-one replacement. Exercise video downloads, automated programming, gym profiles, body metrics, levels and several source interactions remain under investigation. See [the investigation ledger](docs/open-factor/INVESTIGATION.md).
+**Development status:** a working training foundation, not yet a complete one-to-one replacement. Source video access, automated programming, body metrics and complete visual/interaction parity remain under investigation. Gym profiles and Levels have partial local implementations. See [the investigation ledger](docs/open-factor/INVESTIGATION.md).
 
 ## Build
 
@@ -21,7 +21,9 @@ The debug APK is `openfactor/app/build/outputs/apk/debug/app-debug.apk`, package
 ## Current training features
 
 - Search exercises and aliases; filter muscles/equipment; favorite exercises.
-- Exercise image demonstrations, available instructions, muscles and properties.
+- Camera-view photos, optional locally imported videos, available instructions, muscles and properties.
+- Gym profiles, literal equipment preset prefills, weight lists and gym-aware exercise filtering.
+- Local muscle set levels over week/month/three-month windows.
 - Create custom exercises and reusable workout templates.
 - Persist active workouts, weight, reps, RIR, warm-ups and notes.
 - Automatic rest timer, workout completion, history and repeat workout.
@@ -31,7 +33,7 @@ The debug APK is `openfactor/app/build/outputs/apk/debug/app-debug.apk`, package
 
 ## Local reference content
 
-The public source builds with a small factual exercise-name catalog and Material icons. The complete reference catalog and imported media are kept in an ignored local pack; their ownership is separate from this repository's GPL code license.
+The public source includes descriptive metadata for all 1,345 exercises and 297 equipment entities, plus Material icons. Original instructions, images, fonts, animations and videos use an ignored local pack; their ownership is separate from this repository's GPL code license.
 
 To create that pack from your own APK:
 
@@ -41,7 +43,7 @@ cd openfactor
 ./gradlew :app:assembleDebug
 ```
 
-For the inspected specimen, the importer produces 1,345 catalog entries, exact images for 619 exercises, and instructions for 1,213. It copies equipment and muscle assets, preserves the full source metadata, and records SHA-256 provenance. **No videos are bundled or recovered.** Image cycling is a local demonstration fallback, not the original streamed video.
+For the inspected specimen, the importer produces 1,345 catalog entries, exact images for 619 exercises, and instructions for 1,213. It copies equipment and muscle assets, preserves the full source metadata, and records SHA-256 provenance. **No source videos have been retrieved or verified.** Static analysis resolves 1,831 object paths, but server access requires valid App Check. For matching local MP4 exports, add `--video-directory /path/to/export`; missing clips show photo previews.
 
 The importer never fetches remote content, executes the APK, or publishes imported files. Do not describe imported proprietary content as GPL-licensed. See [asset provenance](docs/open-factor/ASSETS.md).
 

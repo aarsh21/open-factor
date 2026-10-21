@@ -82,7 +82,14 @@ class EquipmentCatalog(context: Context) {
                     JSONObject(it.readText())
                 }
             }
-            .getOrNull()
+            .getOrElse {
+                runCatching {
+                        context.assets.open("equipment.json").bufferedReader().use {
+                            JSONObject(it.readText())
+                        }
+                    }
+                    .getOrNull()
+            }
     private val index = source?.optJSONObject("uuidIndex") ?: JSONObject()
     val items: List<EquipmentItem> =
         index

@@ -2,7 +2,7 @@
 
 Open Factor's application code inherits GNU GPLv3 from NuvioMedia/NuvioMobile. That license does not establish redistribution rights for content extracted from a separate application.
 
-The public source uses Material icons and a custom geometric Open Factor launcher mark. A small baseline list contains exercise names and categories; it includes no extracted prose, images, fonts or videos.
+The public source uses Material icons and a custom geometric Open Factor launcher mark. The public descriptive dataset contains 1,345 exercise names and their muscle/equipment facts, plus 297 equipment entities, group memberships and literal preset/weight metadata. It includes no source instructions, images, fonts or videos. `catalog-provenance.json` records input hashes and the projection scope.
 
 The reproducible local importer at `tooling/import_reference_apk.py` reads an operator-supplied APK and creates `openfactor/app/src/main/assets/reference/`. Git ignores that directory. It records the source APK digest and each copied member's original path, byte length and SHA-256 in `provenance.json`. It preserves the full original exercise/equipment UUID index in `source-catalog.json` and provides a UI projection in `catalog.json`.
 

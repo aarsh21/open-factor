@@ -32,3 +32,11 @@ python tooling/android_smoke.py --serial emulator-5580 --output /tmp/open-factor
 ## Unverified requirements
 
 Reference-app streamed videos, source program algorithms and complete visual/interaction parity remain unverified. See the investigation matrix for the outstanding features. No complete-clone acceptance has been recorded.
+
+## Full public dataset and optional media checks
+
+The source-only clean build was checked with the entire ignored reference directory absent. Its APK contains zero `assets/reference/` entries. Both instrumented tests pass against this build: 1,345 unique exercise records, no original instruction/media payloads in the descriptive catalog, 297 equipment entities, 89 literal commercial preset IDs, and bench-press equipment requirements. Public browsing was captured natively. The reference directory was restored after the build.
+
+All 1,345 browse-category joins and all 1,831 video path/selection-order joins match their independent static-recovery results. Live catalog count discrepancies remain documented in the investigation ledger.
+
+Optional video ingestion and native playback were tested using an explicitly synthetic two-second test-pattern MP4, joined to an exact filename suffix in a temporary build. Import matched one clip and retained absent values for the other angles; the native player rendered the moving test pattern. Backgrounding the app paused playback and returning showed the play control. The temporary test assets were removed from source. No original streamed video was used or verified in this test.

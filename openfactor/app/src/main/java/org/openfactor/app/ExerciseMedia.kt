@@ -17,6 +17,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -28,6 +31,17 @@ fun ExerciseMedia(e: Exercise) {
     var playing by rememberSaveable(e.id, selected) { mutableStateOf(false) }
     var failed by remember(e.id, selected) { mutableStateOf(false) }
     val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) playing = false
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+    val installTime = remember {
+        context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime
+    }
     val clip = e.clips.getOrNull(selected)?.takeIf { it.isNotBlank() } ?: e.video
     val uri by
         produceState<Uri?>(null, clip) {
@@ -42,7 +56,7 @@ fun ExerciseMedia(e: Exercise) {
                                 val output =
                                     File(
                                         context.cacheDir,
-                                        "exercise-videos/${clip.substringAfterLast('/')}",
+                                        "exercise-videos/$installTime/${clip.substringAfterLast('/')}",
                                     )
                                 output.parentFile?.mkdirs()
                                 if (!output.exists()) {
@@ -57,6 +71,7 @@ fun ExerciseMedia(e: Exercise) {
                         }
                         .getOrNull()
                 }
+            if (clip != null && value == null) failed = true
         }
     if (e.frames.isEmpty() && clip == null) {
         EmptyContent(

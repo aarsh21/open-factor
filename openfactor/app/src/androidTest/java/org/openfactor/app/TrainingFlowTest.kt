@@ -54,13 +54,36 @@ class TrainingFlowTest {
                     context.assets.open(it).use { stream -> assertTrue(stream.read() >= 0) }
                 }
                 if (e.instructions.isNotBlank()) context.assets.open(e.instructions).close()
+                e.clips.filter { it.isNotBlank() }.forEach { context.assets.open(it).close() }
             }
         } else {
             val baseline =
                 context.assets.open("catalog.json").bufferedReader().use {
                     DataCodec.catalog(it.readText())
                 }
-            assertTrue(baseline.isNotEmpty())
+            assertEquals(1345, baseline.size)
+            assertEquals(1345, baseline.map { it.id }.distinct().size)
+            assertTrue(
+                baseline.all {
+                    it.frames.isEmpty() && it.instructions.isEmpty() && it.video == null
+                }
+            )
         }
+        val equipment = EquipmentCatalog(context)
+        assertEquals(297, equipment.items.size)
+        assertEquals(89, equipment.prefill("commercialGym").size)
+        val bench =
+            (imported
+                    ?: context.assets.open("catalog.json").bufferedReader().use {
+                        DataCodec.catalog(it.readText())
+                    })
+                .single { it.id == "19f5c6f170d8808bb424e98de4472a7e" }
+        assertFalse(equipment.available(bench, GymProfile(name = "Blank")))
+        assertTrue(
+            equipment.available(
+                bench,
+                GymProfile(name = "Everything", equipmentIds = equipment.prefill("everything")),
+            )
+        )
     }
 }

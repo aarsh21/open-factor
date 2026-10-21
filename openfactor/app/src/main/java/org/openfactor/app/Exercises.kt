@@ -40,6 +40,7 @@ fun ExerciseLibrary(
     var query by rememberSaveable { mutableStateOf("") }
     var muscle by rememberSaveable { mutableStateOf("All muscles") }
     var equipment by rememberSaveable { mutableStateOf("All equipment") }
+    var expandedGroups by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var onlyFavorites by rememberSaveable { mutableStateOf(false) }
     var filter by remember { mutableStateOf(false) }
     val filtered =
@@ -67,36 +68,42 @@ fun ExerciseLibrary(
                         (equipment == "All equipment" || equipment == e.equipment) &&
                         (!onlyFavorites || e.id in favorites)
                 }
-                .sortedWith(compareByDescending<Exercise> { it.searchBoost }.thenBy { it.name })
+                .sortedWith(
+                    compareByDescending<Exercise> { it.searchBoost }
+                        .thenBy { it.name.lowercase() }
+                        .thenBy { it.id }
+                )
         }
     val groups =
         remember(filtered) {
+            val order =
+                listOf("Bodyweight & Personal", "Free Weights", "Machines", "Cardio", "Other")
             filtered
-                .groupBy {
-                    when (it.equipment) {
-                        "Bodyweight" -> "Bodyweight & Personal"
-                        "Dumbbell",
-                        "Barbell",
-                        "Kettlebell" -> "Free Weights"
-                        "Cable" -> "Cables"
-                        "Machine",
-                        "Smith Machine" -> "Machines"
-                        "Band" -> "Bands"
-                        else -> "Other Equipment"
-                    }
-                }
-                .toSortedMap(
-                    compareBy {
-                        listOf(
-                                "Bodyweight & Personal",
-                                "Free Weights",
-                                "Machines",
-                                "Cables",
-                                "Bands",
-                                "Other Equipment",
+                .flatMap { e ->
+                    e.browseCategories
+                        .ifEmpty {
+                            listOf(
+                                when (e.equipment) {
+                                    "Bodyweight" -> "Bodyweight & Personal"
+                                    "Dumbbell",
+                                    "Barbell",
+                                    "Kettlebell" -> "Free Weights"
+                                    "Cable",
+                                    "Machine",
+                                    "Smith Machine" -> "Machines"
+                                    else -> "Other"
+                                }
                             )
-                            .indexOf(it)
-                    }
+                        }
+                        .map { it to e }
+                }
+                .groupBy({ it.first }, { it.second })
+                .toList()
+                .sortedWith(
+                    compareByDescending<Pair<String, List<Exercise>>> {
+                            it.second.take(5).sumOf { e -> e.searchBoost }
+                        }
+                        .thenBy { order.indexOf(it.first) }
                 )
         }
     Column(Modifier.fillMaxSize()) {
@@ -245,6 +252,8 @@ fun ExerciseLibrary(
                             muscle = "All muscles"
                             equipment = "All equipment"
                             onlyFavorites = false
+                            type = "All types"
+                            laterality = "All lateralities"
                         },
                     )
                 }
@@ -260,10 +269,24 @@ fun ExerciseLibrary(
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Medium,
                         )
-                        Text("${entries.size}", color = OF.muted, fontSize = 12.sp)
+                        if (entries.size > 8)
+                            TextButton({
+                                expandedGroups =
+                                    if (group in expandedGroups) expandedGroups - group
+                                    else expandedGroups + group
+                            }) {
+                                Text(
+                                    if (group in expandedGroups) "See Less"
+                                    else "See ${entries.size - 5} More",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
                     }
                 }
-                items(entries, key = { it.id }) { e ->
+                items(
+                    if (entries.size > 8 && group !in expandedGroups) entries.take(5) else entries,
+                    key = { "$group-${it.id}" },
+                ) { e ->
                     Row(
                         Modifier.fillMaxWidth()
                             .clickable { onDetail(e.id) }
