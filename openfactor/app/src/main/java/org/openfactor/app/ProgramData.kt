@@ -211,3 +211,18 @@ object ProgramCodec {
         )
     }
 }
+
+/** Scope navigation never writes targets; only an explicit edit may update its selected scope. */
+fun applyCycleTargetEdit(
+    cycles: List<CycleTarget>,
+    scope: Int,
+    target: CycleTarget,
+    edited: Boolean,
+): List<CycleTarget> {
+    if (!edited) return cycles
+    require(scope == -1 || scope in cycles.indices) { "Invalid target scope" }
+    return cycles.mapIndexed { index, old -> if (scope == -1 || scope == index) target else old }
+}
+
+fun List<CycleTarget>.haveEquivalentTargets(): Boolean =
+    map { it.copy(sets = it.sets.map { s -> s.copy(id = "") }) }.distinct().size <= 1

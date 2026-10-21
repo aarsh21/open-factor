@@ -46,7 +46,7 @@ if state().get('programDraft'):
  tap('Discard Draft')
 tap('Create program','content-desc')
 name='Synthetic Program '+str(int(time.time()))
-enter('Name',name);tap('Next');tap('Program color 5','content-desc');tap('Next');find('Rest Day');capture('program-rest')
+enter('Name',name);capture('program-name');tap('Next');tap('Blue program color','content-desc');capture('program-color');tap('Next');find('Rest Day');capture('program-rest')
 tap('Add Day',prefix=True);tap('Add Exercises');tap('Search exercises');adb('shell','input','text','chin-up');adb('shell','input','keyevent','4');tap('Add ','content-desc',prefix=True)
 capture('program-exercise')
 for _ in range(4):
@@ -64,7 +64,24 @@ assert cycles[1]['sets'][0]['repsMin']==8 and cycles[1]['sets'][0]['repsMax']==1
 assert cycles[0]['sets'][0]['repsMin']==6 and cycles[2]['sets'][0]['repsMin']==6
 tap('Rename');enter('Name','Upper');tap('Save');tap('Save to Library');find(name);tap('Activate Program')
 program=next(p for p in state()['programs'] if p['name']==name);assert state()['activeProgramId']==program['id']
-launch();library();find(name);capture('program-library');tap('Cycle 2');tap('Start Upper')
+def targets():
+ for _ in range(4):
+  if any(n.get('text')=='7 Cycles' for n in nodes()):break
+  adb('shell','input','swipe','540','1300','540','700','300')
+ tap('7 Cycles')
+def cycle_data(draft=True):
+ data=state();plan=data['programDraft'] if draft else next(p for p in data['programs'] if p['id']==program['id'])
+ return plan['days'][1]['exercises'][0]['cycles']
+# Differentiate skip/rest in the saved plan, then reopen without modifying it.
+launch();library();find(name);tap('Edit '+name,'content-desc');tap('Upper');targets();tap('Cycle 2');tap('Skip exercise in selected cycles','content-desc');enter('Rest timer override (seconds)','90');tap('Save');tap('Save to Library')
+before=cycle_data(False);assert before[1]['skip'] and before[1]['restSeconds']==90
+launch();library();tap('Edit '+name,'content-desc');tap('Upper');targets();tap('Cycle 2');capture('program-reopened-targets');tap('Save');assert cycle_data()==before
+# All-scope navigation and a no-change Save must preserve every existing cycle.
+targets();tap('7 Cycles');tap('Cycle 3');tap('Save');assert cycle_data()==before
+targets();tap('Save');assert cycle_data()==before
+# Restore this exercise for the selected-cycle workout test.
+targets();tap('Cycle 2');tap('Skip exercise in selected cycles','content-desc');enter('Rest timer override (seconds)','45');tap('Save');tap('Save to Library');capture('program-library');tap('Cycle 2');tap('Start Upper')
+
 w=state()['active'];assert w['programId']==program['id'] and w['programCycle']==1
 s=w['exercises'][0]['sets'][0];assert s['reps']==8 and s['targetRepsMin']==8 and s['targetRepsMax']==12 and s['targetRir']==1 and s.get('rir') is None
 find('Targets');tap('Targets');find('Set 1: 8–12 reps · 1 RIR');capture('program-session-targets');tap('Done');tap('Complete set 1','content-desc',prefix=True)
@@ -72,4 +89,4 @@ w=state()['active'];remaining=(w['restUntil']-int(time.time()*1000))/1000;assert
 capture('program-session');tap('Finish Workout');tap('Finish');find('Workout Complete');capture('program-summary')
 w=state()['history'][0];assert w['programId']==program['id'] and w['exercises'][0]['sets'][0]['completed']
 launch();library();find(name);assert state().get('active') is None
-(a.output/'result.json').write_text(json.dumps({'status':'passed','serial':a.serial,'synthetic_program':name,'draft_targets_seven_cycles':True,'cycle_switch_preserves_edits':True,'library_activation_restart':True,'planned_targets_to_session':True,'exercise_rest_override':True,'completed_program_history':True},indent=2)+'\n');print((a.output/'result.json').read_text())
+(a.output/'result.json').write_text(json.dumps({'status':'passed','serial':a.serial,'synthetic_program':name,'draft_targets_seven_cycles':True,'cycle_switch_preserves_edits':True,'saved_target_reentry_preserved':True,'unchanged_save_preserved':True,'all_scope_navigation_preserved':True,'differentiated_skip_rest_preserved':True,'library_activation_restart':True,'planned_targets_to_session':True,'exercise_rest_override':True,'completed_program_history':True},indent=2)+'\n');print((a.output/'result.json').read_text())

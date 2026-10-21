@@ -206,4 +206,56 @@ class ProgramDataTest {
         val p = TrainingProgram(name = "Invalid")
         DataCodec.decode(DataCodec.encode(AppData(programs = listOf(p, p))))
     }
+
+    @Test
+    fun reopeningAndScopeNavigationWithoutEditsPreserveDifferentiatedTargets() {
+        val first =
+            CycleTarget(listOf(SetTarget(repsMin = 6, repsMax = 10, rir = 2)), restSeconds = 45)
+        val second =
+            CycleTarget(
+                listOf(SetTarget(repsMin = 8, repsMax = 12, rir = 1)),
+                skip = true,
+                restSeconds = 90,
+            )
+        val cycles = List(7) { if (it == 1) second else first }
+        assertFalse(cycles.haveEquivalentTargets())
+        val reopened = applyCycleTargetEdit(cycles, -1, first, edited = false)
+        assertSame(cycles, reopened)
+        assertEquals(cycles, applyCycleTargetEdit(reopened, 1, second, edited = false))
+        assertEquals(cycles, applyCycleTargetEdit(reopened, 2, first, edited = false))
+        val p =
+            TrainingProgram(
+                name = "Training",
+                days =
+                    listOf(
+                        ProgramDay(
+                            exercises =
+                                listOf(PlannedExercise(exerciseId = "press", cycles = reopened))
+                        )
+                    ),
+            )
+        assertEquals(
+            cycles,
+            ProgramCodec.decode(ProgramCodec.encode(p)).days.single().exercises.single().cycles,
+        )
+    }
+
+    @Test
+    fun intentionalSingleCycleAndAllCycleEditsHaveDistinctScopes() {
+        val first = CycleTarget(listOf(SetTarget(repsMin = 6, repsMax = 10)), restSeconds = 45)
+        val changed =
+            CycleTarget(
+                listOf(SetTarget(repsMin = 8, repsMax = 12, rir = 1)),
+                skip = true,
+                restSeconds = 90,
+            )
+        val cycles = List(7) { first }
+        val single = applyCycleTargetEdit(cycles, 1, changed, edited = true)
+        assertEquals(changed, single[1])
+        assertEquals(first, single[0])
+        assertEquals(first, single[2])
+        val all = applyCycleTargetEdit(single, -1, changed, edited = true)
+        assertTrue(all.all { it == changed })
+        assertTrue(all.haveEquivalentTargets())
+    }
 }

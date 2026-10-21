@@ -5,6 +5,8 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -14,10 +16,16 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -167,6 +175,27 @@ fun ProgramLibrary(
 }
 
 @Composable
+private fun ProgramHeader(title: String, onBack: () -> Unit, onSettings: (() -> Unit)? = null) {
+    Box(Modifier.fillMaxWidth().height(56.dp).background(OF.top)) {
+        IconButton(onBack, Modifier.align(Alignment.CenterStart)) {
+            Icon(Icons.Rounded.ChevronLeft, "Back")
+        }
+        Text(
+            title,
+            Modifier.align(Alignment.Center).padding(horizontal = 56.dp),
+            fontSize = 20.sp,
+            fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+        )
+        if (onSettings != null)
+            IconButton(onSettings, Modifier.align(Alignment.CenterEnd)) {
+                Icon(Icons.Rounded.Tune, "Program settings")
+            }
+    }
+}
+
+@Composable
 fun ProgramSetup(
     program: TrainingProgram,
     vm: WorkoutViewModel,
@@ -177,7 +206,7 @@ fun ProgramSetup(
     var name by rememberSaveable(program.id) { mutableStateOf(program.name) }
     BackHandler { if (step == 1) step = 0 else onBack() }
     Column(Modifier.fillMaxSize().background(OF.top).imePadding()) {
-        PageHeading("Create Program", { if (step == 1) step = 0 else onBack() })
+        ProgramHeader("Create Program", { if (step == 1) step = 0 else onBack() })
         LinearProgressIndicator(
             progress = { if (step == 0) .5f else .85f },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
@@ -230,7 +259,10 @@ private fun ProgramColorChoices(selected: Long, onSelect: (Long) -> Unit) {
                 border = if (selected == color) BorderStroke(3.dp, Color.White) else null,
                 modifier =
                     Modifier.size(48.dp).semantics {
-                        contentDescription = "Program color ${index + 1}"
+                        contentDescription =
+                            "${listOf("Red", "Orange", "Amber", "Green", "Blue", "Purple", "Teal")[index]} program color"
+                        this.selected = selected == color
+                        role = Role.RadioButton
                     },
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -284,11 +316,7 @@ fun ProgramEditor(
             plan.copy(days = plan.days.map { if (it.id == day.id) block(it) else it })
         }
     Column(Modifier.fillMaxSize().background(OF.top)) {
-        PageHeading(
-            "Create Program",
-            onBack,
-            actions = { RoundAction(Icons.Rounded.Tune, "Program settings", { options = true }) },
-        )
+        ProgramHeader("Create Program", onBack, { options = true })
         ScrollableTabRow(
             p.days.indexOf(day),
             edgePadding = 0.dp,
@@ -395,11 +423,22 @@ fun ProgramEditor(
                         color = OF.top,
                         border = BorderStroke(1.dp, OF.line),
                     ) {
-                        Text(
-                            "You can convert the rest day into a workout day by adding exercises below",
-                            Modifier.padding(18.dp),
-                            color = OF.muted,
-                        )
+                        Row(
+                            Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Rounded.BeachAccess,
+                                null,
+                                Modifier.size(44.dp),
+                                tint = OF.line,
+                            )
+                            Text(
+                                "You can convert the rest day into a workout day by adding exercises below",
+                                Modifier.padding(start = 16.dp),
+                                color = OF.muted,
+                            )
+                        }
                     }
                 }
             if (day.exercises.isNotEmpty())
@@ -410,11 +449,31 @@ fun ProgramEditor(
                             Modifier.weight(1f),
                             style = MaterialTheme.typography.titleLarge,
                         )
-                        TextButton({ cycleMuscles = false }) {
-                            Text("Day", color = if (!cycleMuscles) Color.White else OF.muted)
-                        }
-                        TextButton({ cycleMuscles = true }) {
-                            Text("Cycle", color = if (cycleMuscles) Color.White else OF.muted)
+                        Row(
+                            Modifier.clip(RoundedCornerShape(8.dp))
+                                .background(OF.background)
+                                .padding(3.dp)
+                                .selectableGroup()
+                        ) {
+                            listOf("Day", "Cycle").forEachIndexed { index, label ->
+                                val selected = cycleMuscles == (index == 1)
+                                Box(
+                                    Modifier.clip(RoundedCornerShape(6.dp))
+                                        .background(
+                                            if (selected) Color.White else Color.Transparent
+                                        )
+                                        .selectable(
+                                            selected,
+                                            role = Role.Tab,
+                                            onClick = { cycleMuscles = index == 1 },
+                                        )
+                                        .heightIn(min = 48.dp)
+                                        .padding(horizontal = 14.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(label, color = if (selected) Color.Black else Color.White)
+                                }
+                            }
                         }
                     }
                     val included =
@@ -466,14 +525,20 @@ fun ProgramEditor(
                     }
                 }
             item {
-                SectionTitle(
-                    "${day.exercises.size} ${if (day.exercises.size == 1) "Exercise" else "Exercises"}",
-                    "Add Exercises",
-                    { onPick(day.id) },
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "${day.exercises.size} ${if (day.exercises.size == 1) "Exercise" else "Exercises"}",
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    TextButton({ onPick(day.id) }) {
+                        Text("Add Exercises", textDecoration = TextDecoration.Underline)
+                    }
+                }
             }
             items(day.exercises, key = { it.id }) { planned ->
                 val e = exercises.find { it.id == planned.exerciseId }
+                var exerciseMenu by remember(planned.id) { mutableStateOf(false) }
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (e != null) ExerciseImage(e, Modifier.size(56.dp))
@@ -482,21 +547,72 @@ fun ProgramEditor(
                                 e?.title ?: "Exercise",
                                 style = MaterialTheme.typography.titleMedium,
                             )
-                            Text(
-                                e?.muscles?.joinToString(", ") ?: "",
-                                color = OF.muted,
-                                fontSize = 12.sp,
-                            )
+                            Row(
+                                Modifier.horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                (e?.muscles.orEmpty() + e?.secondary.orEmpty())
+                                    .distinct()
+                                    .forEach { muscle ->
+                                        val primary = muscle in e?.muscles.orEmpty()
+                                        Surface(
+                                            color = if (primary) OF.elevated else Color.Transparent,
+                                            shape = RoundedCornerShape(3.dp),
+                                            border =
+                                                if (primary) null else BorderStroke(1.dp, OF.line),
+                                        ) {
+                                            Text(
+                                                muscle,
+                                                Modifier.padding(
+                                                    horizontal = 5.dp,
+                                                    vertical = 2.dp,
+                                                ),
+                                                fontSize = 13.sp,
+                                            )
+                                        }
+                                    }
+                            }
                         }
-                        IconButton({
-                            editDay {
-                                it.copy(
-                                    exercises =
-                                        it.exercises.filterNot { item -> item.id == planned.id }
+                        Box {
+                            IconButton({ exerciseMenu = true }) {
+                                Icon(
+                                    Icons.Rounded.MoreVert,
+                                    "Exercise options for ${e?.name ?: "exercise"}",
                                 )
                             }
-                        }) {
-                            Icon(Icons.Rounded.Close, "Remove ${e?.name ?: "exercise"}")
+                            DropdownMenu(exerciseMenu, { exerciseMenu = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Remove Exercise") },
+                                    onClick = {
+                                        editDay {
+                                            it.copy(
+                                                exercises =
+                                                    it.exercises.filterNot { item ->
+                                                        item.id == planned.id
+                                                    }
+                                            )
+                                        }
+                                        exerciseMenu = false
+                                    },
+                                )
+                                listOf(-1 to "Move Up", 1 to "Move Down").forEach { (delta, label)
+                                    ->
+                                    val index = day.exercises.indexOf(planned)
+                                    DropdownMenuItem(
+                                        text = { Text(label) },
+                                        enabled = index + delta in day.exercises.indices,
+                                        onClick = {
+                                            editDay { d ->
+                                                val list = d.exercises.toMutableList()
+                                                val item = list.removeAt(index)
+                                                list.add(index + delta, item)
+                                                d.copy(exercises = list)
+                                            }
+                                            exerciseMenu = false
+                                        },
+                                    )
+                                }
+                            }
                         }
                     }
                     Spacer(Modifier.height(10.dp))
@@ -662,7 +778,11 @@ private fun ProgramTargets(
     onSave: (List<CycleTarget>) -> Unit,
 ) {
     var pending by remember(e.id) { mutableStateOf(e.cycles) }
-    var cycle by rememberSaveable { mutableIntStateOf(-1) }
+    var cycle by
+        rememberSaveable(e.id) {
+            mutableIntStateOf(if (e.cycles.haveEquivalentTargets()) -1 else 0)
+        }
+    var edited by remember(cycle) { mutableStateOf(false) }
     var rows by
         remember(cycle) {
             mutableStateOf(
@@ -687,9 +807,7 @@ private fun ProgramTargets(
             (rest.isEmpty() || (rest.toIntOrNull() ?: -1) in 0..1800)
     fun committed(): List<CycleTarget> {
         val changed = CycleTarget(rows.map { it.target() }, skip, rest.toIntOrNull())
-        return pending.mapIndexed { index, old ->
-            if (cycle == -1 || cycle == index) changed else old
-        }
+        return applyCycleTargetEdit(pending, cycle, changed, edited)
     }
     fun selectCycle(next: Int) {
         if (valid) {
@@ -705,7 +823,18 @@ private fun ProgramTargets(
         Column(
             Modifier.fillMaxWidth().fillMaxHeight(.9f).imePadding().padding(horizontal = 18.dp)
         ) {
-            Text(name, style = MaterialTheme.typography.headlineSmall)
+            Text(
+                name,
+                Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp),
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                if (cycle == -1) "${e.cycles.size} Cycles" else "Cycle ${cycle + 1}",
+                Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                textAlign = TextAlign.Center,
+                color = OF.muted,
+            )
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -725,6 +854,12 @@ private fun ProgramTargets(
                     )
                 }
             }
+            if (cycle == -1 && !pending.haveEquivalentTargets())
+                Text(
+                    "Cycles have different targets. Edits here apply to all cycles.",
+                    color = OF.muted,
+                    fontSize = 12.sp,
+                )
             Column(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -754,6 +889,7 @@ private fun ProgramTargets(
                                     DropdownMenuItem(
                                         text = { Text("Remove Set") },
                                         onClick = {
+                                            edited = true
                                             rows = rows.filterNot { it.id == input.id }
                                             menu = false
                                         },
@@ -761,27 +897,44 @@ private fun ProgramTargets(
                                 }
                             }
                             fun replace(changed: TargetInput) {
+                                edited = true
                                 rows = rows.map { if (it.id == input.id) changed else it }
                             }
-                            OutlinedTextField(
+                            TextField(
                                 input.min,
                                 { replace(input.copy(min = it)) },
                                 Modifier.weight(1f).semantics {
                                     contentDescription = "Target set ${index + 1} minimum reps"
                                 },
                                 placeholder = { Text("Optional", fontSize = 11.sp) },
+                                shape = RoundedCornerShape(8.dp),
+                                colors =
+                                    TextFieldDefaults.colors(
+                                        focusedContainerColor = OF.elevated,
+                                        unfocusedContainerColor = OF.elevated,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                    ),
                                 singleLine = true,
                                 isError = !input.valid(),
                                 keyboardOptions =
                                     KeyboardOptions(keyboardType = KeyboardType.Number),
                             )
-                            OutlinedTextField(
+                            TextField(
                                 input.max,
                                 { replace(input.copy(max = it)) },
                                 Modifier.weight(1f).semantics {
                                     contentDescription = "Target set ${index + 1} maximum reps"
                                 },
                                 placeholder = { Text("Optional", fontSize = 11.sp) },
+                                shape = RoundedCornerShape(8.dp),
+                                colors =
+                                    TextFieldDefaults.colors(
+                                        focusedContainerColor = OF.elevated,
+                                        unfocusedContainerColor = OF.elevated,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                    ),
                                 singleLine = true,
                                 isError = !input.valid(),
                                 keyboardOptions =
@@ -801,17 +954,32 @@ private fun ProgramTargets(
                         }
                     }
                 }
-                TextButton({ rows = rows + TargetInput(newId()) }) {
+                TextButton({
+                    edited = true
+                    rows = rows + TargetInput(newId())
+                }) {
                     Icon(Icons.Rounded.Add, null)
                     Text(" Add Set")
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Skip Exercise", Modifier.weight(1f))
-                    Switch(skip, { skip = it })
+                    Switch(
+                        skip,
+                        {
+                            edited = true
+                            skip = it
+                        },
+                        Modifier.semantics {
+                            contentDescription = "Skip exercise in selected cycles"
+                        },
+                    )
                 }
                 OutlinedTextField(
                     rest,
-                    { rest = it },
+                    {
+                        edited = true
+                        rest = it
+                    },
                     Modifier.fillMaxWidth(),
                     label = { Text("Rest timer override (seconds)") },
                     supportingText = { Text("Leave empty to use your workout rest timer") },
