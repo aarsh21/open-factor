@@ -1,6 +1,6 @@
 # Open Factor
 
-An open source Android workout tracker built in a GPLv3 fork of [NuvioMobile](https://github.com/NuvioMedia/NuvioMobile). Open Factor takes its floating navigation and grouped settings from Nuvio. Workout screens and behavior are being reconstructed from an explicitly supplied reference application.
+An independently maintained open source Android workout tracker. Open Factor uses [NuvioMobile](https://github.com/NuvioMedia/NuvioMobile) as its base, with Nuvio-derived floating navigation and grouped settings. Workout screens and behavior are being reconstructed from an explicitly supplied reference application.
 
 **Development status:** a working training foundation, not yet a complete one-to-one replacement. Original exercise-video acquisition is deferred to a future phone-assisted pass; automated programming, body metrics and complete visual/interaction parity remain unfinished. Gym profiles and Levels have partial local implementations. See [the investigation ledger](docs/open-factor/INVESTIGATION.md).
 
@@ -57,6 +57,8 @@ The deferred phone-assisted media task is recorded in [TODO.md](docs/open-factor
 
 The importer never fetches remote content, executes the APK, or publishes imported files. Do not describe imported proprietary content as GPL-licensed. See [asset provenance](docs/open-factor/ASSETS.md).
 
-## Upstream and license
+## Credits and license
 
-Code is [GPLv3](LICENSE), preserving Nuvio's license and attribution. The original media implementation remains in `composeApp/`, `androidApp/`, and `iosApp/`; [the original upstream README](docs/upstream/NUVIO-README.md) documents those targets. Open Factor's Android entry point is `openfactor/app/`.
+Thanks to **[NuvioMedia and the NuvioMobile contributors](https://github.com/NuvioMedia/NuvioMobile)** for the base application and the navigation/settings foundation. See [CREDITS.md](CREDITS.md).
+
+Code remains [GPLv3](LICENSE), preserving Nuvio's license, copyright notices and attribution. The original media implementation remains in `composeApp/`, `androidApp/`, and `iosApp/`; [the original upstream README](docs/upstream/NUVIO-README.md) documents those targets. Open Factor's Android entry point is `openfactor/app/`.

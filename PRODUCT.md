@@ -8,7 +8,7 @@ android
 
 ## Stack
 
-A GPLv3 fork of NuvioMedia/NuvioMobile. The Android workout application uses Kotlin and Jetpack Compose, matching the base project's technology. The upstream media application is retained as reference; Open Factor builds separately to avoid requiring streaming services, media engines, or their credentials.
+An independently maintained GPLv3 project based on NuvioMedia/NuvioMobile, with base-app credits and original license notices retained. The Android workout application uses Kotlin and Jetpack Compose, matching the base project's technology. The upstream media application is retained as reference; Open Factor builds separately to avoid requiring streaming services, media engines, or their credentials.
 
 ## Product Purpose
 
