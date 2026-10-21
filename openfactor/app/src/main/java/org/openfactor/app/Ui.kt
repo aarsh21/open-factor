@@ -72,7 +72,7 @@ object OF {
     val display=remember { runCatching { FontFamily(Typeface.createFromAsset(context.assets,"reference/fonts/MacroSans-VF.ttf")) }.getOrDefault(FontFamily.SansSerif) }
     Row(Modifier.fillMaxWidth().background(OF.top).padding(horizontal=18.dp,vertical=16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
         if(back!=null) IconButton(back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack,"Back") }
-        Text(title,Modifier.weight(1f),fontFamily=display,fontSize=if(back==null) 25.sp else 20.sp,fontWeight=FontWeight.Bold,maxLines=2)
+        Text(title,Modifier.weight(1f),fontFamily=if(back==null)display else MaterialTheme.typography.titleLarge.fontFamily,fontSize=if(back==null) 25.sp else 20.sp,fontWeight=FontWeight.Bold,maxLines=2)
         actions()
     }
 }
@@ -107,4 +107,14 @@ object OF {
 @Composable fun NameDialog(title:String,initial:String="",onDismiss:()->Unit,onSave:(String)->Unit) {
     var name by remember { mutableStateOf(initial) }
     AlertDialog(onDismissRequest=onDismiss,title={Text(title)},text={OutlinedTextField(name,{name=it},label={Text("Name")},singleLine=true)},confirmButton={TextButton({onSave(name.trim())},enabled=name.isNotBlank()){Text("Save")}},dismissButton={TextButton(onDismiss){Text("Cancel")}})
+}
+
+@Composable fun MuscleImage(muscle:String,modifier:Modifier=Modifier) {
+    val path=muscle.lowercase().replace(' ','_')
+    val context=LocalContext.current
+    val exists=remember(path) {runCatching {context.assets.open("reference/muscle_groups/male/$path.svg").close();true}.getOrDefault(false)}
+    Box(modifier.clip(RoundedCornerShape(10.dp)).background(OF.elevated),contentAlignment=Alignment.Center) {
+        if(exists) AsyncImage("file:///android_asset/reference/muscle_groups/male/$path.svg",muscle,Modifier.fillMaxSize())
+        else Icon(Icons.Rounded.AccessibilityNew,null,Modifier.size(40.dp),tint=OF.muted)
+    }
 }

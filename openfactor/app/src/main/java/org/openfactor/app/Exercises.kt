@@ -30,28 +30,46 @@ import kotlinx.coroutines.delay
     var equipment by rememberSaveable {mutableStateOf("All equipment")}
     var onlyFavorites by rememberSaveable {mutableStateOf(false)}
     var filter by remember {mutableStateOf(false)}
-    val filtered=remember(exercises,query,muscle,equipment,onlyFavorites,favorites) {exercises.filter {e -> (query.isBlank() || e.name.contains(query,true)) && (muscle=="All muscles" || muscle==e.muscle) && (equipment=="All equipment" || equipment==e.equipment) && (!onlyFavorites || e.id in favorites)}.sortedBy {it.name}}
+    val filtered=remember(exercises,query,muscle,equipment,onlyFavorites,favorites) {
+        exercises.filter {e -> (query.isBlank() || e.name.contains(query,true) || e.aliases.any {it.contains(query,true)}) &&
+            (muscle=="All muscles" || muscle in e.muscles) && (equipment=="All equipment" || equipment==e.equipment) && (!onlyFavorites || e.id in favorites)}.sortedBy {it.name}
+    }
+    val groups=remember(filtered) {filtered.groupBy {when(it.equipment){"Bodyweight"->"Bodyweight & Personal";"Dumbbell","Barbell","Kettlebell"->"Free Weights";"Cable"->"Cables";"Machine","Smith Machine"->"Machines";"Band"->"Bands";else->"Other Equipment"}}.toSortedMap(compareBy {listOf("Bodyweight & Personal","Free Weights","Machines","Cables","Bands","Other Equipment").indexOf(it)})}
     Column(Modifier.fillMaxSize()) {
         PageHeading(if(picking)"Add Exercise" else "Exercises",onBack,actions={RoundAction(Icons.Rounded.Add,"Create custom exercise",onCustom)})
-        OutlinedTextField(query,{query=it},Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=10.dp),placeholder={Text("Search exercises")},leadingIcon={Icon(Icons.Rounded.Search,null)},trailingIcon={if(query.isNotEmpty())IconButton({query=""}){Icon(Icons.Rounded.Close,"Clear search")}},singleLine=true,shape=RoundedCornerShape(50))
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal=18.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            FilterChip(filter || muscle!="All muscles" || equipment!="All equipment",{filter=!filter},label={Text("Filters")},leadingIcon={Icon(Icons.Rounded.Tune,null,Modifier.size(18.dp))})
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal=18.dp,vertical=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            FilterChip(filter || equipment!="All equipment",{filter=!filter},label={Text(if(equipment=="All equipment")"Everything Gym" else equipment)},leadingIcon={Icon(Icons.Rounded.Tune,null,Modifier.size(18.dp))})
             FilterChip(onlyFavorites,{onlyFavorites=!onlyFavorites},label={Text("Favorites")},leadingIcon={Icon(Icons.Rounded.Star,null,Modifier.size(18.dp))})
-            if(muscle!="All muscles") InputChip(true,{muscle="All muscles"},label={Text(muscle)},trailingIcon={Icon(Icons.Rounded.Close,null,Modifier.size(14.dp))})
-            if(equipment!="All equipment") InputChip(true,{equipment="All equipment"},label={Text(equipment)},trailingIcon={Icon(Icons.Rounded.Close,null,Modifier.size(14.dp))})
+            if(muscle!="All muscles") InputChip(true,{muscle="All muscles"},label={Text("Clear $muscle")},trailingIcon={Icon(Icons.Rounded.Close,null,Modifier.size(14.dp))})
         }
-        if(filter) Column(Modifier.padding(horizontal=18.dp)) {FilterChooser("Muscle group",listOf("All muscles")+exercises.map {it.muscle}.distinct().sorted(),muscle){muscle=it};FilterChooser("Equipment",listOf("All equipment")+exercises.map {it.equipment}.distinct().sorted(),equipment){equipment=it}}
-        Text("${filtered.size} exercises",Modifier.padding(horizontal=20.dp,vertical=10.dp),color=OF.muted,style=MaterialTheme.typography.labelLarge)
+        if(filter) Column(Modifier.padding(horizontal=18.dp)) {FilterChooser("Muscle group",listOf("All muscles")+exercises.flatMap {it.muscles}.distinct().sorted(),muscle){muscle=it};FilterChooser("Equipment",listOf("All equipment")+exercises.map {it.equipment}.distinct().sorted(),equipment){equipment=it}}
+        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal=14.dp,vertical=6.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            val muscles=listOf("Chest","Quads","Upper Back","Glutes","Lats","Biceps","Triceps","Hamstrings","Abs","Calves","Side Delts")
+            muscles.forEach {m->Column(Modifier.width(72.dp).clickable {muscle=if(muscle==m)"All muscles" else m},horizontalAlignment=Alignment.CenterHorizontally) {
+                Box(Modifier.border(if(muscle==m)2.dp else 1.dp,if(muscle==m)Color.White else OF.line,RoundedCornerShape(10.dp))) {MuscleImage(m,Modifier.size(72.dp))}
+                Text(m,Modifier.padding(top=4.dp),fontSize=12.sp,maxLines=1,color=if(muscle==m)Color.White else OF.muted)
+            }}
+        }
         LazyColumn(Modifier.weight(1f),contentPadding=PaddingValues(horizontal=18.dp,vertical=2.dp)) {
             if(filtered.isEmpty()) item {EmptyContent(Icons.Rounded.SearchOff,"No exercises found","Try a different name or clear your filters.","Clear Filters",{query="";muscle="All muscles";equipment="All equipment";onlyFavorites=false})}
-            items(filtered,key={it.id}) {e->
-                Row(Modifier.fillMaxWidth().clickable {if(picking && onPick!=null)onPick(e.id) else onDetail(e.id)}.padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                    ExerciseImage(e,Modifier.size(64.dp))
-                    Column(Modifier.weight(1f)) {Text(e.name,style=MaterialTheme.typography.bodyLarge,fontWeight=FontWeight.Medium,maxLines=2,overflow=TextOverflow.Ellipsis);Text("${e.muscle} · ${e.equipment}",color=OF.muted,fontSize=12.sp,maxLines=2)}
-                    IconButton({if(picking && onPick!=null)onDetail(e.id) else onFavorite(e.id)}) {Icon(if(picking) Icons.Rounded.Info else if(e.id in favorites)Icons.Rounded.Star else Icons.Rounded.StarOutline,if(picking)"Exercise details" else if(e.id in favorites)"Remove favorite" else "Favorite exercise",tint=if(e.id in favorites)OF.purple else OF.muted)}
+            groups.forEach {(group,entries)->
+                item(key="group-$group") {Row(Modifier.fillMaxWidth().padding(top=14.dp,bottom=6.dp),verticalAlignment=Alignment.CenterVertically) {Text(group,Modifier.weight(1f),fontSize=17.sp,fontWeight=FontWeight.Medium);Text("${entries.size}",color=OF.muted,fontSize=12.sp)}}
+                items(entries,key={it.id}) {e->
+                    Row(Modifier.fillMaxWidth().clickable {onDetail(e.id)}.padding(vertical=14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
+                        ExerciseImage(e,Modifier.width(46.dp).height(62.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(e.name,style=MaterialTheme.typography.bodyLarge,fontWeight=FontWeight.Medium,maxLines=2,overflow=TextOverflow.Ellipsis)
+                            Text(e.muscles.joinToString(", ")+if(e.secondary.isNotEmpty())" • "+e.secondary.joinToString(", ") else "",color=OF.muted,fontSize=14.sp,lineHeight=21.sp,maxLines=3,overflow=TextOverflow.Ellipsis)
+                        }
+                        RoundAction(if(picking)Icons.Rounded.Add else if(e.id in favorites)Icons.Rounded.Star else Icons.Rounded.StarOutline,if(picking)"Add ${e.name}" else "Favorite ${e.name}") {if(picking && onPick!=null)onPick(e.id) else onFavorite(e.id)}
+                    }
+                    HorizontalDivider(Modifier.padding(start=60.dp),color=OF.line.copy(alpha=0.5f))
                 }
-                HorizontalDivider(color=OF.line.copy(alpha=0.5f))
             }
+        }
+        Row(Modifier.fillMaxWidth().background(OF.top).imePadding().padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(query,{query=it},Modifier.weight(1f),placeholder={Text("Search exercises")},leadingIcon={Icon(Icons.Rounded.Search,null)},trailingIcon={if(query.isNotEmpty())IconButton({query=""}){Icon(Icons.Rounded.Close,"Clear search")}},singleLine=true,shape=RoundedCornerShape(50))
+            if(picking && onBack!=null)Button(onBack,shape=RoundedCornerShape(50)){Text("Done")}
         }
     }
 }
@@ -59,6 +77,7 @@ import kotlinx.coroutines.delay
     var expanded by remember {mutableStateOf(false)}
     Box {TextButton({expanded=true}){Text("$title: $selected");Icon(Icons.Rounded.ExpandMore,null)};DropdownMenu(expanded,{expanded=false}) {values.forEach {v->DropdownMenuItem(text={Text(v)},onClick={expanded=false;onSelect(v)})}}}
 }
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable fun ExerciseDetail(e:Exercise,data:AppData,vm:WorkoutViewModel,onBack:()->Unit,onAdd:()->Unit) {
     var tab by rememberSaveable {mutableIntStateOf(0)}
     var frame by rememberSaveable(e.id) {mutableIntStateOf(0)}
@@ -68,7 +87,7 @@ import kotlinx.coroutines.delay
     LaunchedEffect(playing,e.id) {while(playing && e.frames.size>1) {delay(1100);frame=(frame+1)%e.frames.size}}
     Column(Modifier.fillMaxSize()) {
         PageHeading(e.name,onBack,actions={IconButton({vm.favorite(e.id)}){Icon(if(e.id in data.favorites)Icons.Rounded.Star else Icons.Rounded.StarOutline,"Toggle favorite")}})
-        SecondaryTabRow(tab,containerColor=OF.top) {listOf("Overview","Instructions","History").forEachIndexed {i,s->Tab(tab==i,{tab=i},text={Text(s)})}}
+        SecondaryTabRow(tab,containerColor=OF.top) {listOf("Instructions","Details","History").forEachIndexed {i,s->Tab(tab==i,{tab=i},text={Text(s)})}}
         LazyColumn(Modifier.weight(1f),contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
             if(tab==0) {
                 item {
@@ -83,12 +102,27 @@ import kotlinx.coroutines.delay
                         }
                     } else EmptyContent(Icons.Rounded.FitnessCenter,"${e.equipment} exercise","No demonstration is installed for this exercise.")
                 }
-                item {SectionTitle("Muscle Groups");Text(e.muscle,style=MaterialTheme.typography.titleMedium);if(e.secondary.isNotEmpty())Text(e.secondary.joinToString(", "),color=OF.muted)}
-                item {SectionTitle("Equipment");Text(e.equipment,style=MaterialTheme.typography.bodyLarge)}
-                item {SectionTitle("Exercise Details");Text(if(instructions.isBlank())"Add your own technique notes in a workout, or import the exercise reference pack." else descriptionSection(instructions),color=OF.muted,style=MaterialTheme.typography.bodyLarge)}
+                if(instructions.isNotBlank()) markdownItems(instructions).forEach { (heading,text) -> item {
+                    if(heading!=null) Text(heading,style=MaterialTheme.typography.titleLarge)
+                    else Text(text,style=MaterialTheme.typography.bodyLarge,color=OF.muted)
+                }}
             } else if(tab==1) {
-                if(instructions.isBlank())item{EmptyContent(Icons.Rounded.Notes,"No instructions installed","This exercise can still be added and logged.")}
-                else markdownItems(instructions).forEach {(heading,text)->item {if(heading!=null)Text(heading,style=MaterialTheme.typography.titleLarge) else Text(text,style=MaterialTheme.typography.bodyLarge,color=OF.muted)}}
+                item {SectionTitle("Target Muscles")}
+                item {Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                    (e.muscles+e.secondary).distinct().forEach {m -> Column(horizontalAlignment=Alignment.CenterHorizontally) {
+                        MuscleImage(m,Modifier.size(110.dp))
+                        Text(m,style=MaterialTheme.typography.titleMedium)
+                        Text(if(m in e.muscles) "Primary" else "Secondary",color=OF.muted,fontSize=12.sp)
+                    }}
+                }}
+                if(e.properties.isNotEmpty()) item {SectionTitle("Properties");Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceAround) {
+                    listOf("Range of Motion","Stability").forEach {p->Column(horizontalAlignment=Alignment.CenterHorizontally){Text(p,color=OF.muted);Text("${e.properties[p] ?: "–"}/5",style=MaterialTheme.typography.headlineMedium)}}
+                }}
+                item {SectionTitle("Resistance Equipment");Text(e.equipmentOptions.ifEmpty {listOf(e.equipment)}.joinToString(", "),style=MaterialTheme.typography.bodyLarge)}
+                item {SectionTitle("Details");if(e.aliases.isNotEmpty()){Text("Alternative Names",color=OF.muted);Text(e.aliases.joinToString(", "),Modifier.padding(bottom=12.dp))}
+                    e.properties.filterKeys {it !in listOf("Range of Motion","Stability")}.forEach {(label,value)->Text(label,color=OF.muted);Text(value,Modifier.padding(bottom=12.dp))}
+                    Text("Body Weight Contribution",color=OF.muted);Text("${(e.bodyweight*100).toInt()}%")
+                }
             } else {
                 val history=data.history.filter {w->w.exercises.any {it.exerciseId==e.id}}
                 if(history.isEmpty())item{EmptyContent(Icons.Rounded.History,"No exercise history","Completed sets will appear here after your first workout.")}

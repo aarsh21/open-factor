@@ -37,3 +37,43 @@ Optional Ghidra/Hopper/IDA/JADX/Kuna engines are absent. The base APK contains n
 ## Parity status
 
 Every unobserved flow remains unverified. No one-to-one completeness claim is made at this stage. Update this ledger as screens and behavior are captured.
+
+## Catalog recovery and runtime update
+
+The packaged import member `assets/flutter_assets/packages/macrofactor/assets/import/app_file.json` provides 1,345 unique exercise records and a 5,301-entry UUID index. It resolves all exercise metadata references, including 297 equipment entities, 35 resistance equipment groups and 53 support equipment groups. Its SHA-256 is `65f1d2450e6a3c01542210705b929cf4c9544af1cadfd6374474fd1633c1e00f`.
+
+Exact ID joins resolve images for 619 exercises and instructions for 1,213. The local import retains complete raw metadata and equipment/group structures; the UI projection exposes aliases, muscles, equipment and biomechanical properties. Available still images and instructions are loaded locally. Video retrieval remains unresolved.
+
+After the user signed in, runtime captures established:
+
+- Main areas: Dashboard, Workout, central Shortcuts action, Levels, More.
+- Dashboard: weekly muscles/sets/exercise targets; active-program/all-workout scopes; insights/analytics, habits and body metrics.
+- Workout: weekly calendar, active program, workout library, program blocks, rest days and muscle labels.
+- Shortcuts: Weight, Photos, Metrics, History, Up Next, Empty Workout, New Program, New Workout.
+- More: Account, Subscription, Integrations, Units, Language, Dashboard/Workout/Weight Trend/Exercises settings, Gym Profiles, Theme, Data Export, Data Visibility, Account & Data Deletion, Community & Support, Other.
+- Create Workout: scratch/XLSX import, name, gym, target muscles and exercise selection, save-to-library.
+- Exercise selection: equipment/type/laterality filters, muscle-image filters, categorized exercise list, search, add, supersets.
+- Exercise detail: Instructions/Details/History tabs; camera-angle thumbnails; technique sections; target muscle cards, range-of-motion/stability values, resistance equipment, alternative names, type, bodyweight contribution, metrics, laterality and joint actions.
+
+These screenshots remain private because they include a signed-in personal account. A temporary creation wizard was inspected without saving a new workout to the source account; restarting the source application returned to Dashboard.
+
+## Implementation parity matrix
+
+| Surface or behavior | Status |
+| --- | --- |
+| Nuvio-derived capsule navigation and settings grouping | Implemented; device visual review pending |
+| 1,345-entry reference catalog and available local images/instructions | Implemented through ignored local import |
+| Basic exercise search, aliases, muscles/equipment, favorites | Implemented; source filter set is broader |
+| Exercise properties, target muscles and available media | Partial; videos and exact source media layout pending |
+| Local workout templates and custom exercises | Implemented; source creation wizard/XLSX flow not yet matched |
+| Weight/reps/RIR, warm-ups, notes, rest timer | Implemented; source logging layout and full set options pending |
+| Workout completion, history and repeat | Implemented; records/summary parity pending |
+| Units and JSON backup/restore | Implemented; source export formats differ |
+| Dashboard | Partial; source customization and full metrics pending |
+| Program builder, periodization, automatic progression | Pending |
+| Gym profiles and equipment customization | Pending |
+| Weight, photos and body metrics | Pending |
+| Levels and game | Pending |
+| Health Connect, remote sync, localization | Pending |
+
+No complete-clone claim is supported by the current state.

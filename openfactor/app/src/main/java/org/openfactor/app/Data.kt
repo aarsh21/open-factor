@@ -23,6 +23,11 @@ data class Exercise(
     val instructions: String = "",
     val video: String? = null,
     val custom: Boolean = false,
+    val muscles: List<String> = listOf(muscle),
+    val aliases: List<String> = emptyList(),
+    val equipmentOptions: List<String> = emptyList(),
+    val properties: Map<String,String> = emptyMap(),
+    val bodyweight: Double = 0.0,
 )
 data class LoggedSet(val id: String = newId(), val weightKg: Double = 0.0, val reps: Int = 8, val rir: Int? = null, val completed: Boolean = false, val warmup: Boolean = false)
 data class SessionExercise(val id: String = newId(), val exerciseId: String, val sets: List<LoggedSet> = listOf(LoggedSet(), LoggedSet(), LoggedSet()), val notes: String = "")
@@ -65,7 +70,15 @@ object DataCodec {
             j.array("customExercises").objects().map { Exercise(it.getString("id"),it.getString("name"),it.getString("muscle"),it.getString("equipment"),instructions=it.optString("instructions"),custom=true) },
             Preferences(p.optBoolean("pounds"),p.optInt("restSeconds",120).coerceIn(0,1800),p.optBoolean("autoRest",true),p.optBoolean("showRir",true),p.optString("displayName","Athlete")))
     }
-    fun catalog(text: String): List<Exercise> = JSONArray(text).objects().map { e -> Exercise(e.getString("id"),e.getString("name"),e.optString("muscle","Other"),e.optString("equipment","Other"),e.array("secondary").strings(),e.array("frames").strings(),e.optString("instructions"),e.optString("video").takeIf { it.isNotBlank() && it != "null" },e.optBoolean("custom")) }
+    fun catalog(text: String): List<Exercise> = JSONArray(text).objects().map { e ->
+        val properties=e.optJSONObject("properties")
+        Exercise(e.getString("id"),e.getString("name"),e.optString("muscle","Other"),e.optString("equipment","Other"),
+            e.array("secondary").strings(),e.array("frames").strings(),e.optString("instructions"),
+            e.optString("video").takeIf { it.isNotBlank() && it != "null" },e.optBoolean("custom"),
+            e.array("muscles").strings().ifEmpty {listOf(e.optString("muscle","Other"))},e.array("aliases").strings(),e.array("equipmentOptions").strings(),
+            properties?.keys()?.asSequence()?.associateWith {properties.getString(it)} ?: emptyMap(),e.optDouble("bodyweight",0.0))
+    }
+
 }
 
 class WorkoutStore(context: Context) {
