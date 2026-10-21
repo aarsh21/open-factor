@@ -2,7 +2,7 @@
 
 An independently maintained open source Android workout tracker. Open Factor uses [NuvioMobile](https://github.com/NuvioMedia/NuvioMobile) as its base, with Nuvio-derived floating navigation and grouped settings. Workout screens and behavior are being reconstructed from an explicitly supplied reference application.
 
-**Development status:** a working training foundation, not yet a complete one-to-one replacement. Original exercise-video acquisition is deferred to a future phone-assisted pass; automated programming, body metrics and complete visual/interaction parity remain unfinished. Gym profiles and Levels have partial local implementations. See [the investigation ledger](docs/open-factor/INVESTIGATION.md).
+**Development status:** a working training foundation, not yet a complete one-to-one replacement. Original exercise-video acquisition awaits a [Mac-assisted pass](docs/open-factor/media-handoff/README.md); automated programming, body metrics and complete visual/interaction parity remain unfinished. Gym profiles and Levels have partial local implementations. See [the investigation ledger](docs/open-factor/INVESTIGATION.md).
 
 ## Test on Android
 
@@ -53,7 +53,7 @@ cd openfactor
 
 For the inspected specimen, the importer produces 1,345 catalog entries, exact images for 619 exercises, and instructions for 1,213. It copies equipment and muscle assets, preserves the full source metadata, and records SHA-256 provenance. **No source videos have been retrieved or verified.** Static analysis resolves 1,831 object paths, but server access requires valid App Check. For matching local MP4 exports, add `--video-directory /path/to/export`; missing clips show photo previews.
 
-The deferred phone-assisted media task is recorded in [TODO.md](docs/open-factor/TODO.md).
+The original-media task and Mac agent handoff are recorded in [TODO.md](docs/open-factor/TODO.md).
 
 The importer never fetches remote content, executes the APK, or publishes imported files. Do not describe imported proprietary content as GPL-licensed. See [asset provenance](docs/open-factor/ASSETS.md).
 

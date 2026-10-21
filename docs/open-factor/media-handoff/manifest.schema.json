@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Original exercise-media export manifest row",
+  "description": "One acquired-file object per line of manifest.jsonl. No credential values or URL query tokens.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "exercise_id",
+    "exercise_name",
+    "suffix",
+    "relative_path",
+    "source_filename",
+    "sha256",
+    "bytes",
+    "source_kind",
+    "source_app_version",
+    "collected_at_utc",
+    "mapping_evidence",
+    "byte_identity_verified",
+    "media",
+    "validation"
+  ],
+  "properties": {
+    "kind": {
+      "enum": [
+        "video",
+        "exercise_photo"
+      ]
+    },
+    "exercise_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "exercise_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "suffix": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "relative_path": {
+      "type": "string",
+      "pattern": "^(videos|photos|unmatched)/(?!\\.{1,2}$)[^/\\\\\\x00]+$",
+      "description": "Flat relative POSIX media path; no traversal or credential-bearing URLs."
+    },
+    "source_filename": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_sha256_before": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_sha256_after": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_kind": {
+      "enum": [
+        "original_app_cache",
+        "original_app_bundle",
+        "authorized_media_response"
+      ]
+    },
+    "source_app_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "collected_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "mapping_evidence": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Exact filename/catalog join or observed app identity; explicitly explain null exercise_id."
+    },
+    "byte_identity_verified": {
+      "type": "boolean",
+      "description": "Original source bytes match the copy; not a recording or re-encode."
+    },
+    "media": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "codec",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "codec": {
+          "type": "string",
+          "minLength": 1
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "duration_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "sha256_verified",
+        "full_video_decode",
+        "image_decode"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "verified",
+            "pending",
+            "failed"
+          ]
+        },
+        "sha256_verified": {
+          "type": "boolean"
+        },
+        "full_video_decode": {
+          "enum": [
+            "passed",
+            "failed",
+            "not_run",
+            "not_applicable"
+          ]
+        },
+        "image_decode": {
+          "enum": [
+            "passed",
+            "failed",
+            "not_run",
+            "not_applicable"
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "video"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "media": {
+            "required": [
+              "duration_seconds"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "validation": {
+            "properties": {
+              "status": {
+                "const": "verified"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "byte_identity_verified": {
+            "const": true
+          },
+          "validation": {
+            "properties": {
+              "sha256_verified": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "video"
+          },
+          "validation": {
+            "properties": {
+              "status": {
+                "const": "verified"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "validation": {
+            "properties": {
+              "full_video_decode": {
+                "const": "passed"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "exercise_photo"
+          },
+          "validation": {
+            "properties": {
+              "status": {
+                "const": "verified"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "validation": {
+            "properties": {
+              "image_decode": {
+                "const": "passed"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

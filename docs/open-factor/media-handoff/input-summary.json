@@ -1,0 +1,26 @@
+{
+  "reference_package": "com.sbs.train",
+  "reference_version": "1.4.1",
+  "reference_version_code": 130,
+  "reference_platform": "Android",
+  "reference_apk_sha256": "32df7bbb6939444957d150641e48c2a2788f8fd6c85bc111df8d6047cd044396",
+  "input_kind": "static_catalog_and_path_reconstruction_not_verified_remote_media",
+  "catalog_exercises": 1345,
+  "exercises_with_static_video_paths": 619,
+  "exercises_without_static_video_paths": 726,
+  "static_video_paths": 1831,
+  "verified_original_video_files_at_handoff": 0,
+  "static_bucket": "sbs-diet-app-remote-us-central1",
+  "human_camera_labels_recovered": false,
+  "mac_app_bundle_identity": "not_yet_inspected",
+  "mac_original_file_acquisition": "not_yet_verified",
+  "user_preference": "original_files_only_no_screen_recordings",
+  "targets_file": "exercise-targets.jsonl",
+  "targets_sha256": "b1584a08c397db14550ed1a86ec19fb09e846f93958aa59a90a1da6ce86c0eb3",
+  "source_mapping_sha256": "84b377d065eb8265813658c7bec03f297b153a7b6c3dc27a5fcf3018869b5e71",
+  "notes": [
+    "Empty target lists are missing static mappings, not proof of absent server videos.",
+    "The raw packaged thumbnail manifest has one unmatched/noncatalog image, excluded from these exact catalog joins.",
+    "No media, source instructions, account data, device identifiers or credentials are included in this handoff."
+  ]
+}

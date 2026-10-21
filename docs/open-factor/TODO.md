@@ -2,12 +2,12 @@
 
 Full source parity remains in progress. Completed checkpoints and independent findings are recorded in INVESTIGATION.md and reviews/.
 
-## Deferred exercise-video acquisition
+## Original exercise-video acquisition: Mac handoff
 
-User decision, 21 October 2026: defer server-side exercise-video collection. In a future explicitly started phone-assisted pass, inspect the source app's normal authenticated playback and available media/cache export paths, then acquire the accessible demonstrations and preserve their exercise/camera mapping for offline use. No phone operations or new media acquisition are part of the current implementation pass.
+The user reactivated media recovery on 22 October 2026 and then paused the phone pass to arrange MacBook access. Continue original-file acquisition from the [Mac agent handoff and target map](media-handoff/README.md). The phone is unrooted; its private cache could not be read through ADB. The user explicitly rejected per-video recordings. No Mac original-file acquisition has yet been verified.
 
 - Reuse the existing static mapping: 1,831 candidate video paths for 619/1,345 exercises. A candidate path is not a working URL.
-- Preserve the existing Firebase 401/App Check failure. Use supported authenticated access; do not bypass integrity checks or copy account tokens into the new app.
+- Preserve the Firebase 401/App Check failures for metadata and the actual media GET, plus the known object's public Cloud Storage 403. REA traced separate Auth/App Check inputs and the Android app's Play Integrity selection. Use supported authenticated access; do not bypass integrity checks or copy account tokens into the new app.
 - Establish which exercises and camera angles actually have demonstrations, rather than assuming all 1,345 do.
 - Validate acquired videos by exercise identity, content type, full decode, duration and SHA-256; retain per-file provenance and an explicit missing-media list.
 - Keep source media private until its redistribution terms are established separately from the GPL code. The indexed walkthrough and captured demos are reference evidence, not recovered original media.
