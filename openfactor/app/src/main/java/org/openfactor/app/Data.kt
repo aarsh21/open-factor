@@ -58,6 +58,9 @@ data class Workout(
     val notes: String = "",
     val restUntil: Long = 0,
     val programId: String? = null,
+    val selectedExerciseId: String? = null,
+    val pausedAt: Long? = null,
+    val pausedDurationMs: Long = 0,
 )
 
 data class Routine(val id: String = newId(), val name: String, val exerciseIds: List<String>)
@@ -97,6 +100,20 @@ fun Workout.volumeKg() =
 fun Workout.localDate(): LocalDate =
     Instant.ofEpochMilli(startedAt).atZone(ZoneId.systemDefault()).toLocalDate()
 
+fun Workout.elapsedSeconds(now: Long): Long =
+    (((finishedAt ?: pausedAt ?: now) - startedAt - pausedDurationMs) / 1000).coerceAtLeast(0)
+
+fun Workout.withPause(paused: Boolean, now: Long): Workout =
+    when {
+        paused && pausedAt == null -> copy(pausedAt = now)
+        !paused && pausedAt != null ->
+            copy(
+                pausedAt = null,
+                pausedDurationMs = pausedDurationMs + (now - pausedAt).coerceAtLeast(0),
+            )
+        else -> this
+    }
+
 fun Double.displayWeight(pounds: Boolean): String {
     val value = if (pounds) this * 2.2046226218 else this
     return if (value % 1.0 < 0.005) value.toLong().toString()
@@ -134,6 +151,9 @@ object DataCodec {
             .put("finishedAt", finishedAt)
             .put("restUntil", restUntil)
             .put("programId", programId)
+            .put("selectedExerciseId", selectedExerciseId)
+            .put("pausedAt", pausedAt)
+            .put("pausedDurationMs", pausedDurationMs)
             .put("exercises", JSONArray(exercises.map { it.json() }))
             .put("notes", notes)
 
@@ -213,6 +233,9 @@ object DataCodec {
             optString("notes"),
             optLong("restUntil", 0),
             optString("programId").takeIf { it.isNotBlank() && it != "null" },
+            optString("selectedExerciseId").takeIf { it.isNotBlank() && it != "null" },
+            if (isNull("pausedAt")) null else getLong("pausedAt"),
+            optLong("pausedDurationMs", 0).coerceAtLeast(0),
         )
 
     fun decode(text: String): AppData {
@@ -381,6 +404,14 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun clearRest() = editActive { it.copy(restUntil = 0) }
 
+    fun pauseWorkout(paused: Boolean) = editActive {
+        it.withPause(paused, System.currentTimeMillis())
+    }
+
+    fun selectExercise(id: String) = editActive { w ->
+        if (w.exercises.any { it.id == id }) w.copy(selectedExerciseId = id) else w
+    }
+
     fun renameActive(name: String) = editActive {
         it.copy(name = name.trim().ifBlank { "Workout" })
     }
@@ -390,7 +421,8 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun addExercise(id: String) = editActive {
-        it.copy(exercises = it.exercises + SessionExercise(exerciseId = id))
+        val exercise = SessionExercise(exerciseId = id)
+        it.copy(exercises = it.exercises + exercise, selectedExerciseId = exercise.id)
     }
 
     fun removeExercise(id: String) = editActive {
@@ -452,7 +484,11 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         update {
             it.copy(
                 active = null,
-                history = listOf(w.copy(finishedAt = System.currentTimeMillis())) + it.history,
+                history =
+                    listOf(
+                        w.withPause(false, System.currentTimeMillis())
+                            .copy(finishedAt = System.currentTimeMillis())
+                    ) + it.history,
             )
         }
     }

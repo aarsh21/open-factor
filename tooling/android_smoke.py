@@ -27,6 +27,9 @@ def capture(name):
  (a.output/(name+'.png')).write_bytes(adb('exec-out','screencap','-p',raw=True))
  (a.output/(name+'.xml')).write_text(adb('shell','cat','/sdcard/of-smoke.xml'))
 def launch():adb('shell','am','start','-n','org.openfactor.app/.MainActivity')
+def persisted():
+ xml=ET.fromstring(adb('shell','run-as','org.openfactor.app','cat','shared_prefs/open_factor.xml'))
+ return json.loads(next(n.text for n in xml if n.get('name')=='data'))
 # Clear only a leftover active Open Factor smoke workout, through its UI.
 adb('shell','am','force-stop','org.openfactor.app');launch();find('Dashboard')
 if any(n.get('text') == 'Resume Workout' for n in nodes()):
@@ -35,20 +38,28 @@ if any(n.get('text') == 'Resume Workout' for n in nodes()):
 capture('phone-dashboard')
 tap('Workout');tap('New workout','content-desc');tap('Empty Workout')
 tap('Add Exercise');tap('Search exercises');adb('shell','input','text','barbell% sbench% spress'.replace('% s','%s'))
+adb('shell','input','keyevent','4')  # Expose results on short API-26 emulator viewports.
 tap('Add ','content-desc',prefix=True);find('Complete set','content-desc',prefix=True)
 tap('Complete set','content-desc',prefix=True);find('Mark set incomplete','content-desc',prefix=True);capture('phone-session')
+tap('Workout options','content-desc');tap('Pause Workout');find('Paused')
+paused=persisted()['active']
+assert paused['pausedAt']>0
+assert paused['selectedExerciseId'] in [e['id'] for e in paused['exercises']]
 # Persist the active session across a genuine process restart.
 adb('shell','am','force-stop','org.openfactor.app');launch();find('Resume Workout');capture('phone-dashboard-active');tap('Resume Workout')
 find('Mark set incomplete','content-desc',prefix=True)
+find('Paused')
+assert persisted()['active']['pausedAt']==paused['pausedAt'], 'Pause did not survive restart'
+tap('Workout options','content-desc');tap('Resume Workout')
+assert persisted()['active']['pausedDurationMs']>0, 'Resume did not account for paused time'
 assert any(n.get('text','').strip().startswith('Rest ') for n in nodes()), 'Rest timer did not survive restart'
 tap('Finish Workout');tap('Finish');find('Workout Complete');capture('phone-summary')
-xml=ET.fromstring(adb('shell','run-as','org.openfactor.app','cat','shared_prefs/open_factor.xml'))
-state=json.loads(next(n.text for n in xml if n.get('name')=='data'))
+state=persisted()
 assert state.get('active') is None
 assert len(state['history'])>=1
 assert any(s['completed'] for e in state['history'][0]['exercises'] for s in e['sets'])
 # Capture the two explicitly requested Nuvio-style surfaces and exercise library.
 adb('shell','am','force-stop','org.openfactor.app');launch();tap('Exercises',last=True);find('Search exercises');capture('phone-exercises')
 tap('Settings');find('Settings');capture('phone-settings')
-(a.output/'result.json').write_text(json.dumps({'status':'passed','serial':a.serial,'history_count':len(state['history']),'active_session_restart':True,'completed_workout_persisted':True},indent=2)+'\n')
+(a.output/'result.json').write_text(json.dumps({'status':'passed','serial':a.serial,'history_count':len(state['history']),'active_session_restart':True,'pause_resume_restart':True,'completed_workout_persisted':True},indent=2)+'\n')
 print((a.output/'result.json').read_text())

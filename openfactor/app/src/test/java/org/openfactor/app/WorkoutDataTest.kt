@@ -5,6 +5,28 @@ import org.junit.Test
 
 class WorkoutDataTest {
     @Test
+    fun pauseAndSelectionSurviveBackupWithoutCountingPausedTime() {
+        val workout =
+            Workout(
+                name = "Training",
+                startedAt = 1000,
+                selectedExerciseId = "selected",
+                pausedDurationMs = 2000,
+            )
+        val paused = workout.withPause(true, 13000)
+        assertEquals(10L, paused.elapsedSeconds(60000))
+        val restored = DataCodec.decode(DataCodec.encode(AppData(active = paused))).active!!
+        assertEquals(paused, restored)
+        assertEquals("selected", restored.selectedExerciseId)
+        val resumed = restored.withPause(false, 18000)
+        assertNull(resumed.pausedAt)
+        assertEquals(7000L, resumed.pausedDurationMs)
+        assertEquals(12L, resumed.elapsedSeconds(20000))
+        assertEquals(resumed, resumed.withPause(false, 21000))
+        assertEquals(12L, resumed.copy(finishedAt = 20000).elapsedSeconds(30000))
+    }
+
+    @Test
     fun volumeCountsOnlyCompletedWorkingSets() {
         val workout =
             Workout(

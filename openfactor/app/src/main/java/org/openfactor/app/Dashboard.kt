@@ -254,9 +254,9 @@ private fun WeeklyRing(value: Int, target: Int, label: String, modifier: Modifie
         Text(
             label,
             Modifier.padding(top = 20.dp),
-            fontSize = if (small) 16.sp else 18.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = MaterialTheme.typography.titleMedium.fontFamily,
+            fontSize = if (small) 18.sp else 20.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = MaterialTheme.typography.headlineMedium.fontFamily,
         )
         Text(
             if (target > 0) "$target target" else "Set a routine",

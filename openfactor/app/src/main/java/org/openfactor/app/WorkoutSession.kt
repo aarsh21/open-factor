@@ -3,7 +3,10 @@ package org.openfactor.app
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -48,6 +51,9 @@ fun WorkoutSession(
     var confirm by remember { mutableStateOf("") }
     var menu by remember { mutableStateOf(false) }
     var rename by remember { mutableStateOf(false) }
+    val selected =
+        workout.exercises.find { it.id == workout.selectedExerciseId }
+            ?: workout.exercises.firstOrNull()
     val restUntil = workout.restUntil
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var saveTemplate by rememberSaveable { mutableStateOf(false) }
@@ -57,56 +63,115 @@ fun WorkoutSession(
             now = System.currentTimeMillis()
         }
     }
-    val elapsed = ((now - workout.startedAt) / 1000).coerceAtLeast(0)
+    val elapsed = workout.elapsedSeconds(now)
     val remaining = ((restUntil - now + 999) / 1000).coerceAtLeast(0)
     Column(Modifier.fillMaxSize().imePadding()) {
-        PageHeading(
-            workout.name,
-            onBack,
-            actions = {
-                Box {
-                    IconButton({ menu = true }) { Icon(Icons.Rounded.MoreVert, "Workout options") }
-                    DropdownMenu(menu, { menu = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Rename Workout") },
-                            onClick = {
-                                menu = false
-                                rename = true
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Save as Workout Template") },
-                            onClick = {
-                                menu = false
-                                vm.saveRoutine(
-                                    workout.name,
-                                    workout.exercises.map { it.exerciseId },
-                                )
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Discard Workout") },
-                            onClick = {
-                                menu = false
-                                confirm = "discard"
-                            },
-                        )
-                    }
-                }
-            },
-        )
         Row(
-            Modifier.fillMaxWidth()
-                .background(OF.top)
-                .padding(horizontal = 20.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            Modifier.fillMaxWidth().background(OF.top).padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("${elapsed/60}m ${elapsed%60}s", color = OF.muted)
-            Text("${workout.completedSets()} sets", color = OF.muted)
-            Text(
-                "${workout.volumeKg().displayWeight(data.preferences.pounds)} ${if(data.preferences.pounds)"lb" else "kg"}",
-                color = OF.muted,
-            )
+            Box {
+                IconButton({ menu = true }) { Icon(Icons.Rounded.Menu, "Workout options") }
+                DropdownMenu(menu, { menu = false }) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                if (workout.pausedAt == null) "Pause Workout" else "Resume Workout"
+                            )
+                        },
+                        onClick = {
+                            menu = false
+                            vm.pauseWorkout(workout.pausedAt == null)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Minimize Workout") },
+                        onClick = {
+                            menu = false
+                            onBack()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Finish Workout") },
+                        enabled = workout.completedSets() > 0,
+                        onClick = {
+                            menu = false
+                            confirm = "finish"
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Rename Workout") },
+                        onClick = {
+                            menu = false
+                            rename = true
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Save as Workout Template") },
+                        onClick = {
+                            menu = false
+                            vm.saveRoutine(workout.name, workout.exercises.map { it.exerciseId })
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Discard Workout") },
+                        onClick = {
+                            menu = false
+                            confirm = "discard"
+                        },
+                    )
+                }
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "%d:%02d:%02d".format(elapsed / 3600, elapsed / 60 % 60, elapsed % 60),
+                    fontSize = 22.sp,
+                )
+                if (workout.pausedAt != null) Text("Paused", color = OF.muted, fontSize = 12.sp)
+            }
+            Icon(Icons.Rounded.Timer, null, Modifier.size(20.dp))
+            Text("${remaining/60}:${(remaining%60).toString().padStart(2, '0')}", fontSize = 20.sp)
+        }
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.selectableGroup(),
+        ) {
+            items(workout.exercises, key = { it.id }) { entry ->
+                val exercise =
+                    exercises.find { it.id == entry.exerciseId }
+                        ?: Exercise(entry.exerciseId, "Exercise", "Other", "Other")
+                val active = entry.id == selected?.id
+                Column(
+                    Modifier.width(80.dp)
+                        .selectable(
+                            selected = active,
+                            role = Role.Tab,
+                            onClick = { vm.selectExercise(entry.id) },
+                        )
+                        .semantics { contentDescription = "Select ${exercise.title}" }
+                ) {
+                    ExerciseImage(exercise, Modifier.fillMaxWidth().height(104.dp))
+                    Spacer(Modifier.height(5.dp))
+                    Box(
+                        Modifier.fillMaxWidth()
+                            .height(3.dp)
+                            .background(
+                                if (active) MaterialTheme.colorScheme.onSurface else OF.line
+                            )
+                    )
+                }
+            }
+            item {
+                FilledTonalIconButton(
+                    onAdd,
+                    Modifier.size(width = 80.dp, height = 104.dp),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Icon(Icons.Rounded.Add, "Add Exercise", Modifier.size(32.dp))
+                }
+            }
         }
         if (remaining > 0)
             Surface(color = OF.elevated, modifier = Modifier.fillMaxWidth()) {
@@ -138,7 +203,7 @@ fun WorkoutSession(
                         onAdd,
                     )
                 }
-            items(workout.exercises, key = { it.id }) { se ->
+            items(listOfNotNull(selected), key = { it.id }) { se ->
                 val e =
                     exercises.find { it.id == se.exerciseId }
                         ?: Exercise(se.exerciseId, "Exercise", "Other", "Other")
