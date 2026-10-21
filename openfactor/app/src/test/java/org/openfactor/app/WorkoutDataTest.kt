@@ -152,4 +152,21 @@ class WorkoutDataTest {
         )
         assertTrue(equipmentRequirementsMet(emptyList(), emptyList(), emptySet()))
     }
+
+    @Test
+    fun equipmentReferencesMayNameAnEntityOrAnEquipmentGroup() {
+        val index =
+            org.json.JSONObject(
+                """{"bar":{"type":"equipment"},"plates":{"type":"equipment"},"bar-and-plates":{"type":"resistanceEquipmentGroup","equipment":["bar","plates"]}}"""
+            )
+        assertEquals(setOf("bar"), resolveEquipmentRequirement(index, "bar"))
+        assertEquals(setOf("bar", "plates"), resolveEquipmentRequirement(index, "bar-and-plates"))
+        assertFalse(
+            equipmentRequirementsMet(
+                listOf(resolveEquipmentRequirement(index, "bar")),
+                emptyList(),
+                emptySet(),
+            )
+        )
+    }
 }

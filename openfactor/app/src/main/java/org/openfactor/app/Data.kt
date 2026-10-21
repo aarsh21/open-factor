@@ -493,7 +493,19 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun restore(text: String) {
-        val d = DataCodec.decode(text)
+        val decoded = DataCodec.decode(text)
+        val d =
+            if (decoded.gyms.isEmpty())
+                decoded.copy(
+                    gyms =
+                        listOf(
+                            GymProfile(
+                                name = "Everything Gym",
+                                equipmentIds = equipmentCatalog.prefill("everything"),
+                            )
+                        )
+                )
+            else decoded
         store.save(d)
         _data.value = d
     }
