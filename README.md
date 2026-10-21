@@ -2,7 +2,7 @@
 
 An open source Android workout tracker built in a GPLv3 fork of [NuvioMobile](https://github.com/NuvioMedia/NuvioMobile). Open Factor takes its floating navigation and grouped settings from Nuvio. Workout screens and behavior are being reconstructed from an explicitly supplied reference application.
 
-**Development status:** a working training foundation, not yet a complete one-to-one replacement. Source video access, automated programming, body metrics and complete visual/interaction parity remain under investigation. Gym profiles and Levels have partial local implementations. See [the investigation ledger](docs/open-factor/INVESTIGATION.md).
+**Development status:** a working training foundation, not yet a complete one-to-one replacement. Original exercise-video acquisition is deferred to a future phone-assisted pass; automated programming, body metrics and complete visual/interaction parity remain unfinished. Gym profiles and Levels have partial local implementations. See [the investigation ledger](docs/open-factor/INVESTIGATION.md).
 
 ## Build
 
@@ -25,10 +25,12 @@ The debug APK is `openfactor/app/build/outputs/apk/debug/app-debug.apk`, package
 - Gym profiles, literal equipment preset prefills, weight lists and gym-aware exercise filtering.
 - Local muscle set levels over week/month/three-month windows.
 - Create custom exercises and reusable workout templates.
-- Persist active workouts, weight, reps, RIR, warm-ups and notes.
-- Automatic rest timer, workout completion, history and repeat workout.
+- Build manual programs with ordered rest/workout days, gym selection, seven-cycle set targets, library saving and activation.
+- Launch a selected program day/cycle with rep/RIR targets and per-exercise rest overrides.
+- Persist active workouts, selected exercise, pause/resume, weight, reps, RIR, warm-ups and notes.
+- Automatic rest timer and exercise auto-next, pause-excluding summaries, completion, history and repeat workout.
 - Kilograms/pounds with canonical kilogram storage.
-- Export/restore local JSON backups.
+- Export/restore local JSON backups, including programs and drafts.
 - Nuvio-derived floating pill navigation and grouped settings.
 
 ## Local reference content
@@ -44,6 +46,8 @@ cd openfactor
 ```
 
 For the inspected specimen, the importer produces 1,345 catalog entries, exact images for 619 exercises, and instructions for 1,213. It copies equipment and muscle assets, preserves the full source metadata, and records SHA-256 provenance. **No source videos have been retrieved or verified.** Static analysis resolves 1,831 object paths, but server access requires valid App Check. For matching local MP4 exports, add `--video-directory /path/to/export`; missing clips show photo previews.
+
+The deferred phone-assisted media task is recorded in [TODO.md](docs/open-factor/TODO.md).
 
 The importer never fetches remote content, executes the APK, or publishes imported files. Do not describe imported proprietary content as GPL-licensed. See [asset provenance](docs/open-factor/ASSETS.md).
 

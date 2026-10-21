@@ -40,6 +40,9 @@ data class LoggedSet(
     val rir: Int? = null,
     val completed: Boolean = false,
     val warmup: Boolean = false,
+    val targetRepsMin: Int? = null,
+    val targetRepsMax: Int? = null,
+    val targetRir: Int? = null,
 )
 
 data class SessionExercise(
@@ -47,6 +50,7 @@ data class SessionExercise(
     val exerciseId: String,
     val sets: List<LoggedSet> = listOf(LoggedSet(), LoggedSet(), LoggedSet()),
     val notes: String = "",
+    val restSeconds: Int? = null,
 )
 
 data class Workout(
@@ -61,6 +65,9 @@ data class Workout(
     val selectedExerciseId: String? = null,
     val pausedAt: Long? = null,
     val pausedDurationMs: Long = 0,
+    val programDayId: String? = null,
+    val programCycle: Int? = null,
+    val gymId: String? = null,
 )
 
 data class Routine(val id: String = newId(), val name: String, val exerciseIds: List<String>)
@@ -87,6 +94,8 @@ data class AppData(
     val preferences: Preferences = Preferences(),
     val activeProgramId: String? = null,
     val gyms: List<GymProfile> = emptyList(),
+    val programs: List<TrainingProgram> = emptyList(),
+    val programDraft: TrainingProgram? = null,
 )
 
 fun newId() = UUID.randomUUID().toString()
@@ -139,13 +148,12 @@ fun Workout.toggleSetCompletion(
                 .firstOrNull { candidate -> candidate.sets.any { !it.completed } }
                 ?.id
         } else null
+    val rest = exercise.restSeconds ?: preferences.restSeconds
     return copy(
         exercises = updated,
         selectedExerciseId = next ?: selectedExerciseId,
         restUntil =
-            if (completing && preferences.autoRest && preferences.restSeconds > 0)
-                now + preferences.restSeconds * 1000L
-            else restUntil,
+            if (completing && preferences.autoRest && rest > 0) now + rest * 1000L else restUntil,
     )
 }
 
@@ -170,6 +178,9 @@ object DataCodec {
             .put("rir", rir)
             .put("completed", completed)
             .put("warmup", warmup)
+            .put("targetRepsMin", targetRepsMin)
+            .put("targetRepsMax", targetRepsMax)
+            .put("targetRir", targetRir)
 
     private fun SessionExercise.json() =
         JSONObject()
@@ -177,6 +188,7 @@ object DataCodec {
             .put("exerciseId", exerciseId)
             .put("sets", JSONArray(sets.map { it.json() }))
             .put("notes", notes)
+            .put("restSeconds", restSeconds)
 
     private fun Workout.json() =
         JSONObject()
@@ -189,6 +201,9 @@ object DataCodec {
             .put("selectedExerciseId", selectedExerciseId)
             .put("pausedAt", pausedAt)
             .put("pausedDurationMs", pausedDurationMs)
+            .put("programDayId", programDayId)
+            .put("programCycle", programCycle)
+            .put("gymId", gymId)
             .put("exercises", JSONArray(exercises.map { it.json() }))
             .put("notes", notes)
 
@@ -205,6 +220,8 @@ object DataCodec {
         JSONObject()
             .put("schemaVersion", 1)
             .put("activeProgramId", d.activeProgramId)
+            .put("programs", JSONArray(d.programs.map { ProgramCodec.encode(it) }))
+            .put("programDraft", d.programDraft?.let { ProgramCodec.encode(it) })
             .put("gyms", JSONArray(d.gyms.map { GymCodec.encode(it) }))
             .put("active", d.active?.json())
             .put("history", JSONArray(d.history.map { it.json() }))
@@ -261,9 +278,13 @@ object DataCodec {
                             if (s.isNull("rir")) null else s.getInt("rir").coerceIn(0, 10),
                             s.optBoolean("completed"),
                             s.optBoolean("warmup"),
+                            if (s.isNull("targetRepsMin")) null else s.getInt("targetRepsMin"),
+                            if (s.isNull("targetRepsMax")) null else s.getInt("targetRepsMax"),
+                            if (s.isNull("targetRir")) null else s.getInt("targetRir"),
                         )
                     },
                     e.optString("notes"),
+                    if (e.isNull("restSeconds")) null else e.getInt("restSeconds"),
                 )
             },
             optString("notes"),
@@ -272,12 +293,17 @@ object DataCodec {
             optString("selectedExerciseId").takeIf { it.isNotBlank() && it != "null" },
             if (isNull("pausedAt")) null else getLong("pausedAt"),
             optLong("pausedDurationMs", 0).coerceAtLeast(0),
+            optString("programDayId").takeIf { it.isNotBlank() && it != "null" },
+            if (isNull("programCycle")) null else getInt("programCycle"),
+            optString("gymId").takeIf { it.isNotBlank() && it != "null" },
         )
 
     fun decode(text: String): AppData {
         val j = JSONObject(text)
         require(j.optInt("schemaVersion") == 1) { "Unsupported backup version" }
         val p = j.optJSONObject("preferences") ?: JSONObject()
+        val programs = j.array("programs").objects().map { ProgramCodec.decode(it) }
+        require(programs.map { it.id }.distinct().size == programs.size) { "Duplicate program" }
         return AppData(
             j.optJSONObject("active")?.workout(),
             j.array("history").objects().map { it.workout() },
@@ -309,6 +335,8 @@ object DataCodec {
             ),
             j.optString("activeProgramId").takeIf { it.isNotBlank() && it != "null" },
             j.array("gyms").objects().map { GymCodec.decode(it) },
+            programs,
+            j.optJSONObject("programDraft")?.let { ProgramCodec.decode(it) },
         )
     }
 
@@ -429,6 +457,46 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                         )
                 )
             }
+    }
+
+    fun editProgramDraft(block: (TrainingProgram) -> TrainingProgram) = update { d ->
+        d.copy(programDraft = d.programDraft?.let(block))
+    }
+
+    fun beginProgram(program: TrainingProgram) = update { it.copy(programDraft = program) }
+
+    fun discardProgramDraft() = update { it.copy(programDraft = null) }
+
+    fun saveProgram(activate: Boolean) = update { d ->
+        val p = d.programDraft ?: return@update d
+        if (p.name.isBlank()) return@update d
+        d.copy(
+            programs = d.programs.filterNot { it.id == p.id } + p,
+            programDraft = null,
+            activeProgramId = if (activate) p.id else d.activeProgramId,
+        )
+    }
+
+    fun activateProgram(id: String?) = update { d ->
+        if (id == null || d.programs.any { it.id == id }) d.copy(activeProgramId = id) else d
+    }
+
+    fun deleteProgram(id: String) = update { d ->
+        d.copy(
+            programs = d.programs.filterNot { it.id == id },
+            activeProgramId = d.activeProgramId?.takeUnless { it == id },
+            programDraft = d.programDraft?.takeUnless { it.id == id },
+        )
+    }
+
+    fun startProgramDay(programId: String, dayId: String, cycle: Int): Boolean {
+        if (_data.value.active != null) return false
+        val workout =
+            _data.value.programs
+                .find { it.id == programId }
+                ?.toWorkout(dayId, cycle, System.currentTimeMillis()) ?: return false
+        update { it.copy(active = workout) }
+        return true
     }
 
     fun startRest(seconds: Int) = editActive {

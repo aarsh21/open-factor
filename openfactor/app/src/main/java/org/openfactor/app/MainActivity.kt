@@ -43,6 +43,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
     var route by rememberSaveable { mutableStateOf("") }
     var detailId by rememberSaveable { mutableStateOf("") }
     var previousRoute by rememberSaveable { mutableStateOf("") }
+    var programDayId by rememberSaveable { mutableStateOf("") }
+    var programExit by remember { mutableStateOf(false) }
     var shortcuts by rememberSaveable { mutableStateOf(false) }
     var routineName by rememberSaveable { mutableStateOf(false) }
     val exercises = vm.exercises(data)
@@ -57,6 +59,13 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
             when (route) {
                 "exercise" -> previousRoute
                 "gym" -> "gyms"
+                "program-picker" -> "program-editor"
+                "program-editor",
+                "program-setup" -> {
+                    programExit = true
+                    route
+                }
+                "programs" -> ""
                 else -> ""
             }
     }
@@ -80,6 +89,80 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                 .background(OF.background)
         ) {
             when (route) {
+                "programs" ->
+                    ProgramLibrary(
+                        data,
+                        vm,
+                        { route = "" },
+                        {
+                            if (data.programDraft != null) route = "program-editor"
+                            else {
+                                vm.beginProgram(
+                                    TrainingProgram(
+                                        name =
+                                            java.time.LocalDate.now()
+                                                .format(
+                                                    java.time.format.DateTimeFormatter.ofPattern(
+                                                        "d MMM yyyy"
+                                                    )
+                                                )
+                                    )
+                                )
+                                route = "program-setup"
+                            }
+                        },
+                        { route = "program-editor" },
+                        { program, day, cycle ->
+                            if (vm.startProgramDay(program, day, cycle)) route = "session"
+                            else shortcuts = true
+                        },
+                    )
+                "program-setup" ->
+                    data.programDraft?.let {
+                        ProgramSetup(it, vm, { programExit = true }, { route = "program-editor" })
+                    }
+                "program-editor" ->
+                    ProgramEditor(
+                        data,
+                        programDayId,
+                        { programDayId = it },
+                        exercises,
+                        vm,
+                        { programExit = true },
+                        { day ->
+                            programDayId = day
+                            route = "program-picker"
+                        },
+                        { route = "programs" },
+                    )
+                "program-picker" ->
+                    ExerciseLibrary(
+                        exercises,
+                        data.favorites,
+                        vm::favorite,
+                        ::openExercise,
+                        { id ->
+                            vm.editProgramDraft { plan ->
+                                plan.copy(
+                                    days =
+                                        plan.days.map { day ->
+                                            if (day.id == programDayId)
+                                                day.addExercise(
+                                                    id,
+                                                    plan.cycleCount,
+                                                    "Workout ${('A'.code + plan.days.count { it.exercises.isNotEmpty() }).toChar()}",
+                                                )
+                                            else day
+                                        }
+                                )
+                            }
+                            route = "program-editor"
+                        },
+                        onBack = { route = "program-editor" },
+                        picking = true,
+                        gyms = data.gyms,
+                        equipmentCatalog = vm.equipmentCatalog,
+                    )
                 "gyms" ->
                     GymProfilesScreen(data, vm, { route = "" }) {
                         detailId = it
@@ -197,6 +280,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                 },
                                 onNewRoutine = { route = "routine" },
                                 onDeleteRoutine = vm::deleteRoutine,
+                                onPrograms = { route = "programs" },
                                 onHistory = { route = "history" },
                             )
                         2 ->
@@ -222,6 +306,33 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
             }
         }
     }
+    if (programExit)
+        AlertDialog(
+            onDismissRequest = { programExit = false },
+            title = { Text("Leave program draft?") },
+            text = {
+                Text(
+                    "Keep the draft to continue later, or discard these unsaved changes. Saved programs stay unchanged."
+                )
+            },
+            confirmButton = {
+                TextButton({
+                    programExit = false
+                    route = "programs"
+                }) {
+                    Text("Keep Draft")
+                }
+            },
+            dismissButton = {
+                TextButton({
+                    vm.discardProgramDraft()
+                    programExit = false
+                    route = "programs"
+                }) {
+                    Text("Discard Draft")
+                }
+            },
+        )
     if (shortcuts)
         ModalBottomSheet(onDismissRequest = { shortcuts = false }, containerColor = OF.top) {
             Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 28.dp)) {

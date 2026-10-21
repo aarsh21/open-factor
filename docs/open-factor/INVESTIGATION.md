@@ -61,7 +61,7 @@ These screenshots remain private because they include a signed-in personal accou
 
 | Surface or behavior | Status |
 | --- | --- |
-| Nuvio-derived capsule navigation and settings grouping | Implemented; device visual review pending |
+| Nuvio-derived capsule navigation and settings grouping | Implemented; scoped native reviews retain open parity findings |
 | 1,345-entry reference catalog and available local images/instructions | Implemented through ignored local import |
 | Basic exercise search, aliases, muscles/equipment, favorites | Implemented; source filter set is broader |
 | Exercise properties, target muscles and available media | Partial; videos and exact source media layout pending |
@@ -69,11 +69,12 @@ These screenshots remain private because they include a signed-in personal accou
 | Weight/reps/RIR, warm-ups, notes, rest timer | Implemented; source logging layout and full set options pending |
 | Workout completion, history and repeat | Implemented; records/summary parity pending |
 | Units and JSON backup/restore | Implemented; source export formats differ |
-| Dashboard | Partial; source customization and full metrics pending |
-| Program builder, periodization, automatic progression | Pending |
-| Gym profiles and equipment customization | Pending |
+| Dashboard | Local scope/customization implemented; full analytics/metrics pending |
+| Manual program builder/library/activation | Local checkpoint implemented; exact source creation/advanced options remain partial |
+| Smart generation, periodization, automatic progression | Pending; static rules partially recovered |
+| Gym profiles and equipment customization | Partial local implementation; exact source membership/defaults remain open |
 | Weight, photos and body metrics | Pending |
-| Levels and game | Pending |
+| Muscle set Levels | Partial local implementation; exact source aggregation/scale unverified |
 | Health Connect, remote sync, localization | Pending |
 
 No complete-clone claim is supported by the current state.
@@ -84,7 +85,7 @@ The source Levels page shows front/back anatomical figures, average weekly sets 
 
 Source gym profile captures establish icon/name, duplicate, selected/all equipment, weight selection editing and prefill choices. Static metadata contains 297 equipment entities; visible Everything Gym reports 292. Preset flag counts and visible row counts do not always match, and this remains open.
 
-The actual active logger was captured separately from workout setup: horizontal exercise strip, single exercise view, weight/reps controls, and Pause/Minimize/Finish/Settings/Gym/Discard menu. The current multi-exercise local logger is not a 1:1 rendition of this screen. The temporary source workout was discarded through the confirmation UI without saving. Source phone stay-awake setting was restored to its original value (0).
+The actual active logger was captured separately from workout setup: horizontal exercise strip, single exercise view, weight/reps controls, and Pause/Minimize/Finish/Settings/Gym/Discard menu. The earlier multi-exercise local logger differed from this screen; the later logger checkpoint below replaces it with one selected exercise. Exact logger fidelity remains incomplete. The temporary source workout was discarded through the confirmation UI without saving. Source phone stay-awake setting was restored to its original value (0).
 
 Static recovery resolves 1,831 ordered video paths for 619 exercises: preferred thumbnail first, then suffix. All paths/order match the independent recovery. A standard anonymous Firebase metadata request for the bench-press preferred object returned HTTP 401, `Firebase App Check token is invalid`. No source video bytes or working source URLs have been verified. The importer supports caller-supplied matching MP4 exports; the UI retains photographic camera choices and labels still-only previews.
 
@@ -130,3 +131,14 @@ Verification: build/lint and 13 unit tests pass, including long pauses, finish-w
 
 
 Independent `logger-04.md` closes the saved-duration P2 and establishes no material correction regressions, retaining overall **fix** for catalog counts and accessibility/recovery verification alongside unfinished full parity. A later parent-run emulator check supplies visible invalid-reps/recovery evidence; this narrows the recovery gap but does not establish TalkBack, other metric recovery, or alter the independent verdict. Design tokens and remaining drift are recorded from the implemented source in `DESIGN.md` and its sidecar.
+
+## Deferred exercise videos: user decision
+
+The user explicitly deferred server-side video collection to a future phone-assisted pass. `TODO.md` records the requested future acquisition, identity mapping and offline validation work. The current pass uses the existing recordings/static evidence and performs no phone operations. A bounded official-public/local-artifact search found zero verified original demo files; product animations and synthetic fixtures were excluded. Original-video coverage remains zero; this is not a playback-completeness claim.
+
+
+## Manual program checkpoint
+
+The local manual workflow now includes name/color setup, ordered rest/workout days, add/remove/reorder/rename actions, per-day gym selection, primary-muscle exercise/set counts, seven cycles of Standard Set targets, rep ranges, target RIR, skip and rest overrides. Drafts persist independently from saved programs and survive backup; editing a saved program does not mutate it until Save. Library entries support activation/deactivation, editing and deletion. Starting a selected day/cycle retains targets separately from actual logged RIR and refuses to replace an ongoing session. Completion preserves program/day/cycle identity in local history. The active program has a real entry on the Workout screen.
+
+This is a functional reconstruction from captured drafts, not recovered complete source program behavior. The source drafts were never saved/activated. Calendar placement, progression, generator/deload algorithms, variable cycle counts, full icon selection, Myo/Failure sets, supersets, XLSX and exact target/apply-scope sheets remain unfinished. Current Day/Cycle muscle totals use the first training cycle; exact source aggregation is not claimed.

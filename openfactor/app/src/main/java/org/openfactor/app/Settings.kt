@@ -381,7 +381,7 @@ private fun SettingsRow(icon: ImageVector, title: String, subtitle: String, onCl
 }
 
 @Composable
-private fun InfoDialog(title: String, text: String, onDismiss: () -> Unit) =
+internal fun InfoDialog(title: String, text: String, onDismiss: () -> Unit) =
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },

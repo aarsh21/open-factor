@@ -305,6 +305,7 @@ fun WorkoutScreen(
     onNewRoutine: () -> Unit,
     onDeleteRoutine: (String) -> Unit,
     onHistory: () -> Unit,
+    onPrograms: () -> Unit,
 ) {
     var selectedDay by remember { mutableStateOf(LocalDate.now()) }
     var delete by remember { mutableStateOf<Routine?>(null) }
@@ -360,7 +361,17 @@ fun WorkoutScreen(
                     SectionTitle("In Progress")
                     PrimaryAction("Resume ${data.active.name}", onResume)
                 }
-                SectionTitle("Active Program", "New Workout", onNewRoutine)
+                SectionTitle("Active Program", "Programs", onPrograms)
+                val program = data.programs.find { it.id == data.activeProgramId }
+                if (program != null) {
+                    Text(program.name, style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "${program.days.size} days · ${program.cycleCount} cycles",
+                        color = OF.muted,
+                    )
+                    PrimaryAction("Open Program", onPrograms)
+                } else Text("No active program", color = OF.muted)
+                SectionTitle("Workout Library", "New Workout", onNewRoutine)
             }
         }
         if (data.routines.isEmpty())

@@ -13,3 +13,6 @@ The static native trace resolves `videos/{exerciseId}_{thumbnailSuffix}.mp4`: 1,
 The importer orders the preferred image first and the remaining suffixes alphabetically. It can ingest matching MP4 files from an authorized local export with `--video-directory /path/to/export`; either flat filenames or a `videos/` subdirectory works. It validates the MP4 signature and records each file digest. Asset-backed video files are copied into the app's cache for native playback. Missing clips retain an honest photo preview; there is no image-cycling approximation of video.
 
 Public distribution of a reference-filled APK is deliberately not part of the source-only CI workflow. A future redistributable content pack needs an explicit asset license or replacement content with suitable permissions.
+
+
+The user deferred server-side exercise-video acquisition to a future phone-assisted task; see [TODO.md](TODO.md). No new phone access or original-video download is part of the manual-program checkpoint.

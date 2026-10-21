@@ -224,6 +224,27 @@ fun WorkoutSession(
                                 Icon(Icons.Rounded.Close, "Remove ${e.name}", tint = OF.muted)
                             }
                         }
+                        if (
+                            se.sets.any {
+                                it.targetRepsMin != null ||
+                                    it.targetRepsMax != null ||
+                                    it.targetRir != null
+                            }
+                        ) {
+                            var targets by remember { mutableStateOf(false) }
+                            TextButton({ targets = true }) { Text("Targets") }
+                            if (targets)
+                                InfoDialog(
+                                    "Targets",
+                                    se.sets
+                                        .mapIndexed { index, set ->
+                                            "Set ${index + 1}: ${set.targetRepsMin?.toString() ?: "—"}–${set.targetRepsMax?.toString() ?: "—"} reps · ${set.targetRir?.toString() ?: "—"} RIR"
+                                        }
+                                        .joinToString("\n"),
+                                ) {
+                                    targets = false
+                                }
+                        }
                         OutlinedTextField(
                             se.notes,
                             { vm.exerciseNotes(se.id, it) },
