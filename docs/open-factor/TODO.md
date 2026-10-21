@@ -22,3 +22,14 @@ Current original-file coverage: **0/1,345 verified**. The bounded public/local s
 - Source logger keypad, metric-specific layouts, targets/warm-up, complete set types and rest sheet.
 - Body metrics, charts, records, import/export, integrations and localization.
 - Authenticated catalog count discrepancy and spoken accessibility checks.
+
+
+### Onboarding review follow-up
+
+- [ ] Rebuild welcome around a redistributable own-app workout-preview plate and source masthead/action hierarchy; keep the private source capture out of public assets.
+- [ ] Restore regular overview subtitle/stage labels and continuous stage-rail rhythm.
+- [ ] Give each gym preset an independent minimum 48dp target; verify enlarged-type/IME reachability.
+- [ ] Retain unavailable account/sync/smart/XLSX truth and unresolved source intermediate-form parity.
+- [ ] Verify actual TalkBack order/selection/error announcements.
+
+See [the independent review](reviews/onboarding-navigation-01.md); welcome disposition remains rebuild independently of the bounded navigation correction.
