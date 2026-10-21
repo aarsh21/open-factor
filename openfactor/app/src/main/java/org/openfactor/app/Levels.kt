@@ -50,10 +50,12 @@ fun muscleContributions(
     days: Int,
     muscle: String,
 ): List<MuscleContribution> {
-    val first = LocalDate.now().minusDays(days.toLong() - 1)
+    val today = LocalDate.now()
+    val first = today.minusDays(days.toLong() - 1)
     val sets =
         history
-            .filter { !it.localDate().isBefore(first) }
+            .distinctBy { it.id }
+            .filter { it.localDate() in first..today }
             .flatMap { it.exercises }
             .groupBy { it.exerciseId }
     return exercises
@@ -78,9 +80,9 @@ fun LevelsScreen(
     var periods by remember { mutableStateOf(false) }
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     val totals =
-        remember(data.history, exercises, days) {
+        remember(data.active, data.history, exercises, days) {
             (upperMuscleGroups + lowerMuscleGroups).associateWith { m ->
-                muscleContributions(data.history, exercises, days, m).sumOf { it.sets } /
+                muscleContributions(data.trainingWorkouts(), exercises, days, m).sumOf { it.sets } /
                     (days / 7.0)
             }
         }
@@ -210,7 +212,7 @@ fun LevelsScreen(
             }
     }
     selected?.let { m ->
-        val contributions = muscleContributions(data.history, exercises, days, m)
+        val contributions = muscleContributions(data.trainingWorkouts(), exercises, days, m)
         AlertDialog(
             onDismissRequest = { selected = null },
             title = { Text(m) },

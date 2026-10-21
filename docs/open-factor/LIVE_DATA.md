@@ -1,0 +1,15 @@
+# Live training data and local media
+
+The dashboard uses completed **working** sets from saved workouts and the current session, without counting the same workout ID twice. Warm-ups remain in the logger/history but do not inflate working-set counts, volume or Levels. Completing, unchecking, editing, finishing or discarding the current session recomputes derived values from persisted app state. Weekly values use workout start dates from Monday through today, excluding future records; history cards use the latest completed records in timestamp order. Habits counts saved workouts only.
+
+Active Program filters by its ID. When no saved program is active, the dashboard falls back to All Workouts instead of hiding all history. In program scope, comparison totals come from the exact active session's or latest started program cycle, falling back to Cycle 1 before any launch. They sum stored sets and skip flags across program days and derive distinct exercises and primary/secondary muscles from the catalog. The UI labels this **Compared with Cycle N plan** and **N planned**; it is not a reconstructed calendar schedule or a claim about MacroFactor's analytics algorithm. All Workouts has no program comparison. Workout templates do not supply plan targets.
+
+Levels uses the same completed-working-set policy, including the current workout, over its selected rolling period. Levels aggregates all workouts, independent of the dashboard scope. History/completion summaries still describe all completed sets, including warm-ups; that differs deliberately from working-set analytics. Source metric/bodyweight load coefficients, exact secondary-muscle weighting and original analytics remain unresolved.
+
+## Why alpha.2 showed icons
+
+The public alpha.2 APK deliberately contains no `assets/reference/` pack. Its icons are fallback content, not failed network downloads. Source imagery is available only in a local build with the operator-supplied APK imported through `tooling/import_reference_apk.py`.
+
+The current local pack joins 1,831 image files to **619 of 1,345 exercises**, with 44 anatomy SVGs and equipment artwork. Every mapped image path exists in the local APK. The remaining 726 exercises have no recovered photo mapping. No original exercise videos are bundled; their future acquisition remains deferred. The local media testing APK is separate from public GitHub source/releases. The code, tests and audit methodology can be public; extracted media stays outside Git.
+
+Install the local-media testing APK as an update to `org.openfactor.app` to retain local data. A future public/source-only update without the reference pack will return to media fallbacks. Do not infer complete media coverage or runtime video parity from a successful photo check.

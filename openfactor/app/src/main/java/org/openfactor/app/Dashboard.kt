@@ -20,6 +20,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,25 +43,10 @@ fun DashboardScreen(
     onLevels: () -> Unit,
 ) {
     var customize by remember { mutableStateOf(false) }
-    val allWorkouts = data.preferences.dashboardAllWorkouts
-    val week = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-    val scopedHistory =
-        if (allWorkouts) data.history
-        else
-            data.history.filter {
-                data.activeProgramId != null && it.programId == data.activeProgramId
-            }
-    val workouts = scopedHistory.filter { !it.localDate().isBefore(week) }
-    val sets = workouts.sumOf { it.completedSets() }
-    val exerciseIds =
-        workouts
-            .flatMap { it.exercises }
-            .filter { it.sets.any { s -> s.completed } }
-            .map { it.exerciseId }
-            .toSet()
-    val muscles = exercises.filter { it.id in exerciseIds }.flatMap { it.muscles }.toSet().size
-    val targetSets =
-        if (data.activeProgramId != null) data.routines.sumOf { it.exerciseIds.size * 3 } else 0
+    val metrics = data.dashboardMetrics(exercises)
+    val allWorkouts = metrics.allWorkouts
+    val scopedHistory = metrics.history
+    val workouts = metrics.weekly
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 108.dp)) {
         item {
             PageHeading(
@@ -92,18 +79,42 @@ fun DashboardScreen(
                         .padding(bottom = 26.dp)
                 ) {
                     SectionTitle("Weekly Workouts")
+                    Text(
+                        if (metrics.includesActive)
+                            "Completed working sets · includes current workout"
+                        else "Completed working sets",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OF.muted,
+                    )
+                    metrics.planCycle?.let { cycle ->
+                        Text(
+                            "Compared with Cycle ${cycle + 1} plan",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = OF.muted,
+                        )
+                    }
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        WeeklyRing(muscles, 20, "Muscles", Modifier.weight(1f), small = true)
-                        WeeklyRing(sets, targetSets, "Sets", Modifier.weight(1.65f), small = false)
                         WeeklyRing(
-                            exerciseIds.size,
-                            if (data.activeProgramId != null)
-                                data.routines.sumOf { it.exerciseIds.size }
-                            else 0,
+                            metrics.totals.muscles,
+                            metrics.plan?.muscles,
+                            "Muscles",
+                            Modifier.weight(1f),
+                            small = true,
+                        )
+                        WeeklyRing(
+                            metrics.totals.sets,
+                            metrics.plan?.sets,
+                            "Sets",
+                            Modifier.weight(1.65f),
+                            small = false,
+                        )
+                        WeeklyRing(
+                            metrics.totals.exercises,
+                            metrics.plan?.exercises,
                             "Exercises",
                             Modifier.weight(1f),
                             small = true,
@@ -119,6 +130,8 @@ fun DashboardScreen(
                             (all, label) ->
                             TextButton(
                                 { vm.settings { it.copy(dashboardAllWorkouts = all) } },
+                                enabled =
+                                    all || data.programs.any { it.id == data.activeProgramId },
                                 colors =
                                     ButtonDefaults.textButtonColors(
                                         containerColor =
@@ -141,8 +154,8 @@ fun DashboardScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         InsightCard(
                             "Workouts",
-                            "Last 7 Workouts",
-                            scopedHistory.take(7).sumOf { it.completedSets() }.toString(),
+                            "Last 7 Completed",
+                            scopedHistory.take(7).sumOf { it.completedWorkingSets() }.toString(),
                             "sets",
                             Modifier.weight(1f),
                             onHistory,
@@ -175,7 +188,10 @@ fun DashboardScreen(
                             Spacer(Modifier.width(14.dp))
                             Column(Modifier.weight(1f)) {
                                 Text("Workouts", style = MaterialTheme.typography.titleMedium)
-                                Text("${workouts.size} completed this week", color = OF.muted)
+                                Text(
+                                    "${metrics.completedWorkouts} completed this week",
+                                    color = OF.muted,
+                                )
                             }
                             IconButton(onStart) { Icon(Icons.Rounded.Add, "Start workout") }
                         }
@@ -223,12 +239,25 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun WeeklyRing(value: Int, target: Int, label: String, modifier: Modifier, small: Boolean) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+private fun WeeklyRing(
+    value: Int,
+    target: Int?,
+    label: String,
+    modifier: Modifier,
+    small: Boolean,
+) {
+    Column(
+        modifier.semantics(mergeDescendants = true) {
+            contentDescription =
+                "$label: $value completed this week" +
+                    if (target != null && target > 0) ", $target in cycle plan" else ""
+        },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Box(Modifier.fillMaxWidth().height(170.dp), contentAlignment = Alignment.Center) {
             Canvas(Modifier.fillMaxWidth().aspectRatio(1f).padding(2.dp)) {
                 drawCircle(OF.line, style = Stroke(4.dp.toPx()))
-                if (target > 0 && value > 0)
+                if (target != null && target > 0 && value > 0)
                     drawArc(
                         OF.blue,
                         -90f,
@@ -244,11 +273,7 @@ private fun WeeklyRing(value: Int, target: Int, label: String, modifier: Modifie
                     fontSize = if (small) 24.sp else 30.sp,
                     fontWeight = FontWeight.Bold,
                 )
-                Text(
-                    if (target > 0) "${(target-value).coerceAtLeast(0)} left" else "No target",
-                    fontSize = if (small) 12.sp else 14.sp,
-                    color = OF.muted,
-                )
+                Text("this week", fontSize = if (small) 12.sp else 14.sp, color = OF.muted)
             }
         }
         Text(
@@ -259,7 +284,7 @@ private fun WeeklyRing(value: Int, target: Int, label: String, modifier: Modifie
             fontFamily = MaterialTheme.typography.headlineMedium.fontFamily,
         )
         Text(
-            if (target > 0) "$target target" else "Set a routine",
+            if (target != null) "$target planned" else "No plan",
             color = OF.muted,
             fontSize = 12.sp,
         )
