@@ -100,3 +100,17 @@ The first independent onboarding/navigation review, [onboarding-navigation-01.md
 
 
 The fresh independent [navigation-content-02.md](reviews/navigation-content-02.md) verdict is **ship for the navigation correction only**: no material new regression established in 14 paired native captures and both motion records. Content continuation around the capsule, fixed targets, search access and end clearance meet the bounded request. The independent onboarding **rebuild** and earlier full-clone **fix** findings remain open.
+
+
+## Live metrics and local-media checkpoint
+
+Dashboard aggregation no longer uses unrelated workout templates or a hardcoded muscle target. Completed working sets, distinct exercises and primary/secondary muscles derive from stored history plus the current session, deduplicated by workout identity. No active program falls back to All Workouts. Exact per-cycle program sets/skips supply explicitly labeled cycle comparisons, not an invented weekly schedule. Levels includes current completed working sets too. See [data semantics](LIVE_DATA.md).
+
+Build/lint and **30 unit tests** pass, with four new regression cases for no-program history, live completion/undo/finish/discard/deduplication, exact cycle targets/skips versus unrelated templates, and date bounds/history ordering. The public clean build repeats all 30 tests and Android-test APK compilation with the ignored reference pack absent, then restores it. No new connected instrumentation run is claimed.
+
+The private local-media APK contains 1,345 catalog records, 1,831 image paths for 619 exercises and 44 muscle-group SVGs; every mapped image path exists, and the signature verifies. It is separate from the public APK and remains outside Git/GitHub releases. There are still 726 exercises without recovered photos and zero recovered original videos.
+
+
+Native checks on API26/API35 combine UI-driven prefixes with separately resumed tails after test-helper corrections; they are not uninterrupted full-run passes. The fixture starts with one saved working set and one active session: completing one set shows 2, undo returns 1, completing both shows 3, restarting keeps 3 and finishing keeps 3. Volume shows 150kg and Levels reports 3 Lats sets including the live session. A separate synthetic program seed shows 3 completed versus 5 Cycle 2 planned sets and changes to 4 in All Workouts. Photo/anatomy list and Chin-Up detail captures render on both emulators. Each phase restores the exact original own-app data.
+
+Earlier helper attempts failed on a missing null JSON key, a sheet/Back transition, clipped volume/header lookup and selecting the ring's Exercises label instead of the navigation entry. These failed attempts are retained and are not app-test passes. The final resumed result records link their preceding flow evidence. The parent inspected the actual required stills/contact sheets and validated 12 PNG/XML pairs. Independent review is pending; these checks establish the local mapping and recovered-media checkpoint, not complete source analytics or full photo/video parity.
