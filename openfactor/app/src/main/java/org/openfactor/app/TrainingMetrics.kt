@@ -4,6 +4,11 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
 
+fun averageWeeklySets(sets: Int, days: Int): Double {
+    require(days > 0) { "The averaging period must be positive" }
+    return sets * 7.0 / days
+}
+
 /** Dashboard/Levels count completed working sets; warm-ups remain in session history. */
 fun Workout.completedWorkingSets() =
     exercises.sumOf { e -> e.sets.count { it.completed && !it.warmup } }

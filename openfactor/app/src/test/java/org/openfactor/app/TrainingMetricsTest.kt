@@ -6,6 +6,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TrainingMetricsTest {
+    @Test
+    fun levelsUsesTheSameWeeklyUnitsForShortAndLongPeriods() {
+        assertEquals(3.0, averageWeeklySets(3, 7), 0.000001)
+        assertEquals(0.7, averageWeeklySets(3, 30), 0.000001)
+        assertEquals(7.0 / 30.0, averageWeeklySets(3, 90), 0.000001)
+        assertEquals(0.0, averageWeeklySets(0, 90), 0.0)
+    }
+
     private val today = LocalDate.of(2026, 10, 21)
     private val now = today.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
     private val catalog =

@@ -82,8 +82,12 @@ fun LevelsScreen(
     val totals =
         remember(data.active, data.history, exercises, days) {
             (upperMuscleGroups + lowerMuscleGroups).associateWith { m ->
-                muscleContributions(data.trainingWorkouts(), exercises, days, m).sumOf { it.sets } /
-                    (days / 7.0)
+                averageWeeklySets(
+                    muscleContributions(data.trainingWorkouts(), exercises, days, m).sumOf {
+                        it.sets
+                    },
+                    days,
+                )
             }
         }
     val context = LocalContext.current
@@ -186,7 +190,7 @@ fun LevelsScreen(
                                 Column(Modifier.weight(1f)) {
                                     Text(muscle, style = MaterialTheme.typography.titleMedium)
                                     Text(
-                                        "${"%.1f".format(java.util.Locale.US, totals.getValue(muscle))} sets",
+                                        "${"%.1f".format(java.util.Locale.US, totals.getValue(muscle))} sets/week",
                                         color = OF.muted,
                                     )
                                     LinearProgressIndicator(
@@ -232,7 +236,10 @@ fun LevelsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(c.exercise.title, Modifier.weight(1f))
-                            Text("${c.sets} sets", color = OF.muted)
+                            Text(
+                                "${"%.1f".format(java.util.Locale.US, averageWeeklySets(c.sets, days))} sets/week",
+                                color = OF.muted,
+                            )
                         }
                     }
                 }
