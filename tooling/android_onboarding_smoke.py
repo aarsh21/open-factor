@@ -43,6 +43,6 @@ now=nav_targets();assert nav==now,(nav,now)
 # Disable system animation and prove every destination remains accessible. Always restore the setting.
 old=adb('shell','settings','get','global','animator_duration_scale').strip()
 try:
- adb('shell','settings','put','global','animator_duration_scale','0');tap('Exercises');find(state()['gyms'][0]['name']);capture('reduced-motion');tap('Dashboard');find('Dashboard')
+ adb('shell','settings','put','global','animator_duration_scale','0');tap('Exercises');find('Search exercises');capture('reduced-motion');assert bounds(find('Search exercises')[0])[3]<min(v[1] for v in nav_targets().values());enter('Search exercises','chin-up');find('Chin-Up');capture('exercise-search');tap('Clear search','content-desc');tap('Dashboard');find('Dashboard')
 finally:adb('shell','settings','put','global','animator_duration_scale',old)
 (a.output/'result.json').write_text(json.dumps({'status':'passed','serial':serial,'onboarding_flow':True,'defer_restart_resume':True,'validation_recovery':True,'training_data_preserved':True,'fixed_navigation_targets':True,'last_row_clearance':True,'reduced_motion_destinations':True},indent=2)+'\n');print((a.output/'result.json').read_text())

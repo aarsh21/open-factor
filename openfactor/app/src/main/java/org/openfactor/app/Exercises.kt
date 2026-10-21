@@ -338,7 +338,11 @@ fun ExerciseLibrary(
             }
         }
         Row(
-            Modifier.fillMaxWidth().background(OF.top).imePadding().padding(12.dp),
+            Modifier.fillMaxWidth()
+                .padding(bottom = if (onBack == null) 88.dp else 0.dp)
+                .background(OF.top)
+                .imePadding()
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {

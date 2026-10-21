@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-21T15:06:54.108367+00:00",
+  "generatedAt": "2026-10-21T16:55:28.341076+00:00",
   "title": "Design System: Open Factor",
   "extensions": {
     "colorMeta": {
@@ -335,12 +335,48 @@
         "purpose": "Fixed destination labels; selected bold, inactive regular."
       }
     },
-    "shadows": [],
+    "shadows": [
+      {
+        "name": "navigation-native-elevation",
+        "value": "6dp + abs(scrollEnergy) * 3dp",
+        "purpose": "Ui.kt graphicsLayer shadowElevation on shell material only, 6dp at rest and at most 9dp; native elevation is not a measured CSS shadow."
+      }
+    ],
     "motion": [
       {
         "name": "navigation-selection-duration",
-        "value": "300ms",
-        "purpose": "Ui.kt animateDpAsState tween(300); Compose default easing is not redefined. Web preview timing is illustrative."
+        "value": "280ms",
+        "purpose": "Shared animateDpAsState selection with FastOutSlowInEasing; replaces the former 300ms selection."
+      },
+      {
+        "name": "navigation-response-duration",
+        "value": "180ms",
+        "purpose": "Shell animateFloatAsState response uses FastOutSlowInEasing. Icon tween uses Compose default easing."
+      },
+      {
+        "name": "navigation-response-easing",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Compose FastOutSlowInEasing for shared selection and shell response."
+      },
+      {
+        "name": "navigation-icon-scale",
+        "value": "1.04",
+        "purpose": "Selected 26dp icon scales independently; fixed tab hit areas and labels do not shift."
+      },
+      {
+        "name": "navigation-shell-scroll-response",
+        "value": "translationY = energy * 2dp; scaleX = 1 - abs(energy) * 0.008",
+        "purpose": "Root user scroll energy = clamp(previous - consumed.y / 160, -1, 1). Only shell material and its selected surface transform; anchor and touch row stay fixed."
+      },
+      {
+        "name": "navigation-settle-delay",
+        "value": "140ms",
+        "purpose": "MainActivity.kt LaunchedEffect(scrollEnergy, tab) resets energy after this delay; the shell settles through the response tween."
+      },
+      {
+        "name": "navigation-system-animation-policy",
+        "value": "ValueAnimator.areAnimatorsEnabled(); Compose animation scale",
+        "purpose": "Scroll-energy updates are gated by Android animator enablement; Compose state animations follow system scaling. Implementation evidence does not establish TalkBack or complete reduced-motion verification."
       }
     ],
     "breakpoints": []
@@ -406,9 +442,9 @@
       "name": "Floating navigation",
       "kind": "nav",
       "refersTo": "navigation",
-      "description": "Fixed native destinations and shared moving capsule. Panel focus/hover illustrates offsets; it does not persist navigation or emulate Android semantics.",
-      "html": "<nav class=\"ds-nav\" aria-label=\"Main\"><div class=\"ds-nav-track\" role=\"tablist\"><span class=\"ds-nav-selection\"></span><button role=\"tab\" aria-selected=\"true\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3 3h8v8H3zm10 0h8v5h-8zm0 7h8v11h-8zM3 13h8v8H3z\"/></svg><span>Dashboard</span></button><button role=\"tab\" aria-selected=\"false\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m20.57 14.86 1.43-1.43-1.43-1.43L17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14 4.14 5.57 2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z\"/></svg><span>Workout</span></button><button role=\"tab\" aria-selected=\"false\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M9.5 3a6.5 6.5 0 1 0 3.98 11.64L19.85 21 21 19.85l-6.36-6.37A6.5 6.5 0 0 0 9.5 3m0 2a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9\"/></svg><span>Exercises</span></button><button role=\"tab\" aria-selected=\"false\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill-rule=\"evenodd\" d=\"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20m0 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6m-6 11c0-2 4-3.1 6-3.1s6 1.1 6 3.1a8 8 0 0 1-12 0\"/></svg><span>Settings</span></button></div></nav>",
-      "css": ".ds-nav{max-width:440px;border:1px solid transparent;border-radius:999px;background:linear-gradient(#1C1C1E,#1C1C1E) padding-box,linear-gradient(#9B786E,#2E2929) border-box}.ds-nav-track{height:66px;position:relative;display:flex;padding:0 4px}.ds-nav-selection{position:absolute;top:4px;left:4px;width:calc((100% - 8px)/4);height:58px;border-radius:999px;background:#393939;transition:transform 300ms}.ds-nav-track button{font-family:\"DM Sans\",sans-serif;z-index:1;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:0;border:0;border-radius:999px;background:transparent;color:#A1A4AA;font-size:12px;line-height:16px;cursor:pointer}.ds-nav-track svg{fill:#92969C}.ds-nav-track button[aria-selected=\"true\"]{color:#fff;font-weight:700}.ds-nav-track button[aria-selected=\"true\"] svg{fill:#fff}.ds-nav-track button:hover{color:#fff}.ds-nav-track button:focus-visible{outline:2px solid #fff;outline-offset:-2px}.ds-nav-track:has(button:nth-of-type(2):hover) .ds-nav-selection,.ds-nav-track:has(button:nth-of-type(2):focus-visible) .ds-nav-selection{transform:translateX(100%)}.ds-nav-track:has(button:nth-of-type(3):hover) .ds-nav-selection,.ds-nav-track:has(button:nth-of-type(3):focus-visible) .ds-nav-selection{transform:translateX(200%)}.ds-nav-track:has(button:nth-of-type(4):hover) .ds-nav-selection,.ds-nav-track:has(button:nth-of-type(4):focus-visible) .ds-nav-selection{transform:translateX(300%)}"
+      "description": "Overlaid native capsule with transparent surroundings, fixed touch row and shell-only scroll response. Panel preview illustrates selection/icon timing at rest; it does not emulate Android scroll, elevation, persistence or semantics.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Main\"><div class=\"ds-nav-track\" role=\"tablist\"><div class=\"ds-nav-material\"><span class=\"ds-nav-selection\"></span></div><button role=\"tab\" aria-selected=\"true\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3 3h8v8H3zm10 0h8v5h-8zm0 7h8v11h-8zM3 13h8v8H3z\"/></svg><span>Dashboard</span></button><button role=\"tab\" aria-selected=\"false\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m20.57 14.86 1.43-1.43-1.43-1.43L17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14 4.14 5.57 2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z\"/></svg><span>Workout</span></button><button role=\"tab\" aria-selected=\"false\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M9.5 3a6.5 6.5 0 1 0 3.98 11.64L19.85 21 21 19.85l-6.36-6.37A6.5 6.5 0 0 0 9.5 3m0 2a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9\"/></svg><span>Exercises</span></button><button role=\"tab\" aria-selected=\"false\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill-rule=\"evenodd\" d=\"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20m0 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6m-6 11c0-2 4-3.1 6-3.1s6 1.1 6 3.1a8 8 0 0 1-12 0\"/></svg><span>Settings</span></button></div></nav>",
+      "css": ".ds-nav{max-width:440px;background:transparent}.ds-nav-material{position:absolute;inset:0;overflow:hidden;border:1px solid transparent;border-radius:999px;background:linear-gradient(#1C1C1E,#1C1C1E) padding-box,linear-gradient(#9B786E,#2E2929) border-box;pointer-events:none}.ds-nav-track{height:66px;position:relative;display:flex;padding:0 4px}.ds-nav-selection{position:absolute;top:4px;left:4px;width:calc((100% - 8px)/4);height:58px;border-radius:999px;background:#393939;transition:transform 280ms cubic-bezier(.4,0,.2,1)}.ds-nav-track button{font-family:\"DM Sans\",sans-serif;z-index:1;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:0;border:0;border-radius:999px;background:transparent;color:#A1A4AA;font-size:12px;line-height:16px;cursor:pointer}.ds-nav-track svg{fill:#92969C;transition:transform 180ms cubic-bezier(.4,0,.2,1)}.ds-nav-track button[aria-selected=\"true\"]{color:#fff;font-weight:700}.ds-nav-track button[aria-selected=\"true\"] svg{fill:#fff;transform:scale(1.04)}.ds-nav-track button:hover{color:#fff}.ds-nav-track button:focus-visible{outline:2px solid #fff;outline-offset:-2px}.ds-nav-track:has(button:nth-of-type(2):hover) .ds-nav-selection,.ds-nav-track:has(button:nth-of-type(2):focus-visible) .ds-nav-selection{transform:translateX(100%)}.ds-nav-track:has(button:nth-of-type(3):hover) .ds-nav-selection,.ds-nav-track:has(button:nth-of-type(3):focus-visible) .ds-nav-selection{transform:translateX(200%)}.ds-nav-track:has(button:nth-of-type(4):hover) .ds-nav-selection,.ds-nav-track:has(button:nth-of-type(4):focus-visible) .ds-nav-selection{transform:translateX(300%)}@media(prefers-reduced-motion:reduce){.ds-nav-selection,.ds-nav-track svg{transition:none}}"
     },
     {
       "name": "Grouped Settings rows",
@@ -421,7 +457,7 @@
   ],
   "narrative": {
     "northStar": "Source Workouts with Nuvio navigation and settings",
-    "overview": "Preserve the inherited Workouts visual hierarchy: neutral charcoal fields, white foreground, wide geometric workout headings, DM Sans reading text, blue training diagrams and real exercise photography. The interface serves recording and reviewing training. Density comes from aligned metrics and clear groups, rather than ornamental content.\n\nThe user's two explicit exceptions are Nuvio's floating navigation capsule and grouped Settings presentation. Their warmer navigation rim, moving selected surface, oversized Settings title and monochrome icon tiles belong to those components. They do not replace the workout world's neutral surfaces. Qualitative direction is already pinned in [PRODUCT.md](PRODUCT.md) and the [workouts contract](.impeccable/surfaces/workouts.md); this document records reused implementation rules, not a redesign or complete source acceptance.\n\nEvidence sampled: `openfactor/app/src/main/java/org/openfactor/app/Ui.kt`, `MainActivity.kt`, `Dashboard.kt`, `Settings.kt`, `WorkoutSession.kt`, exercise filters/search in `Exercises.kt`, and selection/auto-next in `Data.kt`. Existing API 26 logger dashboard, session and settings PNGs were visually inspected, alongside the private source live/empty logger originals outside this repository. Captures support the rendered checkpoint, not every later behavior correction. No new device, font-scaling, IME or TalkBack test was performed. The investigation ledger records later duration/auto-next corrections; older review findings must be reconciled against current code.",
+    "overview": "Preserve the inherited Workouts visual hierarchy: neutral charcoal fields, white foreground, wide geometric workout headings, DM Sans reading text, blue training diagrams and real exercise photography. The interface serves recording and reviewing training. Density comes from aligned metrics and clear groups, rather than ornamental content.\n\nThe user's Nuvio exceptions are the floating navigation capsule and grouped Settings presentation; the user also explicitly requested the new onboarding and subtle scroll/tab response at a fixed navigation anchor. Their warmer navigation rim, moving selected surface, oversized Settings title and monochrome icon tiles belong to those components. They do not replace the workout world's neutral surfaces. Qualitative direction is already pinned in [PRODUCT.md](PRODUCT.md) and the [workouts contract](.impeccable/surfaces/workouts.md); this document records reused implementation rules, not a redesign or complete source acceptance.\n\nEvidence for this documentation refresh is local source inspection of `openfactor/app/src/main/java/org/openfactor/app/Onboarding.kt`, `Ui.kt`, `MainActivity.kt`, `Data.kt`, `Dashboard.kt`, `Exercises.kt` and `Settings.kt`, plus `PRODUCT.md`, both surface contracts and `docs/open-factor/ONBOARDING.md`. The supplied checkpoint is app correction `0a12a431` after `51e19fdb`; revision identity was supplied by the parent, not independently checked here. The parent reports 26 unit tests, build/lint, and combined native setup plus resumed-navigation checks on API 26/API 35. These are reported checks, not runs or visual inspections performed by this documentation pass. Earlier logger/dashboard/settings captures remain evidence only for their captured checkpoint. No runtime, device, font-scaling, IME or TalkBack verification was performed here. Independent review is separate and pending; neither these checks nor this document establish full source parity or clone acceptance. A subsequent source-only recheck confirms the root Exercises search footer now adds bottom clearance (88dp) when `onBack == null`; picker/detail behavior is unchanged. Tests remain parent-owned and ongoing; this recheck adds no runtime verification or parity acceptance.",
     "keyCharacteristics": [
       "Neutral charcoal hierarchy with white primary actions and restrained semantic color.",
       "Geometric workout headings and DM Sans text when the local reference pack is present.",
@@ -451,7 +487,7 @@
       },
       {
         "name": "The Fixed Targets Rule",
-        "body": "Animate one shared selected capsule beneath fixed icon and label targets; preserve the native selection semantics and safe-area padding.",
+        "body": "Animate one shared selected capsule beneath fixed tab targets; confine scroll translation, width and depth response to the shell material, retain the fixed anchor and touch row, and preserve native selection semantics, system insets and trailing scroll clearance.",
         "section": "components"
       }
     ],
