@@ -6,7 +6,7 @@ An open source Android workout tracker built in a GPLv3 fork of [NuvioMobile](ht
 
 ## Test on Android
 
-Download the installable APK from [Open Factor 0.1.0-alpha.2](https://github.com/aarsh21/open-factor/releases/tag/v0.1.0-alpha.2). Android 8.0 or newer is required. This debug-signed testing prerelease excludes the private reference-media pack; read the [release notes and known limits](docs/open-factor/releases/v0.1.0-alpha.2.md).
+Download the installable APK from [Open Factor 0.1.0-alpha.4](https://github.com/aarsh21/open-factor/releases/tag/v0.1.0-alpha.4). Android 8.0 or newer is required. This debug-signed media-enabled testing prerelease includes recovered photos for 619 of 1,345 exercises; read the [release notes and known limits](docs/open-factor/releases/v0.1.0-alpha.4.md).
 
 ## Build
 

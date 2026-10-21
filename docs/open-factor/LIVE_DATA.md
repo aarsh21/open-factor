@@ -8,8 +8,8 @@ Levels uses the same completed-working-set policy, including the current workout
 
 ## Why alpha.2 showed icons
 
-The public alpha.2 APK deliberately contains no `assets/reference/` pack. Its icons are fallback content, not failed network downloads. Source imagery is available only in a local build with the operator-supplied APK imported through `tooling/import_reference_apk.py`.
+The public alpha.2 APK deliberately contains no `assets/reference/` pack. Its icons are fallback content, not failed network downloads. Source imagery is available in builds with the operator-supplied APK imported through `tooling/import_reference_apk.py`, including the explicitly requested media-enabled alpha.4 release.
 
-The current local pack joins 1,831 image files to **619 of 1,345 exercises**, with 44 anatomy SVGs and equipment artwork. Every mapped image path exists in the local APK. The remaining 726 exercises have no recovered photo mapping. No original exercise videos are bundled; their future acquisition remains deferred. The local media testing APK is separate from public GitHub source/releases. The code, tests and audit methodology can be public; extracted media stays outside Git.
+The current local pack joins 1,831 image files to **619 of 1,345 exercises**, with 44 anatomy SVGs and equipment artwork. Every mapped image path exists in the local APK. The remaining 726 exercises have no recovered photo mapping. No original exercise videos are bundled; their future acquisition remains deferred. The media testing APK was initially local. Following the user’s explicit request to release that build, alpha.4 includes this pack as a release artifact. Extracted media stays outside the Git source tree and retains its original ownership; application-code licensing does not relicense it.
 
 Install the local-media testing APK as an update to `org.openfactor.app` to retain local data. A future public/source-only update without the reference pack will return to media fallbacks. Do not infer complete media coverage or runtime video parity from a successful photo check.
