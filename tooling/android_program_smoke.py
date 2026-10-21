@@ -25,10 +25,40 @@ def find(t,attr='text',prefix=False):
   if found:return found
   time.sleep(.3)
  (a.output/'failure.xml').write_text(adb('shell','cat','/sdcard/of-program.xml'));raise AssertionError((t,attr))
+def bounds(n):return tuple(map(int,re.findall(r'\d+',n.get('bounds'))))
+def ensure_visible(t,attr='text',prefix=False):
+ for _ in range(5):
+  ns=nodes()
+  matches=[n for n in ns if (n.get(attr,'').startswith(t) if prefix else n.get(attr,'').strip()==t)]
+  # Compose can expose an 11px sliver behind the anchored footer as a node.
+  if any(bounds(n)[3]-bounds(n)[1]>=30 for n in matches):return
+  scrolls=[n for n in ns if n.get('class')=='android.widget.ScrollView']
+  if not scrolls:return
+  n=max(scrolls,key=lambda n:bounds(n)[3]-bounds(n)[1]);l,top,r,b= bounds(n)
+  x=(l+r)//2;h=b-top
+  adb('shell','input','swipe',str(x),str(top+int(h*.85)),str(x),str(top+int(h*.2)),'300')
 def tap(t,attr='text',prefix=False,last=False):
- n=find(t,attr,prefix)[-1 if last else 0];x,y,r,b=map(int,re.findall(r'\d+',n.get('bounds')));adb('shell','input','tap',str((x+r)//2),str((y+b)//2))
+ ensure_visible(t,attr,prefix)
+ n=find(t,attr,prefix)[-1 if last else 0];x,y,r,b=bounds(n);assert b-y>=30,'Control clipped: '+t
+ adb('shell','input','tap',str((x+r)//2),str((y+b)//2))
 def enter(t,value,attr='text'):
- tap(t,attr);adb('shell','input','keyevent','123',*(['67']*25));adb('shell','input','text',str(value).replace(' ','%s'));adb('shell','input','keyevent','4')
+ tap(t,attr)
+ def focused():
+  fields=[n for n in nodes() if n.get('class')=='android.widget.EditText' and n.get('focused')=='true']
+  assert len(fields)==1, 'Expected one focused input'
+  return fields[0].get('text','')
+ # Separate key events and wait for Compose/IME state instead of assuming an event burst cleared text.
+ for _ in range(3):
+  old=focused()
+  if not old:break
+  adb('shell','input','keyevent','123')
+  count=min(len(old)+3,250)
+  adb('shell','for i in '+ ' '.join(str(n) for n in range(count)) +'; do input keyevent 67; done')
+ else:raise AssertionError('Input did not clear: '+t)
+ assert focused()=='', 'Old input text remains: '+t
+ adb('shell','input','text',str(value).replace(' ','%s'))
+ assert focused()==str(value), 'Replacement input differs: '+t
+ adb('shell','input','keyevent','4')
 def capture(name):
  nodes();(a.output/(name+'.png')).write_bytes(adb('exec-out','screencap','-p',raw=True));(a.output/(name+'.xml')).write_text(adb('shell','cat','/sdcard/of-program.xml'))
 def state():

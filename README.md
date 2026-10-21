@@ -33,6 +33,8 @@ The debug APK is `openfactor/app/build/outputs/apk/debug/app-debug.apk`, package
 - Export/restore local JSON backups, including programs and drafts.
 - Nuvio-derived floating pill navigation and grouped settings.
 
+See [manual program usage and limits](docs/open-factor/PROGRAMS.md).
+
 ## Local reference content
 
 The public source includes descriptive metadata for all 1,345 exercises and 297 equipment entities, plus Material icons. Original instructions, images, fonts, animations and videos use an ignored local pack; their ownership is separate from this repository's GPL code license.
