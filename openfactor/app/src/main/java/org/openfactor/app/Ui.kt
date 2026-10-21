@@ -225,13 +225,9 @@ fun RoundAction(icon: ImageVector, description: String, onClick: () -> Unit) {
 }
 
 @Composable
-fun PageHeading(
-    title: String,
-    back: (() -> Unit)? = null,
-    actions: @Composable RowScope.() -> Unit = {},
-) {
+fun workoutDisplayFont(): FontFamily {
     val context = LocalContext.current
-    val display = remember {
+    return remember {
         runCatching {
                 FontFamily(
                     Typeface.Builder(context.assets, "reference/fonts/MacroSans-VF.ttf")
@@ -242,6 +238,15 @@ fun PageHeading(
             }
             .getOrDefault(FontFamily.SansSerif)
     }
+}
+
+@Composable
+fun PageHeading(
+    title: String,
+    back: (() -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {},
+) {
+    val display = workoutDisplayFont()
     Row(
         Modifier.fillMaxWidth().background(OF.top).padding(horizontal = 18.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
