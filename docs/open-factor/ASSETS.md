@@ -8,6 +8,8 @@ The reproducible local importer at `tooling/import_reference_apk.py` reads an op
 
 The inspected catalog has 1,345 exercise records. Exact filename-ID joins find images for 619 and Markdown for 1,213. The source APK also contains 297 equipment PNGs, 44 muscle-group SVGs and four body avatars. All are copied into the local pack with their original ownership retained. The importer also copies source fonts and Rive assets for local inspection; not every copied asset is rendered by the current application.
 
-There are no verified video files or per-exercise video URLs in the import. The native app constructs a `videos/{operand1}_{operand2}.mp4` path, but the operand meanings and authenticated retrieval remain unresolved. Open Factor must not fabricate working URLs or claim image cycling reproduces the original videos.
+The static native trace resolves `videos/{exerciseId}_{thumbnailSuffix}.mp4`: 1,831 ordered paths for 619 exercises. A path is not a working URL. A standard anonymous Firebase metadata request returned HTTP 401 (invalid App Check token); no source videos or playback have been verified. Camera labels remain unknown, so the UI numbers the views without inventing angle names.
+
+The importer orders the preferred image first and the remaining suffixes alphabetically. It can ingest matching MP4 files from an authorized local export with `--video-directory /path/to/export`; either flat filenames or a `videos/` subdirectory works. It validates the MP4 signature and records each file digest. Asset-backed video files are copied into the app's cache for native playback. Missing clips retain an honest photo preview; there is no image-cycling approximation of video.
 
 Public distribution of a reference-filled APK is deliberately not part of the source-only CI workflow. A future redistributable content pack needs an explicit asset license or replacement content with suitable permissions.

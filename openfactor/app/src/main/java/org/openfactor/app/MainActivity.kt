@@ -52,7 +52,14 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
         detailId = id
         route = "exercise"
     }
-    BackHandler(route.isNotBlank()) { route = if (route == "exercise") previousRoute else "" }
+    BackHandler(route.isNotBlank()) {
+        route =
+            when (route) {
+                "exercise" -> previousRoute
+                "gym" -> "gyms"
+                else -> ""
+            }
+    }
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = OF.background,
@@ -73,6 +80,18 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                 .background(OF.background)
         ) {
             when (route) {
+                "gyms" ->
+                    GymProfilesScreen(data, vm, { route = "" }) {
+                        detailId = it
+                        route = "gym"
+                    }
+                "gym" ->
+                    data.gyms
+                        .firstOrNull { it.id == detailId }
+                        ?.let { gym ->
+                            GymEditorScreen(gym, data, vm, { route = "gyms" }) { detailId = it }
+                        }
+                "levels" -> LevelsScreen(data, exercises, { route = "" }, ::openExercise)
                 "exercise" ->
                     exercises
                         .firstOrNull { it.id == detailId }
@@ -102,6 +121,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                         onBack = { route = "session" },
                         onCustom = { route = "custom" },
                         picking = true,
+                        gyms = data.gyms,
+                        equipmentCatalog = vm.equipmentCatalog,
                     )
                 "custom" ->
                     CustomExercise({ route = "" }) { n, m, e, i ->
@@ -157,9 +178,12 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                             DashboardScreen(
                                 data,
                                 exercises,
+                                vm,
                                 onWorkout = { tab = 1 },
                                 onHistory = { route = "history" },
                                 onStart = { shortcuts = true },
+                                onResume = { route = "session" },
+                                onLevels = { route = "levels" },
                             )
                         1 ->
                             WorkoutScreen(
@@ -182,6 +206,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                 vm::favorite,
                                 ::openExercise,
                                 onCustom = { route = "custom" },
+                                gyms = data.gyms,
+                                equipmentCatalog = vm.equipmentCatalog,
                             )
                         3 ->
                             SettingsScreen(
@@ -190,6 +216,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                 snackbar,
                                 onExercises = { tab = 2 },
                                 onHistory = { route = "history" },
+                                onGyms = { route = "gyms" },
                             )
                     }
             }

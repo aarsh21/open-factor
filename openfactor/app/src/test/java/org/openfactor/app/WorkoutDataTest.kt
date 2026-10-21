@@ -75,4 +75,81 @@ class WorkoutDataTest {
     fun unsupportedBackupRejected() {
         DataCodec.decode("{\"schemaVersion\":999}")
     }
+
+    @Test
+    fun restDeadlineAndDashboardChoicesSurviveBackup() {
+        val deadline = System.currentTimeMillis() + 120000
+        val source =
+            AppData(
+                active = Workout(name = "Training", restUntil = deadline),
+                preferences =
+                    Preferences(
+                        dashboardAllWorkouts = true,
+                        showWeeklyWorkouts = false,
+                        showInsights = false,
+                        showHabits = false,
+                    ),
+            )
+        val restored = DataCodec.decode(DataCodec.encode(source))
+        assertEquals(deadline, restored.active!!.restUntil)
+        assertEquals(source, restored)
+    }
+
+    @Test
+    fun levelsCountCompletedWorkingSetsInPrimaryAndSecondaryGroups() {
+        val exercise = Exercise("press", "Press", "Chest", "Barbell", secondary = listOf("Triceps"))
+        val workout =
+            Workout(
+                name = "Training",
+                exercises =
+                    listOf(
+                        SessionExercise(
+                            exerciseId = "press",
+                            sets =
+                                listOf(
+                                    LoggedSet(completed = true),
+                                    LoggedSet(completed = true, warmup = true),
+                                    LoggedSet(completed = false),
+                                ),
+                        )
+                    ),
+            )
+        assertEquals(
+            1,
+            muscleContributions(listOf(workout), listOf(exercise), 7, "Chest").single().sets,
+        )
+        assertEquals(
+            1,
+            muscleContributions(listOf(workout), listOf(exercise), 7, "Triceps").single().sets,
+        )
+        assertTrue(muscleContributions(listOf(workout), listOf(exercise), 7, "Quads").isEmpty())
+    }
+
+    @Test
+    fun gymSelectionsAndWeightsSurviveBackup() {
+        val gym =
+            GymProfile(
+                name = "Garage",
+                icon = "garage",
+                equipmentIds = setOf("bar", "plates"),
+                weightsKg = mapOf("plates" to listOf(1.25, 2.5, 5.0)),
+            )
+        val source = AppData(gyms = listOf(gym))
+        assertEquals(source, DataCodec.decode(DataCodec.encode(source)))
+        val oldBackup = DataCodec.decode("{\"schemaVersion\":1}")
+        assertTrue(oldBackup.gyms.isEmpty())
+    }
+
+    @Test
+    fun gymAvailabilityRequiresAllMembersOfAnAlternativeGroup() {
+        val resistance = listOf(setOf("bar", "plates"), setOf("dumbbells"))
+        val support = listOf(setOf("bench", "rack"), setOf("station"))
+        assertFalse(equipmentRequirementsMet(resistance, support, setOf("bar", "station")))
+        assertFalse(equipmentRequirementsMet(resistance, support, setOf("bar", "plates", "bench")))
+        assertTrue(equipmentRequirementsMet(resistance, support, setOf("bar", "plates", "station")))
+        assertTrue(
+            equipmentRequirementsMet(resistance, support, setOf("dumbbells", "bench", "rack"))
+        )
+        assertTrue(equipmentRequirementsMet(emptyList(), emptyList(), emptySet()))
+    }
 }

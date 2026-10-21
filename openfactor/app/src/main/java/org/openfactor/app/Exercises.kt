@@ -1,8 +1,5 @@
 package org.openfactor.app
 
-import android.net.Uri
-import android.widget.MediaController
-import android.widget.VideoView
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,8 +18,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import kotlinx.coroutines.delay
 
 @Composable
 fun ExerciseLibrary(
@@ -34,19 +29,40 @@ fun ExerciseLibrary(
     onBack: (() -> Unit)? = null,
     onCustom: () -> Unit = {},
     picking: Boolean = false,
+    gyms: List<GymProfile> = emptyList(),
+    equipmentCatalog: EquipmentCatalog? = null,
 ) {
+    var gymId by rememberSaveable { mutableStateOf("") }
+    var gymMenu by remember { mutableStateOf(false) }
+    var type by rememberSaveable { mutableStateOf("All types") }
+    var laterality by rememberSaveable { mutableStateOf("All lateralities") }
+    val gym = gyms.find { it.id == gymId } ?: gyms.firstOrNull()
     var query by rememberSaveable { mutableStateOf("") }
     var muscle by rememberSaveable { mutableStateOf("All muscles") }
     var equipment by rememberSaveable { mutableStateOf("All equipment") }
     var onlyFavorites by rememberSaveable { mutableStateOf(false) }
     var filter by remember { mutableStateOf(false) }
     val filtered =
-        remember(exercises, query, muscle, equipment, onlyFavorites, favorites) {
+        remember(
+            exercises,
+            query,
+            muscle,
+            equipment,
+            onlyFavorites,
+            favorites,
+            gym,
+            type,
+            laterality,
+        ) {
             exercises
                 .filter { e ->
-                    (query.isBlank() ||
-                        e.name.contains(query, true) ||
-                        e.aliases.any { it.contains(query, true) }) &&
+                    (equipmentCatalog?.available(e, gym) != false) &&
+                        (type == "All types" || e.properties["Type"] == type) &&
+                        (laterality == "All lateralities" ||
+                            e.properties["Laterality"] == laterality) &&
+                        (query.isBlank() ||
+                            e.name.contains(query, true) ||
+                            e.aliases.any { it.contains(query, true) }) &&
                         (muscle == "All muscles" || muscle in e.muscles) &&
                         (equipment == "All equipment" || equipment == e.equipment) &&
                         (!onlyFavorites || e.id in favorites)
@@ -95,10 +111,46 @@ fun ExerciseLibrary(
                 .padding(horizontal = 18.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            Box {
+                FilterChip(
+                    true,
+                    { gymMenu = true },
+                    label = { Text(gym?.name ?: "Everything Gym") },
+                    leadingIcon = { Icon(Icons.Rounded.Warehouse, null, Modifier.size(18.dp)) },
+                    trailingIcon = { Icon(Icons.Rounded.ExpandMore, null) },
+                )
+                DropdownMenu(gymMenu, { gymMenu = false }) {
+                    gyms.forEach { g ->
+                        DropdownMenuItem(
+                            text = { Text(g.name) },
+                            onClick = {
+                                gymId = g.id
+                                gymMenu = false
+                            },
+                        )
+                    }
+                }
+            }
+            FilterChooser(
+                "Type",
+                listOf("All types") +
+                    exercises.mapNotNull { it.properties["Type"] }.distinct().sorted(),
+                type,
+            ) {
+                type = it
+            }
+            FilterChooser(
+                "Laterality",
+                listOf("All lateralities") +
+                    exercises.mapNotNull { it.properties["Laterality"] }.distinct().sorted(),
+                laterality,
+            ) {
+                laterality = it
+            }
             FilterChip(
                 filter || equipment != "All equipment",
                 { filter = !filter },
-                label = { Text(if (equipment == "All equipment") "Everything Gym" else equipment) },
+                label = { Text("Filters") },
                 leadingIcon = { Icon(Icons.Rounded.Tune, null, Modifier.size(18.dp)) },
             )
             FilterChip(
@@ -290,7 +342,7 @@ private fun FilterChooser(
     var expanded by remember { mutableStateOf(false) }
     Box {
         TextButton({ expanded = true }) {
-            Text("$title: $selected")
+            Text(if (selected.startsWith("All ")) title else selected)
             Icon(Icons.Rounded.ExpandMore, null)
         }
         DropdownMenu(expanded, { expanded = false }) {
@@ -317,8 +369,6 @@ fun ExerciseDetail(
     onAdd: () -> Unit,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    var frame by rememberSaveable(e.id) { mutableIntStateOf(0) }
-    var playing by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val instructions =
         remember(e.id) {
@@ -329,12 +379,6 @@ fun ExerciseDetail(
                     .getOrDefault("")
             else e.instructions
         }
-    LaunchedEffect(playing, e.id) {
-        while (playing && e.frames.size > 1) {
-            delay(1100)
-            frame = (frame + 1) % e.frames.size
-        }
-    }
     Column(Modifier.fillMaxSize()) {
         PageHeading(
             e.title,
@@ -360,53 +404,7 @@ fun ExerciseDetail(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (tab == 0) {
-                item {
-                    if (e.video != null)
-                        AndroidView(
-                            factory = { ctx ->
-                                VideoView(ctx).apply {
-                                    setVideoURI(Uri.parse(e.video))
-                                    setMediaController(
-                                        MediaController(ctx).also { it.setAnchorView(this) }
-                                    )
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth().height(250.dp),
-                            onRelease = { it.stopPlayback() },
-                        )
-                    else if (e.frames.isNotEmpty()) {
-                        ExerciseImage(e, Modifier.fillMaxWidth().height(260.dp), frame)
-                        if (e.frames.size > 1)
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center,
-                            ) {
-                                IconButton({
-                                    frame = (frame - 1 + e.frames.size) % e.frames.size
-                                }) {
-                                    Icon(Icons.Rounded.SkipPrevious, "Previous frame")
-                                }
-                                IconButton({ playing = !playing }) {
-                                    Icon(
-                                        if (playing) Icons.Rounded.Pause
-                                        else Icons.Rounded.PlayArrow,
-                                        if (playing) "Pause demonstration"
-                                        else "Play image demonstration",
-                                    )
-                                }
-                                Text("${frame+1} / ${e.frames.size}", color = OF.muted)
-                                IconButton({ frame = (frame + 1) % e.frames.size }) {
-                                    Icon(Icons.Rounded.SkipNext, "Next frame")
-                                }
-                            }
-                    } else
-                        EmptyContent(
-                            Icons.Rounded.FitnessCenter,
-                            "${e.equipment} exercise",
-                            "No demonstration is installed for this exercise.",
-                        )
-                }
+                item { ExerciseMedia(e) }
                 if (instructions.isNotBlank())
                     markdownItems(instructions).forEach { (heading, text) ->
                         item {

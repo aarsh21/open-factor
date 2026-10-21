@@ -27,14 +27,20 @@ def capture(name):
  (a.output/(name+'.png')).write_bytes(adb('exec-out','screencap','-p',raw=True))
  (a.output/(name+'.xml')).write_text(adb('shell','cat','/sdcard/of-smoke.xml'))
 def launch():adb('shell','am','start','-n','org.openfactor.app/.MainActivity')
-launch();find('Dashboard');capture('phone-dashboard')
+# Clear only a leftover active Open Factor smoke workout, through its UI.
+adb('shell','am','force-stop','org.openfactor.app');launch();find('Dashboard')
+if any(n.get('text') == 'Resume Workout' for n in nodes()):
+ tap('Resume Workout');tap('Workout options','content-desc');tap('Discard Workout');tap('Discard')
+ adb('shell','am','force-stop','org.openfactor.app');launch();find('Dashboard')
+capture('phone-dashboard')
 tap('Workout');tap('New workout','content-desc');tap('Empty Workout')
 tap('Add Exercise');tap('Search exercises');adb('shell','input','text','barbell% sbench% spress'.replace('% s','%s'))
-tap('Add ','content-desc',prefix=True);find('Complete set','content-desc')
-tap('Complete set','content-desc');find('Mark set incomplete','content-desc');capture('phone-session')
+tap('Add ','content-desc',prefix=True);find('Complete set','content-desc',prefix=True)
+tap('Complete set','content-desc',prefix=True);find('Mark set incomplete','content-desc',prefix=True);capture('phone-session')
 # Persist the active session across a genuine process restart.
-adb('shell','am','force-stop','org.openfactor.app');launch();tap('Workout');tap('Resume Workout')
-find('Mark set incomplete','content-desc')
+adb('shell','am','force-stop','org.openfactor.app');launch();find('Resume Workout');capture('phone-dashboard-active');tap('Resume Workout')
+find('Mark set incomplete','content-desc',prefix=True)
+assert any(n.get('text','').strip().startswith('Rest ') for n in nodes()), 'Rest timer did not survive restart'
 tap('Finish Workout');tap('Finish');find('Workout Complete');capture('phone-summary')
 xml=ET.fromstring(adb('shell','run-as','org.openfactor.app','cat','shared_prefs/open_factor.xml'))
 state=json.loads(next(n.text for n in xml if n.get('name')=='data'))

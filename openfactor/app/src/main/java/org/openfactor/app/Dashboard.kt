@@ -33,12 +33,23 @@ import java.time.temporal.TemporalAdjusters
 fun DashboardScreen(
     data: AppData,
     exercises: List<Exercise>,
+    vm: WorkoutViewModel,
     onWorkout: () -> Unit,
     onHistory: () -> Unit,
     onStart: () -> Unit,
+    onResume: () -> Unit,
+    onLevels: () -> Unit,
 ) {
+    var customize by remember { mutableStateOf(false) }
+    val allWorkouts = data.preferences.dashboardAllWorkouts
     val week = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-    val workouts = data.history.filter { !it.localDate().isBefore(week) }
+    val scopedHistory =
+        if (allWorkouts) data.history
+        else
+            data.history.filter {
+                data.activeProgramId != null && it.programId == data.activeProgramId
+            }
+    val workouts = scopedHistory.filter { !it.localDate().isBefore(week) }
     val sets = workouts.sumOf { it.completedSets() }
     val exerciseIds =
         workouts
@@ -46,98 +57,169 @@ fun DashboardScreen(
             .filter { it.sets.any { s -> s.completed } }
             .map { it.exerciseId }
             .toSet()
-    val muscles = exercises.filter { it.id in exerciseIds }.map { it.muscle }.toSet().size
-    val targetSets = data.routines.sumOf { it.exerciseIds.size * 3 }
+    val muscles = exercises.filter { it.id in exerciseIds }.flatMap { it.muscles }.toSet().size
+    val targetSets =
+        if (data.activeProgramId != null) data.routines.sumOf { it.exerciseIds.size * 3 } else 0
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 20.dp)) {
         item {
             PageHeading(
                 "Dashboard",
-                actions = { RoundAction(Icons.Rounded.Add, "Workout shortcuts", onStart) },
+                actions = {
+                    RoundAction(Icons.Rounded.Tune, "Customize Dashboard", { customize = true })
+                },
             )
         }
-        item {
-            Column(
-                Modifier.fillMaxWidth()
-                    .background(OF.top)
-                    .padding(horizontal = 18.dp)
-                    .padding(bottom = 26.dp)
-            ) {
-                SectionTitle("Weekly Workouts")
-                Row(
-                    Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+        if (data.active != null)
+            item {
+                Box(
+                    Modifier.fillMaxWidth()
+                        .background(OF.top)
+                        .padding(horizontal = 18.dp, vertical = 8.dp)
                 ) {
-                    WeeklyRing(muscles, 20, "Muscles", Modifier.weight(1f), small = true)
-                    WeeklyRing(sets, targetSets, "Sets", Modifier.weight(1.65f), small = false)
-                    WeeklyRing(
-                        exerciseIds.size,
-                        data.routines.sumOf { it.exerciseIds.size },
-                        "Exercises",
-                        Modifier.weight(1f),
-                        small = true,
+                    PrimaryAction(
+                        "Resume ${data.active.name}",
+                        onResume,
+                        icon = Icons.Rounded.PlayArrow,
                     )
-                }
-                Row(
-                    Modifier.align(Alignment.CenterHorizontally)
-                        .padding(top = 16.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(OF.elevated)
-                ) {
-                    TextButton(
-                        onWorkout,
-                        colors =
-                            ButtonDefaults.textButtonColors(
-                                containerColor = Color.White,
-                                contentColor = Color.Black,
-                            ),
-                    ) {
-                        Text("Active Program")
-                    }
-                    TextButton(onHistory) { Text("All Workouts") }
                 }
             }
-        }
-        item {
-            Column(Modifier.padding(horizontal = 18.dp)) {
-                SectionTitle("Insights & Analytics", "History", onHistory)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    InsightCard(
-                        "Workouts",
-                        "Last 7 Workouts",
-                        data.history.take(7).sumOf { it.completedSets() }.toString(),
-                        "sets",
-                        Modifier.weight(1f),
-                        onHistory,
-                    )
-                    InsightCard(
-                        "Volume",
-                        "This Week",
-                        workouts.sumOf { it.volumeKg() }.displayWeight(data.preferences.pounds),
-                        if (data.preferences.pounds) "lb" else "kg",
-                        Modifier.weight(1f),
-                        onHistory,
-                    )
-                }
-                SectionTitle("Habits")
-                Surface(shape = OF.shape, color = OF.card, modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.CalendarMonth, null, Modifier.size(26.dp))
-                        Spacer(Modifier.width(14.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("Workouts", style = MaterialTheme.typography.titleMedium)
-                            Text("${workouts.size} completed this week", color = OF.muted)
+        if (data.preferences.showWeeklyWorkouts)
+            item {
+                Column(
+                    Modifier.fillMaxWidth()
+                        .background(OF.top)
+                        .padding(horizontal = 18.dp)
+                        .padding(bottom = 26.dp)
+                ) {
+                    SectionTitle("Weekly Workouts")
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        WeeklyRing(muscles, 20, "Muscles", Modifier.weight(1f), small = true)
+                        WeeklyRing(sets, targetSets, "Sets", Modifier.weight(1.65f), small = false)
+                        WeeklyRing(
+                            exerciseIds.size,
+                            if (data.activeProgramId != null)
+                                data.routines.sumOf { it.exerciseIds.size }
+                            else 0,
+                            "Exercises",
+                            Modifier.weight(1f),
+                            small = true,
+                        )
+                    }
+                    Row(
+                        Modifier.align(Alignment.CenterHorizontally)
+                            .padding(top = 16.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(OF.elevated)
+                    ) {
+                        listOf(false to "Active Program", true to "All Workouts").forEach {
+                            (all, label) ->
+                            TextButton(
+                                { vm.settings { it.copy(dashboardAllWorkouts = all) } },
+                                colors =
+                                    ButtonDefaults.textButtonColors(
+                                        containerColor =
+                                            if (allWorkouts == all) Color.White
+                                            else Color.Transparent,
+                                        contentColor =
+                                            if (allWorkouts == all) Color.Black else Color.White,
+                                    ),
+                            ) {
+                                Text(label)
+                            }
                         }
-                        IconButton(onStart) { Icon(Icons.Rounded.Add, "Start workout") }
                     }
                 }
-                if (data.active != null) {
-                    SectionTitle("In Progress")
-                    PrimaryAction("Resume ${data.active.name}", onWorkout)
+            }
+        if (data.preferences.showInsights)
+            item {
+                Column(Modifier.padding(horizontal = 18.dp)) {
+                    SectionTitle("Insights & Analytics", "History", onHistory)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        InsightCard(
+                            "Workouts",
+                            "Last 7 Workouts",
+                            scopedHistory.take(7).sumOf { it.completedSets() }.toString(),
+                            "sets",
+                            Modifier.weight(1f),
+                            onHistory,
+                        )
+                        InsightCard(
+                            "Volume",
+                            "This Week",
+                            workouts.sumOf { it.volumeKg() }.displayWeight(data.preferences.pounds),
+                            if (data.preferences.pounds) "lb" else "kg",
+                            Modifier.weight(1f),
+                            onHistory,
+                        )
+                    }
+                    TextButton(onLevels) {
+                        Icon(Icons.Rounded.AccessibilityNew, null)
+                        Text(" Muscle Levels")
+                    }
                 }
+            }
+        if (data.preferences.showHabits)
+            item {
+                Column(Modifier.padding(horizontal = 18.dp)) {
+                    SectionTitle("Habits")
+                    Surface(shape = OF.shape, color = OF.card, modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            Modifier.padding(18.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Rounded.CalendarMonth, null, Modifier.size(26.dp))
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Workouts", style = MaterialTheme.typography.titleMedium)
+                                Text("${workouts.size} completed this week", color = OF.muted)
+                            }
+                            IconButton(onStart) { Icon(Icons.Rounded.Add, "Start workout") }
+                        }
+                    }
+                }
+            }
+        item {
+            Box(Modifier.padding(18.dp)) {
+                OutlinedButton(onWorkout, Modifier.fillMaxWidth()) { Text("Workout Library") }
             }
         }
     }
+    if (customize)
+        AlertDialog(
+            onDismissRequest = { customize = false },
+            title = { Text("Customize Dashboard") },
+            text = {
+                Column {
+                    listOf(
+                            "Weekly Workouts" to data.preferences.showWeeklyWorkouts,
+                            "Insights & Analytics" to data.preferences.showInsights,
+                            "Habits" to data.preferences.showHabits,
+                        )
+                        .forEachIndexed { i, (label, checked) ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(label, Modifier.weight(1f))
+                                Switch(
+                                    checked,
+                                    { value ->
+                                        vm.settings {
+                                            when (i) {
+                                                0 -> it.copy(showWeeklyWorkouts = value)
+                                                1 -> it.copy(showInsights = value)
+                                                else -> it.copy(showHabits = value)
+                                            }
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                }
+            },
+            confirmButton = { TextButton({ customize = false }) { Text("Done") } },
+        )
 }
 
 @Composable
@@ -158,6 +240,7 @@ private fun WeeklyRing(value: Int, target: Int, label: String, modifier: Modifie
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     value.toString(),
+                    fontFamily = MaterialTheme.typography.headlineMedium.fontFamily,
                     fontSize = if (small) 24.sp else 30.sp,
                     fontWeight = FontWeight.Bold,
                 )
@@ -173,6 +256,7 @@ private fun WeeklyRing(value: Int, target: Int, label: String, modifier: Modifie
             Modifier.padding(top = 20.dp),
             fontSize = if (small) 16.sp else 18.sp,
             fontWeight = FontWeight.Medium,
+            fontFamily = MaterialTheme.typography.titleMedium.fontFamily,
         )
         Text(
             if (target > 0) "$target target" else "Set a routine",

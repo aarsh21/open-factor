@@ -29,6 +29,7 @@ data class Exercise(
     val properties: Map<String, String> = emptyMap(),
     val bodyweight: Double = 0.0,
     val searchBoost: Double = 0.0,
+    val clips: List<String> = emptyList(),
 )
 
 data class LoggedSet(
@@ -54,6 +55,8 @@ data class Workout(
     val finishedAt: Long? = null,
     val exercises: List<SessionExercise> = emptyList(),
     val notes: String = "",
+    val restUntil: Long = 0,
+    val programId: String? = null,
 )
 
 data class Routine(val id: String = newId(), val name: String, val exerciseIds: List<String>)
@@ -64,6 +67,10 @@ data class Preferences(
     val autoRest: Boolean = true,
     val showRir: Boolean = true,
     val displayName: String = "Athlete",
+    val dashboardAllWorkouts: Boolean = false,
+    val showWeeklyWorkouts: Boolean = true,
+    val showInsights: Boolean = true,
+    val showHabits: Boolean = true,
 )
 
 data class AppData(
@@ -73,6 +80,8 @@ data class AppData(
     val favorites: Set<String> = emptySet(),
     val customExercises: List<Exercise> = emptyList(),
     val preferences: Preferences = Preferences(),
+    val activeProgramId: String? = null,
+    val gyms: List<GymProfile> = emptyList(),
 )
 
 fun newId() = UUID.randomUUID().toString()
@@ -122,6 +131,8 @@ object DataCodec {
             .put("name", name)
             .put("startedAt", startedAt)
             .put("finishedAt", finishedAt)
+            .put("restUntil", restUntil)
+            .put("programId", programId)
             .put("exercises", JSONArray(exercises.map { it.json() }))
             .put("notes", notes)
 
@@ -137,6 +148,8 @@ object DataCodec {
     fun encode(d: AppData): String =
         JSONObject()
             .put("schemaVersion", 1)
+            .put("activeProgramId", d.activeProgramId)
+            .put("gyms", JSONArray(d.gyms.map { GymCodec.encode(it) }))
             .put("active", d.active?.json())
             .put("history", JSONArray(d.history.map { it.json() }))
             .put(
@@ -159,7 +172,11 @@ object DataCodec {
                     .put("restSeconds", d.preferences.restSeconds)
                     .put("autoRest", d.preferences.autoRest)
                     .put("showRir", d.preferences.showRir)
-                    .put("displayName", d.preferences.displayName),
+                    .put("displayName", d.preferences.displayName)
+                    .put("dashboardAllWorkouts", d.preferences.dashboardAllWorkouts)
+                    .put("showWeeklyWorkouts", d.preferences.showWeeklyWorkouts)
+                    .put("showInsights", d.preferences.showInsights)
+                    .put("showHabits", d.preferences.showHabits),
             )
             .toString(2)
 
@@ -193,6 +210,8 @@ object DataCodec {
                 )
             },
             optString("notes"),
+            optLong("restUntil", 0),
+            optString("programId").takeIf { it.isNotBlank() && it != "null" },
         )
 
     fun decode(text: String): AppData {
@@ -222,7 +241,13 @@ object DataCodec {
                 p.optBoolean("autoRest", true),
                 p.optBoolean("showRir", true),
                 p.optString("displayName", "Athlete"),
+                p.optBoolean("dashboardAllWorkouts"),
+                p.optBoolean("showWeeklyWorkouts", true),
+                p.optBoolean("showInsights", true),
+                p.optBoolean("showHabits", true),
             ),
+            j.optString("activeProgramId").takeIf { it.isNotBlank() && it != "null" },
+            j.array("gyms").objects().map { GymCodec.decode(it) },
         )
     }
 
@@ -246,6 +271,7 @@ object DataCodec {
                     ?: emptyMap(),
                 e.optDouble("bodyweight", 0.0),
                 e.optDouble("searchBoost", 0.0),
+                e.array("clips").strings(),
             )
         }
 }
@@ -285,6 +311,43 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                 .getOrElse { emptyList() }
         }
 
+    val equipmentCatalog = EquipmentCatalog(application)
+
+    init {
+        if (_data.value.gyms.isEmpty())
+            update {
+                it.copy(
+                    gyms =
+                        listOf(
+                            GymProfile(
+                                name = "Everything Gym",
+                                equipmentIds = equipmentCatalog.prefill("everything"),
+                            )
+                        )
+                )
+            }
+    }
+
+    fun saveGym(gym: GymProfile): String {
+        update { d ->
+            d.copy(
+                gyms =
+                    if (d.gyms.any { it.id == gym.id })
+                        d.gyms.map { if (it.id == gym.id) gym else it }
+                    else d.gyms + gym
+            )
+        }
+        return gym.id
+    }
+
+    fun defaultGym(id: String) = update { d ->
+        d.copy(gyms = d.gyms.sortedBy { if (it.id == id) 0 else 1 })
+    }
+
+    fun deleteGym(id: String) = update { d ->
+        if (d.gyms.size > 1) d.copy(gyms = d.gyms.filterNot { it.id == id }) else d
+    }
+
     fun exercises(d: AppData = _data.value) = catalog + d.customExercises
 
     private fun update(block: (AppData) -> AppData) {
@@ -305,6 +368,16 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                 )
             }
     }
+
+    fun startRest(seconds: Int) = editActive {
+        it.copy(restUntil = System.currentTimeMillis() + seconds * 1000L)
+    }
+
+    fun extendRest(seconds: Int) = editActive {
+        it.copy(restUntil = maxOf(System.currentTimeMillis(), it.restUntil) + seconds * 1000L)
+    }
+
+    fun clearRest() = editActive { it.copy(restUntil = 0) }
 
     fun renameActive(name: String) = editActive {
         it.copy(name = name.trim().ifBlank { "Workout" })

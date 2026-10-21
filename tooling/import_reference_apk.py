@@ -18,7 +18,7 @@ ASSETS = 'assets/flutter_assets/assets/'
 FONTS = 'assets/flutter_assets/packages/macrofactor/fonts/'
 ID = re.compile(r'^(?:preferred_)?([0-9a-f]{32})(?:_[a-z])?$')
 
-def build(apk: Path, dest: Path):
+def build(apk: Path, dest: Path, video_directory: Path | None = None):
     if dest.exists() and any(dest.iterdir()):
         raise ValueError(f'Refusing to overwrite an existing pack: {dest}; choose a new --output')
     dest.mkdir(parents=True, exist_ok=True)
@@ -55,9 +55,33 @@ def build(apk: Path, dest: Path):
                 if token in text:return label
             return names[0] if len(names)==1 else ('Bodyweight' if not names and (record.get('bodyweight') or 0)>0 else 'Other')
         projected=[]
+        video_count=0
+        def frame_order(path):
+            stem=PurePosixPath(path).stem
+            return (not stem.startswith('preferred_'), stem.rsplit('_',1)[-1])
         for record in catalog['exercises']:
             eid=record['id']
             muscles=entities(record,'primaryFeatureMuscle')
+            frames=sorted(pictures.get(eid,[]),key=frame_order)
+            objects=[]
+            clips=[]
+            for frame in frames:
+                suffix=PurePosixPath(frame).stem.rsplit('_',1)[-1]
+                object_path=f'videos/{eid}_{suffix}.mp4'
+                objects.append(object_path)
+                clip=''
+                if video_directory is not None:
+                    source=video_directory/object_path
+                    if not source.is_file():source=video_directory/PurePosixPath(object_path).name
+                    if source.is_file():
+                        data=source.read_bytes()
+                        # Verify an ISO-BMFF file signature, not an HTML/error response.
+                        if len(data)<12 or data[4:8]!=b'ftyp':raise ValueError(f'Not an MP4: {source}')
+                        target=dest/object_path;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data)
+                        clip='reference/'+object_path
+                        provenance.append({'local_file':str(source.resolve()),'asset_path':clip,'sha256':sha256(data).hexdigest(),'bytes':len(data)})
+                        video_count+=1
+                clips.append(clip)
             projected.append({'id':eid,'name':record['name'],'muscle':muscles[0] if muscles else 'Other',
                 'muscles':muscles,'secondary':entities(record,'secondaryFeatureMuscle'),
                 'properties':{label: ', '.join(str(index[i]['name']) for i in (record.get(field,[]) if isinstance(record.get(field),list) else [record.get(field)]) if i in index) or 'None'
@@ -66,15 +90,16 @@ def build(apk: Path, dest: Path):
                 'equipment':equipment(record),'equipmentOptions':entities(record,'resistanceEquipmentGroupIds'),
                 'supportEquipmentOptions':entities(record,'supportEquipmentGroupIds'),
                 'aliases':entities(record,'alternativeName'),
-                'frames':sorted(pictures.get(eid,[])),
+                'frames':frames,'clips':clips,'videoObjectPaths':objects,
                 'instructions':next(iter(markdown.get(eid,[])),''),
-                'video':None,'videoStatus':'unresolved'})
+                'video':None,'videoStatus':'local' if any(clips) else 'static-path-only'})
         (dest/'catalog.json').write_text(json.dumps(projected,ensure_ascii=False,indent=2)+'\n')
         (dest/'source-catalog.json').write_bytes(raw)
     report={'source_apk_sha256':sha256(apk.read_bytes()).hexdigest(),'catalog_sha256':sha256(raw).hexdigest(),
         'exercises':len(projected),'with_images':sum(bool(e['frames']) for e in projected),
-        'with_instructions':sum(bool(e['instructions']) for e in projected),'videos':0,
-        'media_selection':'Exact filename ID joins. Lexical frame order is an implementation choice, not observed playback behavior.',
+        'with_instructions':sum(bool(e['instructions']) for e in projected),'videos':video_count,
+        'static_video_paths':sum(len(e['videoObjectPaths']) for e in projected),
+        'media_selection':'Exact filename ID joins. Static source ordering: preferred thumbnail first, then alphabetical suffix. Object paths do not establish remote access or playback.',
         'license':'Original ownership retained; not relicensed as GPL by this importer.', 'files':provenance}
     (dest/'provenance.json').write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps({k:v for k,v in report.items() if k!='files'},indent=2))
@@ -83,5 +108,6 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('apk',type=Path)
     parser.add_argument('--output',type=Path,default=Path(__file__).resolve().parents[1]/'openfactor/app/src/main/assets/reference')
+    parser.add_argument('--video-directory',type=Path,help='Optional authorized local MP4 export, flat or videos/ subdirectory')
     args=parser.parse_args()
-    build(args.apk,args.output)
+    build(args.apk,args.output,args.video_directory)

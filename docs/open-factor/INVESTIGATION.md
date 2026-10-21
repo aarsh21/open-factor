@@ -77,3 +77,17 @@ These screenshots remain private because they include a signed-in personal accou
 | Health Connect, remote sync, localization | Pending |
 
 No complete-clone claim is supported by the current state.
+
+## 21 October: authenticated continuation
+
+The source Levels page shows front/back anatomical figures, average weekly sets over week/month/three-month windows and muscle-group drill-down. A local implementation now counts completed working sets by primary/secondary group; the source's exact weighting, scale and aggregation algorithm remain unverified. It is not a game screen.
+
+Source gym profile captures establish icon/name, duplicate, selected/all equipment, weight selection editing and prefill choices. Static metadata contains 297 equipment entities; visible Everything Gym reports 292. Preset flag counts and visible row counts do not always match, and this remains open.
+
+The actual active logger was captured separately from workout setup: horizontal exercise strip, single exercise view, weight/reps controls, and Pause/Minimize/Finish/Settings/Gym/Discard menu. The current multi-exercise local logger is not a 1:1 rendition of this screen. The temporary source workout was discarded through the confirmation UI without saving. Source phone stay-awake setting was restored to its original value (0).
+
+Static recovery resolves 1,831 ordered video paths for 619 exercises: preferred thumbnail first, then suffix. All paths/order match the independent recovery. A standard anonymous Firebase metadata request for the bench-press preferred object returned HTTP 401, `Firebase App Check token is invalid`. No source video bytes or working source URLs have been verified. The importer supports caller-supplied matching MP4 exports; the UI retains photographic camera choices and labels still-only previews.
+
+The foundation review disposition is **fix** (`reviews/foundation-01.md`). Scope selection, customization toggles, first-viewport resume, persisted rest deadline, neutral text, label weights, logging semantics and the five-block direction contract were corrected. A fresh review verdict is still pending; complete clone acceptance remains open.
+
+Gym profiles now persist locally with name/icon, duplicate/delete/default selection, literal preset prefills, selected/all equipment search and editable weight lists. Exercise browse selects a gym and applies raw resistance/support groups (all members within each group, alternatives between groups), plus Type and Laterality metadata filters. Source allow/disallow overrides, exact preset visible counts, default weight generation, weight/plate calculator and per-workout gym selection remain open.

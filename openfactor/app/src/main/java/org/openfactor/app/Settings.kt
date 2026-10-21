@@ -28,6 +28,7 @@ fun SettingsScreen(
     snackbar: SnackbarHostState,
     onExercises: () -> Unit,
     onHistory: () -> Unit,
+    onGyms: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -114,6 +115,14 @@ fun SettingsScreen(
                 "Exercises",
                 "Browse the exercise library",
                 onClick = onExercises,
+            )
+        }
+        SettingsSection("GYM PROFILES") {
+            SettingsRow(
+                Icons.Rounded.Warehouse,
+                "Gym Profiles",
+                "Equipment and weight selections",
+                onClick = onGyms,
             )
         }
         SettingsSection("YOUR DATA") {

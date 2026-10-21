@@ -1,11 +1,37 @@
-# Workout application
+# Workout application direction contract
 
-Mode: Operate. Platform: Android. Path: openfactor/app.
+Mode: Operate. Platform: Android. Artifact: `openfactor/app/`.
 
-The user's two Nuvio screenshots bind the navigation and settings. Use a near-black background, large white settings heading, gray section labels, grouped rounded rows, leading monochrome icons in gray tiles, inset separators, and a floating capsule with an animated selected pill. Names: Workout, Exercises, History, Settings (can be revisited after authenticated source inspection).
+## THESIS
 
-Workout-content fidelity is governed by actual source screenshots and runtime observations. Until logged-in access is available, the working foundation must explicitly remain unverified for source parity. No invented source screenshot or complete-clone claim.
+Reproduce the observed MacroFactor Workouts 1.4.1 tasks and visual hierarchy in Open Factor, with the user's explicit Nuvio floating-pill navigation and grouped-settings exceptions. This is a fidelity task, not a new visual concept. Full parity remains open in the investigation ledger.
 
-Build directly in Compose. The first viewport lets the user begin or resume a workout, find today's routine, and inspect recent activity. The signature interaction is Nuvio-derived capsule selection: a shared animated selection surface beneath fixed icon/label targets. Respect OS animation scale and system Back.
+## OWN-WORLD
 
-Inspect on the connected phone. Validate persistent sets, search, exercise details, workout completion/history and settings. Keep a gap ledger for reference features not yet observed or implemented.
+The incumbent references define the world: wide geometric uppercase workout headings, DM Sans text, neutral charcoal fields, white foreground, aligned weekly rings, blue muscle diagrams and photographic exercise media. Nuvio defines the dark floating capsule, animated selected pill, large Settings title, monochrome icon tiles and grouped rows with inset separators. Preserve these references rather than introducing another aesthetic.
+
+## STORY
+
+Dashboard exposes logged training and the active workout. Workout opens the schedule/library and starts or resumes a session. Exercise discovery leads to instructions/properties and logging. Finishing saves history, which supports review and repetition. Settings controls training preferences and local data. Gym, program and Levels flows are being added against their captured source screens.
+
+## FIRST VIEWPORT
+
+In an idle state, show the source's dashboard heading and weekly small/large/small ring hierarchy, then analytics. In an active session, expose a clear resume control immediately. The Active Program/All Workouts segment selects the dashboard's data scope; it is not navigation disguised as selection. Source customization belongs on the header's sliders action. Nuvio-style navigation remains visible on primary destinations and respects safe areas and font scaling.
+
+## FORM
+
+Native Android Jetpack Compose. Build directly in code. Compact-phone captures must come from Android hardware/emulators. Preserve system Back, IME/inset handling, labeled 48dp touch targets, persistent workout state and timer deadlines. The signature interaction is the Nuvio-derived shared capsule selection beneath fixed icon/label targets. No decorative imagery or fabricated videos replace missing reference content. The public code builds independently of the local reference pack.
+
+## Seed and provenance
+
+Status: authenticated source evidence established; implementation fidelity and complete behavior remain under review. This is an inherited visual system; no concept tournament, generated decision comp, approved comp or QUALITY BAR card was requested or created.
+
+- User-supplied Nuvio navigation/settings screenshots: parent thread attachments ending `b4851237-c17b-429b-a961-07286f8f491b.png` and `589ff689-e6ce-493d-85cb-eb39963ed8f7.png`.
+- Nuvio code reference: upstream `c78756d0cbda3337cfff36a95d8b6708f48c0d72`, `core/ui/NavigationBar.kt`, `Tokens.kt`, and `ThemeColors.kt`.
+- Workouts APK SHA-256 `32df7bbb6939444957d150641e48c2a2788f8fd6c85bc111df8d6047cd044396`; authenticated native captures reside privately in the parent workspace's `inspection/private/`.
+- Current native captures: `.impeccable/review/phone-*.png`; generated test workouts, Android 15 Pixel 7 emulator, 1080×2400, density 420. These are phone-emulator captures, not connected-phone screenshots.
+- REA evidence and exact import coverage: `docs/open-factor/INVESTIGATION.md` and `ASSETS.md`. Imported files retain their original ownership and remain ignored by Git.
+
+## Verification and remaining boundaries
+
+Use unit/Android storage tests and ADB smoke flows to validate training continuity. Review enlarged type, IME and semantic labels in the next native pass. The native HTML/CSS detector does not apply. `docs/open-factor/reviews/` records independent dispositions at their actual scope; the foundation review is `fix`, not complete clone acceptance. Do not close the full goal while the parity ledger has required work outstanding.

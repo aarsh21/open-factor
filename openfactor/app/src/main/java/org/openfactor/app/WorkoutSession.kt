@@ -14,6 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,7 +48,7 @@ fun WorkoutSession(
     var confirm by remember { mutableStateOf("") }
     var menu by remember { mutableStateOf(false) }
     var rename by remember { mutableStateOf(false) }
-    var restUntil by rememberSaveable { mutableLongStateOf(0L) }
+    val restUntil = workout.restUntil
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var saveTemplate by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(workout.id) {
@@ -58,7 +59,7 @@ fun WorkoutSession(
     }
     val elapsed = ((now - workout.startedAt) / 1000).coerceAtLeast(0)
     val remaining = ((restUntil - now + 999) / 1000).coerceAtLeast(0)
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().imePadding()) {
         PageHeading(
             workout.name,
             onBack,
@@ -118,8 +119,8 @@ fun WorkoutSession(
                         "  Rest ${remaining/60}:${(remaining%60).toString().padStart(2,'0')}",
                         Modifier.weight(1f),
                     )
-                    TextButton({ restUntil += 30000 }) { Text("+30s") }
-                    TextButton({ restUntil = 0 }) { Text("Skip") }
+                    TextButton({ vm.extendRest(30) }) { Text("+30s") }
+                    TextButton({ vm.clearRest() }) { Text("Skip") }
                 }
             }
         LazyColumn(
@@ -168,9 +169,10 @@ fun WorkoutSession(
                         )
                         Row(
                             Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Set", Modifier.width(30.dp), color = OF.muted, fontSize = 12.sp)
+                            Text("Set", Modifier.width(48.dp), color = OF.muted, fontSize = 12.sp)
                             Text(
                                 if (data.preferences.pounds) "lb" else "kg",
                                 Modifier.weight(1f),
@@ -193,6 +195,7 @@ fun WorkoutSession(
                                     index,
                                     s,
                                     data.preferences,
+                                    exerciseName = e.title,
                                     onChange = { changed -> vm.editSet(se.id, s.id) { changed } },
                                     onComplete = {
                                         val completing = !s.completed
@@ -202,9 +205,7 @@ fun WorkoutSession(
                                                 data.preferences.autoRest &&
                                                 data.preferences.restSeconds > 0
                                         )
-                                            restUntil =
-                                                System.currentTimeMillis() +
-                                                    data.preferences.restSeconds * 1000L
+                                            vm.startRest(data.preferences.restSeconds)
                                     },
                                     onRemove = { vm.removeSet(se.id, s.id) },
                                 )
@@ -313,6 +314,7 @@ private fun SetRow(
     index: Int,
     set: LoggedSet,
     prefs: Preferences,
+    exerciseName: String,
     onChange: (LoggedSet) -> Unit,
     onComplete: () -> Unit,
     onRemove: () -> Unit,
@@ -340,7 +342,9 @@ private fun SetRow(
         Box {
             TextButton(
                 { options = true },
-                Modifier.width(28.dp),
+                Modifier.width(48.dp).semantics {
+                    contentDescription = "Set ${index + 1} options for $exerciseName"
+                },
                 contentPadding = PaddingValues(0.dp),
             ) {
                 Text(if (set.warmup) "W" else "${index+1}", fontSize = 13.sp)
@@ -368,7 +372,15 @@ private fun SetRow(
                 weight = it
                 it.toWeightKg(prefs.pounds)?.let { kg -> onChange(set.copy(weightKg = kg)) }
             },
-            Modifier.weight(1f),
+            Modifier.weight(1f).semantics {
+                contentDescription =
+                    "$exerciseName set ${index + 1} weight (${if(prefs.pounds) "lb" else "kg"})"
+                if (weightError) error("Enter a weight from 0 to 5000")
+            },
+            supportingText =
+                if (weightError) {
+                    { Text("Enter 0–5000") }
+                } else null,
             singleLine = true,
             isError = weightError,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -382,7 +394,14 @@ private fun SetRow(
                     ?.takeIf { n -> n in 1..9999 }
                     ?.let { n -> onChange(set.copy(reps = n)) }
             },
-            Modifier.weight(1f),
+            Modifier.weight(1f).semantics {
+                contentDescription = "$exerciseName set ${index + 1} reps"
+                if (repsError) error("Enter reps from 1 to 9999")
+            },
+            supportingText =
+                if (repsError) {
+                    { Text("Enter 1–9999") }
+                } else null,
             singleLine = true,
             isError = repsError,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -399,7 +418,14 @@ private fun SetRow(
                             ?.takeIf { n -> n in 0..10 }
                             ?.let { n -> onChange(set.copy(rir = n)) }
                 },
-                Modifier.weight(0.65f),
+                Modifier.weight(0.65f).semantics {
+                    contentDescription = "$exerciseName set ${index + 1} reps in reserve"
+                    if (rirError) error("Enter RIR from 0 to 10, or leave empty")
+                },
+                supportingText =
+                    if (rirError) {
+                        { Text("Enter 0–10") }
+                    } else null,
                 singleLine = true,
                 isError = rirError,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -413,7 +439,8 @@ private fun SetRow(
         ) {
             Icon(
                 Icons.Rounded.Check,
-                if (set.completed) "Mark set incomplete" else "Complete set",
+                if (set.completed) "Mark set incomplete ${index + 1} for $exerciseName"
+                else "Complete set ${index + 1} for $exerciseName",
                 tint = if (set.completed) Color.Black else OF.muted,
             )
         }

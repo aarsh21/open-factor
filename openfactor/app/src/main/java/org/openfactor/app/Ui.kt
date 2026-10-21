@@ -65,6 +65,7 @@ fun OpenFactorTheme(content: @Composable () -> Unit) {
                 primary = Color.White,
                 onPrimary = Color.Black,
                 background = OF.background,
+                onBackground = Color.White,
                 surface = OF.card,
                 surfaceVariant = OF.elevated,
                 onSurface = Color.White,
@@ -158,6 +159,10 @@ fun NuvioWorkoutNavigation(selected: Int, onSelect: (Int) -> Unit) {
                             fontSize = 12.sp,
                             lineHeight = 16.sp,
                             fontWeight = if (i == selected) FontWeight.Bold else FontWeight.Normal,
+                            fontFamily =
+                                if (i == selected)
+                                    MaterialTheme.typography.headlineMedium.fontFamily
+                                else MaterialTheme.typography.bodyLarge.fontFamily,
                             color = if (i == selected) Color.White else Color(0xFFA1A4AA),
                             maxLines = 1,
                         )
