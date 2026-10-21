@@ -75,6 +75,7 @@ data class Preferences(
     val showWeeklyWorkouts: Boolean = true,
     val showInsights: Boolean = true,
     val showHabits: Boolean = true,
+    val exerciseAutoNext: Boolean = true,
 )
 
 data class AppData(
@@ -113,6 +114,40 @@ fun Workout.withPause(paused: Boolean, now: Long): Workout =
             )
         else -> this
     }
+
+/** The captured logger advances after an exercise's final set to unfinished work. */
+fun Workout.toggleSetCompletion(
+    exerciseId: String,
+    setId: String,
+    preferences: Preferences,
+    now: Long,
+): Workout {
+    val index = exercises.indexOfFirst { it.id == exerciseId }
+    if (index < 0) return this
+    val exercise = exercises[index]
+    val set = exercise.sets.find { it.id == setId } ?: return this
+    val completing = !set.completed
+    val changed =
+        exercise.copy(
+            sets = exercise.sets.map { if (it.id == setId) it.copy(completed = completing) else it }
+        )
+    val updated = exercises.map { if (it.id == exerciseId) changed else it }
+    val next =
+        if (completing && preferences.exerciseAutoNext && changed.sets.all { it.completed }) {
+            (1 until updated.size)
+                .map { updated[(index + it) % updated.size] }
+                .firstOrNull { candidate -> candidate.sets.any { !it.completed } }
+                ?.id
+        } else null
+    return copy(
+        exercises = updated,
+        selectedExerciseId = next ?: selectedExerciseId,
+        restUntil =
+            if (completing && preferences.autoRest && preferences.restSeconds > 0)
+                now + preferences.restSeconds * 1000L
+            else restUntil,
+    )
+}
 
 fun Double.displayWeight(pounds: Boolean): String {
     val value = if (pounds) this * 2.2046226218 else this
@@ -197,7 +232,8 @@ object DataCodec {
                     .put("dashboardAllWorkouts", d.preferences.dashboardAllWorkouts)
                     .put("showWeeklyWorkouts", d.preferences.showWeeklyWorkouts)
                     .put("showInsights", d.preferences.showInsights)
-                    .put("showHabits", d.preferences.showHabits),
+                    .put("showHabits", d.preferences.showHabits)
+                    .put("exerciseAutoNext", d.preferences.exerciseAutoNext),
             )
             .toString(2)
 
@@ -269,6 +305,7 @@ object DataCodec {
                 p.optBoolean("showWeeklyWorkouts", true),
                 p.optBoolean("showInsights", true),
                 p.optBoolean("showHabits", true),
+                p.optBoolean("exerciseAutoNext", true),
             ),
             j.optString("activeProgramId").takeIf { it.isNotBlank() && it != "null" },
             j.array("gyms").objects().map { GymCodec.decode(it) },
@@ -470,6 +507,18 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
             )
         }
 
+    fun toggleSetCompletion(exerciseId: String, setId: String) = update { d ->
+        d.copy(
+            active =
+                d.active?.toggleSetCompletion(
+                    exerciseId,
+                    setId,
+                    d.preferences,
+                    System.currentTimeMillis(),
+                )
+        )
+    }
+
     fun exerciseNotes(id: String, notes: String) = editActive { w ->
         w.copy(exercises = w.exercises.map { if (it.id == id) it.copy(notes = notes) else it })
     }
@@ -481,14 +530,11 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun finish() {
         val w = _data.value.active ?: return
         if (w.completedSets() == 0) return
+        val now = System.currentTimeMillis()
         update {
             it.copy(
                 active = null,
-                history =
-                    listOf(
-                        w.withPause(false, System.currentTimeMillis())
-                            .copy(finishedAt = System.currentTimeMillis())
-                    ) + it.history,
+                history = listOf(w.withPause(false, now).copy(finishedAt = now)) + it.history,
             )
         }
     }

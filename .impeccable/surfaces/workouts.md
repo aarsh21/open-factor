@@ -29,7 +29,7 @@ Status: authenticated source evidence established; implementation fidelity and c
 - User-supplied Nuvio navigation/settings screenshots: parent thread attachments ending `b4851237-c17b-429b-a961-07286f8f491b.png` and `589ff689-e6ce-493d-85cb-eb39963ed8f7.png`.
 - Nuvio code reference: upstream `c78756d0cbda3337cfff36a95d8b6708f48c0d72`, `core/ui/NavigationBar.kt`, `Tokens.kt`, and `ThemeColors.kt`.
 - Workouts APK SHA-256 `32df7bbb6939444957d150641e48c2a2788f8fd6c85bc111df8d6047cd044396`; authenticated native captures reside privately in the parent workspace's `inspection/private/`.
-- Current native captures: `.impeccable/review/phone-*.png`; generated test workouts, Android 15 Pixel 7 emulator, 1080×2400, density 420. These are phone-emulator captures, not connected-phone screenshots.
+- Current logger checkpoint captures: `.impeccable/review/paku-api26-logger-*.png`; generated Open Factor test workouts on emulator-5554, Android 8/API 26, 1080×1920. Older `.impeccable/review/phone-*.png` are Android 15 emulator captures, 1080×2400, density 420. Neither set is a connected-phone screenshot.
 - REA evidence and exact import coverage: `docs/open-factor/INVESTIGATION.md` and `ASSETS.md`. Imported files retain their original ownership and remain ignored by Git.
 
 ## Verification and remaining boundaries

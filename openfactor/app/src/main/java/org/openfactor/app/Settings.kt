@@ -264,12 +264,35 @@ fun SettingsScreen(
                 onDismissRequest = { dialog = "" },
                 title = { Text("Workout") },
                 text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Reps in reserve")
-                            Text("Show RIR when logging sets", color = OF.muted, fontSize = 12.sp)
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Reps in reserve")
+                                Text(
+                                    "Show RIR when logging sets",
+                                    color = OF.muted,
+                                    fontSize = 12.sp,
+                                )
+                            }
+                            Switch(
+                                p.showRir,
+                                { checked -> vm.settings { it.copy(showRir = checked) } },
+                            )
                         }
-                        Switch(p.showRir, { checked -> vm.settings { it.copy(showRir = checked) } })
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Exercise Auto-Next")
+                                Text(
+                                    "Move to unfinished exercises after the last set",
+                                    color = OF.muted,
+                                    fontSize = 12.sp,
+                                )
+                            }
+                            Switch(
+                                p.exerciseAutoNext,
+                                { checked -> vm.settings { it.copy(exerciseAutoNext = checked) } },
+                            )
+                        }
                     }
                 },
                 confirmButton = { TextButton({ dialog = "" }) { Text("Done") } },

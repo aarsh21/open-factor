@@ -262,16 +262,7 @@ fun WorkoutSession(
                                     data.preferences,
                                     exerciseName = e.title,
                                     onChange = { changed -> vm.editSet(se.id, s.id) { changed } },
-                                    onComplete = {
-                                        val completing = !s.completed
-                                        vm.editSet(se.id, s.id) { it.copy(completed = completing) }
-                                        if (
-                                            completing &&
-                                                data.preferences.autoRest &&
-                                                data.preferences.restSeconds > 0
-                                        )
-                                            vm.startRest(data.preferences.restSeconds)
-                                    },
+                                    onComplete = { vm.toggleSetCompletion(se.id, s.id) },
                                     onRemove = { vm.removeSet(se.id, s.id) },
                                 )
                             }
@@ -608,7 +599,7 @@ fun WorkoutSummary(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     SummaryStat(
                         "Duration",
-                        "${((w.finishedAt ?: w.startedAt)-w.startedAt)/60000} min",
+                        "${w.elapsedSeconds(w.finishedAt ?: w.startedAt) / 60} min",
                     )
                     SummaryStat("Sets", w.completedSets().toString())
                     SummaryStat(

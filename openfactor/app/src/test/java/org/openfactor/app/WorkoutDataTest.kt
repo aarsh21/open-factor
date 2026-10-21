@@ -27,6 +27,83 @@ class WorkoutDataTest {
     }
 
     @Test
+    fun savedDurationExcludesLongPauseIncludingFinishWhilePaused() {
+        val active = Workout(name = "Training", startedAt = 1000)
+        val resumed = active.withPause(true, 61000).withPause(false, 361000)
+        val finished = resumed.copy(finishedAt = 421000)
+        val finishWhilePaused =
+            active.withPause(true, 121000).withPause(false, 421000).copy(finishedAt = 421000)
+        for (workout in listOf(finished, finishWhilePaused)) {
+            val restored =
+                DataCodec.decode(DataCodec.encode(AppData(history = listOf(workout))))
+                    .history
+                    .single()
+            assertEquals(120L, restored.elapsedSeconds(900000))
+            assertEquals(2L, restored.elapsedSeconds(900000) / 60)
+        }
+    }
+
+    @Test
+    fun finalSetAdvancesAndStartsRestInOnePersistableChange() {
+        val first =
+            SessionExercise(
+                id = "first",
+                exerciseId = "chin-up",
+                sets = listOf(LoggedSet(id = "a"), LoggedSet(id = "b", completed = true)),
+            )
+        val second =
+            SessionExercise(id = "second", exerciseId = "dip", sets = listOf(LoggedSet(id = "c")))
+        val workout =
+            Workout(
+                name = "Training",
+                exercises = listOf(first, second),
+                selectedExerciseId = "second",
+            )
+        val advanced = workout.toggleSetCompletion("second", "c", Preferences(), 1000)
+        assertEquals("first", advanced.selectedExerciseId)
+        assertEquals(121000L, advanced.restUntil)
+        assertTrue(advanced.exercises[1].sets.single().completed)
+        assertEquals(
+            advanced,
+            DataCodec.decode(DataCodec.encode(AppData(active = advanced))).active,
+        )
+        val finished = advanced.toggleSetCompletion("first", "a", Preferences(), 2000)
+        assertEquals("first", finished.selectedExerciseId)
+        val unchecked = advanced.toggleSetCompletion("second", "c", Preferences(), 3000)
+        assertEquals("first", unchecked.selectedExerciseId)
+        assertEquals(121000L, unchecked.restUntil)
+    }
+
+    @Test
+    fun autoNextCanBeDisabledAndPartialExerciseDoesNotAdvance() {
+        val first =
+            SessionExercise(
+                id = "first",
+                exerciseId = "chin-up",
+                sets = listOf(LoggedSet(id = "a"), LoggedSet(id = "b")),
+            )
+        val second = SessionExercise(id = "second", exerciseId = "dip")
+        val workout =
+            Workout(
+                name = "Training",
+                exercises = listOf(first, second),
+                selectedExerciseId = "first",
+            )
+        val partial = workout.toggleSetCompletion("first", "a", Preferences(), 1000)
+        assertEquals("first", partial.selectedExerciseId)
+        val prefs = Preferences(exerciseAutoNext = false, autoRest = false)
+        val completed = partial.toggleSetCompletion("first", "b", prefs, 2000)
+        assertEquals("first", completed.selectedExerciseId)
+        assertEquals(partial.restUntil, completed.restUntil)
+        assertEquals(
+            prefs,
+            DataCodec.decode(DataCodec.encode(AppData(preferences = prefs))).preferences,
+        )
+        assertTrue(DataCodec.decode("{\"schemaVersion\":1}").preferences.exerciseAutoNext)
+        assertEquals(workout, workout.toggleSetCompletion("missing", "a", Preferences(), 1000))
+    }
+
+    @Test
     fun volumeCountsOnlyCompletedWorkingSets() {
         val workout =
             Workout(
