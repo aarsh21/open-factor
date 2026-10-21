@@ -122,3 +122,6 @@ The independent [live-metrics-01.md](reviews/live-metrics-01.md) review accepted
 
 
 The focused correction passed build/lint and all 31 unit tests on reference and clean public builds; the latter also compiled the Android-test APK and restored the reference directory afterward. On both API26/API35, a standalone native period check selected 30 and 90 days through the UI using three synthetic working sets plus one excluded warm-up. The Levels list and Lats dialog both showed **0.7 sets/week** and **0.2 sets/week**, respectively. All eight new PNG/XML pairs were validated, and each run restored the exact original app data. This is a focused correction pass, not a rerun of the earlier composite logger/media flow. The post-correction design consistency check reported no changes; a fresh independent verdict is pending.
+
+
+The independent second verdict, [live-metrics-02.md](reviews/live-metrics-02.md), is **ship for the single Levels weekly-average P2 only**. It resolves the period-label/value mismatch and establishes no correction regression in the eight new paired captures. Prior bounded Dashboard/private-photo acceptance is retained; complete analytics, 726 missing photos, original videos, onboarding rebuild, previous parity fixes and accessibility obligations remain open.
