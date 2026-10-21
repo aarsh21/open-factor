@@ -37,3 +37,9 @@ iosApp/Configuration/DeviceSigning.local.json
 
 # Local MPVKit iOS build environment (sparse APFS image, see MPVKit docs)
 .mpvkit-build.sparseimage
+
+# Open Factor local inspection and imported reference media
+inspection/private/
+openfactor/app/src/main/assets/reference/
+openfactor/local.properties
+.impeccable/review/
