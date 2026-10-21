@@ -43,3 +43,4 @@ inspection/private/
 openfactor/app/src/main/assets/reference/
 openfactor/local.properties
 .impeccable/review/
+__pycache__/

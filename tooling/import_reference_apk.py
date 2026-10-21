@@ -50,10 +50,10 @@ def build(apk: Path, dest: Path):
         def equipment(record):
             names=entities(record,'resistanceEquipmentGroupIds')
             # Preserve every precise option in equipmentOptions and the raw catalog.
-            text=' '.join(names).lower()
-            for token,label in [('dumbbell','Dumbbell'),('barbell','Barbell'),('cable','Cable'),('kettlebell','Kettlebell'),('smith','Smith Machine'),('machine','Machine'),('band','Band')]:
+            text=(' '.join(names)+' '+record['name']).lower()
+            for token,label in [('bodyweight only','Bodyweight'),('dumbbell','Dumbbell'),('barbell','Barbell'),('cable','Cable'),('kettlebell','Kettlebell'),('smith','Smith Machine'),('machine','Machine'),('band','Band')]:
                 if token in text:return label
-            return names[0] if len(names)==1 else ('Bodyweight' if not names else 'Other')
+            return names[0] if len(names)==1 else ('Bodyweight' if not names and (record.get('bodyweight') or 0)>0 else 'Other')
         projected=[]
         for record in catalog['exercises']:
             eid=record['id']
@@ -62,7 +62,7 @@ def build(apk: Path, dest: Path):
                 'muscles':muscles,'secondary':entities(record,'secondaryFeatureMuscle'),
                 'properties':{label: ', '.join(str(index[i]['name']) for i in (record.get(field,[]) if isinstance(record.get(field),list) else [record.get(field)]) if i in index) or 'None'
                     for label,field in [('Type','exerciseType'),('Laterality','laterality'),('Primary Joint Action','primaryJointAction'),('Secondary Joint Action','secondaryJointAction'),('Metrics','exerciseMetrics'),('Range of Motion','rom'),('Stability','stability')]},
-                'bodyweight':record.get('bodyweight',0.0),
+                'bodyweight':record.get('bodyweight') or 0.0,'searchBoost':record.get('searchBoostValue') or 0.0,
                 'equipment':equipment(record),'equipmentOptions':entities(record,'resistanceEquipmentGroupIds'),
                 'supportEquipmentOptions':entities(record,'supportEquipmentGroupIds'),
                 'aliases':entities(record,'alternativeName'),

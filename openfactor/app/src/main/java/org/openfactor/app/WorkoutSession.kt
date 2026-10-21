@@ -14,85 +14,571 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.delay
 
-@Composable fun WorkoutSession(data:AppData,exercises:List<Exercise>,vm:WorkoutViewModel,onBack:()->Unit,onAdd:()->Unit,onExercise:(String)->Unit,onFinished:(String)->Unit) {
-    val workout=data.active
-    if(workout==null){Column{PageHeading("Workout",onBack);EmptyContent(Icons.Rounded.FitnessCenter,"No active workout","Start a workout from the Workout tab.","Back",onBack)};return}
-    var confirm by remember {mutableStateOf("")}
-    var menu by remember {mutableStateOf(false)}
-    var rename by remember {mutableStateOf(false)}
-    var restUntil by rememberSaveable {mutableLongStateOf(0L)}
-    var now by remember {mutableLongStateOf(System.currentTimeMillis())}
-    var saveTemplate by rememberSaveable {mutableStateOf(false)}
-    LaunchedEffect(workout.id) {while(true){delay(1000);now=System.currentTimeMillis()}}
-    val elapsed=((now-workout.startedAt)/1000).coerceAtLeast(0)
-    val remaining=((restUntil-now+999)/1000).coerceAtLeast(0)
-    Column(Modifier.fillMaxSize()) {
-        PageHeading(workout.name,onBack,actions={Box {IconButton({menu=true}){Icon(Icons.Rounded.MoreVert,"Workout options")};DropdownMenu(menu,{menu=false}){DropdownMenuItem(text={Text("Rename Workout")},onClick={menu=false;rename=true});DropdownMenuItem(text={Text("Save as Workout Template")},onClick={menu=false;vm.saveRoutine(workout.name,workout.exercises.map {it.exerciseId})});DropdownMenuItem(text={Text("Discard Workout")},onClick={menu=false;confirm="discard"})}}})
-        Row(Modifier.fillMaxWidth().background(OF.top).padding(horizontal=20.dp,vertical=10.dp),horizontalArrangement=Arrangement.SpaceBetween) {Text("${elapsed/60}m ${elapsed%60}s",color=OF.muted);Text("${workout.completedSets()} sets",color=OF.muted);Text("${workout.volumeKg().displayWeight(data.preferences.pounds)} ${if(data.preferences.pounds)"lb" else "kg"}",color=OF.muted)}
-        if(remaining>0) Surface(color=OF.elevated,modifier=Modifier.fillMaxWidth()) {Row(Modifier.padding(horizontal=18.dp,vertical=6.dp),verticalAlignment=Alignment.CenterVertically) {Icon(Icons.Rounded.Timer,null);Text("  Rest ${remaining/60}:${(remaining%60).toString().padStart(2,'0')}",Modifier.weight(1f));TextButton({restUntil+=30000}){Text("+30s")};TextButton({restUntil=0}){Text("Skip")}}}
-        LazyColumn(Modifier.weight(1f),contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
-            if(workout.exercises.isEmpty())item {EmptyContent(Icons.Rounded.FitnessCenter,"Build your workout","Add an exercise to start logging your sets.","Add Exercise",onAdd)}
-            items(workout.exercises,key={it.id}) {se -> val e=exercises.find {it.id==se.exerciseId} ?: Exercise(se.exerciseId,"Exercise","Other","Other")
-                var remove by remember {mutableStateOf(false)}
-                Surface(shape=OF.shape,color=OF.card) {Column(Modifier.padding(14.dp)) {
-                    Row(verticalAlignment=Alignment.CenterVertically) {ExerciseImage(e,Modifier.size(48.dp).clickable {onExercise(e.id)});Column(Modifier.weight(1f).padding(horizontal=10.dp).clickable {onExercise(e.id)}) {Text(e.name,style=MaterialTheme.typography.titleMedium);Text(e.muscle,color=OF.muted,fontSize=12.sp)};IconButton({remove=true}){Icon(Icons.Rounded.Close,"Remove ${e.name}",tint=OF.muted)}}
-                    OutlinedTextField(se.notes,{vm.exerciseNotes(se.id,it)},Modifier.fillMaxWidth().padding(vertical=10.dp),placeholder={Text("Exercise notes")},textStyle=MaterialTheme.typography.bodySmall,maxLines=3)
-                    Row(Modifier.fillMaxWidth().padding(bottom=6.dp),verticalAlignment=Alignment.CenterVertically) {Text("Set",Modifier.width(30.dp),color=OF.muted,fontSize=12.sp);Text(if(data.preferences.pounds)"lb" else "kg",Modifier.weight(1f),color=OF.muted,fontSize=12.sp);Text("Reps",Modifier.weight(1f),color=OF.muted,fontSize=12.sp);if(data.preferences.showRir)Text("RIR",Modifier.weight(0.65f),color=OF.muted,fontSize=12.sp);Spacer(Modifier.width(48.dp))}
-                    se.sets.forEachIndexed {index,s ->key(s.id){SetRow(index,s,data.preferences,onChange={changed->vm.editSet(se.id,s.id){changed}},onComplete={val completing=!s.completed;vm.editSet(se.id,s.id){it.copy(completed=completing)};if(completing && data.preferences.autoRest && data.preferences.restSeconds>0)restUntil=System.currentTimeMillis()+data.preferences.restSeconds*1000L},onRemove={vm.removeSet(se.id,s.id)})}}
-                    TextButton({vm.addSet(se.id)},Modifier.fillMaxWidth()){Icon(Icons.Rounded.Add,null,Modifier.size(18.dp));Text(" Add Set")}
-                }}
-                if(remove)ConfirmDialog("Remove ${e.name}?","Its sets will be removed from this workout.","Remove",{remove=false},{vm.removeExercise(se.id);remove=false})
-            }
-            item {OutlinedButton(onAdd,Modifier.fillMaxWidth().heightIn(min=50.dp),shape=RoundedCornerShape(8.dp)){Icon(Icons.Rounded.Add,null);Text(" Add Exercise")}}
-            item {OutlinedTextField(workout.notes,vm::workoutNotes,Modifier.fillMaxWidth(),label={Text("Workout notes")},minLines=2)}
+@Composable
+fun WorkoutSession(
+    data: AppData,
+    exercises: List<Exercise>,
+    vm: WorkoutViewModel,
+    onBack: () -> Unit,
+    onAdd: () -> Unit,
+    onExercise: (String) -> Unit,
+    onFinished: (String) -> Unit,
+) {
+    val workout = data.active
+    if (workout == null) {
+        Column {
+            PageHeading("Workout", onBack)
+            EmptyContent(
+                Icons.Rounded.FitnessCenter,
+                "No active workout",
+                "Start a workout from the Workout tab.",
+                "Back",
+                onBack,
+            )
         }
-        Box(Modifier.padding(horizontal=18.dp,vertical=10.dp)) {PrimaryAction("Finish Workout",{confirm="finish"},enabled=workout.completedSets()>0,icon=Icons.Rounded.Check)}
+        return
     }
-    if(rename)NameDialog("Rename Workout",workout.name,{rename=false},{vm.renameActive(it);rename=false})
-    if(confirm=="discard")ConfirmDialog("Discard Workout?","This removes the current session and its sets.","Discard",{confirm=""},{vm.discard();confirm="";onBack()})
-    if(confirm=="finish")AlertDialog(onDismissRequest={confirm=""},title={Text("Finish Workout?")},text={Column {Text("${workout.completedSets()} completed sets will be saved to your history.");Row(verticalAlignment=Alignment.CenterVertically){Checkbox(saveTemplate,{saveTemplate=it});Text("Save as workout template")}}},confirmButton={TextButton({if(saveTemplate)vm.saveRoutine(workout.name,workout.exercises.map {it.exerciseId});val id=workout.id;vm.finish();confirm="";onFinished(id)}){Text("Finish")}},dismissButton={TextButton({confirm=""}){Text("Keep Training")}})
+    var confirm by remember { mutableStateOf("") }
+    var menu by remember { mutableStateOf(false) }
+    var rename by remember { mutableStateOf(false) }
+    var restUntil by rememberSaveable { mutableLongStateOf(0L) }
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var saveTemplate by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(workout.id) {
+        while (true) {
+            delay(1000)
+            now = System.currentTimeMillis()
+        }
+    }
+    val elapsed = ((now - workout.startedAt) / 1000).coerceAtLeast(0)
+    val remaining = ((restUntil - now + 999) / 1000).coerceAtLeast(0)
+    Column(Modifier.fillMaxSize()) {
+        PageHeading(
+            workout.name,
+            onBack,
+            actions = {
+                Box {
+                    IconButton({ menu = true }) { Icon(Icons.Rounded.MoreVert, "Workout options") }
+                    DropdownMenu(menu, { menu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Rename Workout") },
+                            onClick = {
+                                menu = false
+                                rename = true
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Save as Workout Template") },
+                            onClick = {
+                                menu = false
+                                vm.saveRoutine(
+                                    workout.name,
+                                    workout.exercises.map { it.exerciseId },
+                                )
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Discard Workout") },
+                            onClick = {
+                                menu = false
+                                confirm = "discard"
+                            },
+                        )
+                    }
+                }
+            },
+        )
+        Row(
+            Modifier.fillMaxWidth()
+                .background(OF.top)
+                .padding(horizontal = 20.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("${elapsed/60}m ${elapsed%60}s", color = OF.muted)
+            Text("${workout.completedSets()} sets", color = OF.muted)
+            Text(
+                "${workout.volumeKg().displayWeight(data.preferences.pounds)} ${if(data.preferences.pounds)"lb" else "kg"}",
+                color = OF.muted,
+            )
+        }
+        if (remaining > 0)
+            Surface(color = OF.elevated, modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Rounded.Timer, null)
+                    Text(
+                        "  Rest ${remaining/60}:${(remaining%60).toString().padStart(2,'0')}",
+                        Modifier.weight(1f),
+                    )
+                    TextButton({ restUntil += 30000 }) { Text("+30s") }
+                    TextButton({ restUntil = 0 }) { Text("Skip") }
+                }
+            }
+        LazyColumn(
+            Modifier.weight(1f),
+            contentPadding = PaddingValues(18.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            if (workout.exercises.isEmpty())
+                item {
+                    EmptyContent(
+                        Icons.Rounded.FitnessCenter,
+                        "Build your workout",
+                        "Add an exercise to start logging your sets.",
+                        "Add Exercise",
+                        onAdd,
+                    )
+                }
+            items(workout.exercises, key = { it.id }) { se ->
+                val e =
+                    exercises.find { it.id == se.exerciseId }
+                        ?: Exercise(se.exerciseId, "Exercise", "Other", "Other")
+                var remove by remember { mutableStateOf(false) }
+                Surface(shape = OF.shape, color = OF.card) {
+                    Column(Modifier.padding(14.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            ExerciseImage(e, Modifier.size(48.dp).clickable { onExercise(e.id) })
+                            Column(
+                                Modifier.weight(1f).padding(horizontal = 10.dp).clickable {
+                                    onExercise(e.id)
+                                }
+                            ) {
+                                Text(e.title, style = MaterialTheme.typography.titleMedium)
+                                Text(e.muscle, color = OF.muted, fontSize = 12.sp)
+                            }
+                            IconButton({ remove = true }) {
+                                Icon(Icons.Rounded.Close, "Remove ${e.name}", tint = OF.muted)
+                            }
+                        }
+                        OutlinedTextField(
+                            se.notes,
+                            { vm.exerciseNotes(se.id, it) },
+                            Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                            placeholder = { Text("Exercise notes") },
+                            textStyle = MaterialTheme.typography.bodySmall,
+                            maxLines = 3,
+                        )
+                        Row(
+                            Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("Set", Modifier.width(30.dp), color = OF.muted, fontSize = 12.sp)
+                            Text(
+                                if (data.preferences.pounds) "lb" else "kg",
+                                Modifier.weight(1f),
+                                color = OF.muted,
+                                fontSize = 12.sp,
+                            )
+                            Text("Reps", Modifier.weight(1f), color = OF.muted, fontSize = 12.sp)
+                            if (data.preferences.showRir)
+                                Text(
+                                    "RIR",
+                                    Modifier.weight(0.65f),
+                                    color = OF.muted,
+                                    fontSize = 12.sp,
+                                )
+                            Spacer(Modifier.width(48.dp))
+                        }
+                        se.sets.forEachIndexed { index, s ->
+                            key(s.id) {
+                                SetRow(
+                                    index,
+                                    s,
+                                    data.preferences,
+                                    onChange = { changed -> vm.editSet(se.id, s.id) { changed } },
+                                    onComplete = {
+                                        val completing = !s.completed
+                                        vm.editSet(se.id, s.id) { it.copy(completed = completing) }
+                                        if (
+                                            completing &&
+                                                data.preferences.autoRest &&
+                                                data.preferences.restSeconds > 0
+                                        )
+                                            restUntil =
+                                                System.currentTimeMillis() +
+                                                    data.preferences.restSeconds * 1000L
+                                    },
+                                    onRemove = { vm.removeSet(se.id, s.id) },
+                                )
+                            }
+                        }
+                        TextButton({ vm.addSet(se.id) }, Modifier.fillMaxWidth()) {
+                            Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
+                            Text(" Add Set")
+                        }
+                    }
+                }
+                if (remove)
+                    ConfirmDialog(
+                        "Remove ${e.name}?",
+                        "Its sets will be removed from this workout.",
+                        "Remove",
+                        { remove = false },
+                        {
+                            vm.removeExercise(se.id)
+                            remove = false
+                        },
+                    )
+            }
+            item {
+                OutlinedButton(
+                    onAdd,
+                    Modifier.fillMaxWidth().heightIn(min = 50.dp),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Icon(Icons.Rounded.Add, null)
+                    Text(" Add Exercise")
+                }
+            }
+            item {
+                OutlinedTextField(
+                    workout.notes,
+                    vm::workoutNotes,
+                    Modifier.fillMaxWidth(),
+                    label = { Text("Workout notes") },
+                    minLines = 2,
+                )
+            }
+        }
+        Box(Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
+            PrimaryAction(
+                "Finish Workout",
+                { confirm = "finish" },
+                enabled = workout.completedSets() > 0,
+                icon = Icons.Rounded.Check,
+            )
+        }
+    }
+    if (rename)
+        NameDialog(
+            "Rename Workout",
+            workout.name,
+            { rename = false },
+            {
+                vm.renameActive(it)
+                rename = false
+            },
+        )
+    if (confirm == "discard")
+        ConfirmDialog(
+            "Discard Workout?",
+            "This removes the current session and its sets.",
+            "Discard",
+            { confirm = "" },
+            {
+                vm.discard()
+                confirm = ""
+                onBack()
+            },
+        )
+    if (confirm == "finish")
+        AlertDialog(
+            onDismissRequest = { confirm = "" },
+            title = { Text("Finish Workout?") },
+            text = {
+                Column {
+                    Text("${workout.completedSets()} completed sets will be saved to your history.")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(saveTemplate, { saveTemplate = it })
+                        Text("Save as workout template")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton({
+                    if (saveTemplate)
+                        vm.saveRoutine(workout.name, workout.exercises.map { it.exerciseId })
+                    val id = workout.id
+                    vm.finish()
+                    confirm = ""
+                    onFinished(id)
+                }) {
+                    Text("Finish")
+                }
+            },
+            dismissButton = { TextButton({ confirm = "" }) { Text("Keep Training") } },
+        )
 }
-@Composable private fun SetRow(index:Int,set:LoggedSet,prefs:Preferences,onChange:(LoggedSet)->Unit,onComplete:()->Unit,onRemove:()->Unit) {
-    var options by remember {mutableStateOf(false)}
-    var weight by remember(set.id,prefs.pounds){mutableStateOf(set.weightKg.displayWeight(prefs.pounds))}
-    var reps by remember(set.id){mutableStateOf(set.reps.toString())}
-    var rir by remember(set.id){mutableStateOf(set.rir?.toString() ?: "")}
-    val weightError=weight.toWeightKg(prefs.pounds)==null
-    val repsValue=reps.toIntOrNull()
-    val repsError=repsValue==null || repsValue !in 1..9999
-    val rirValue=rir.toIntOrNull()
-    val rirError=rir.isNotEmpty() && (rirValue==null || rirValue !in 0..10)
-    Row(Modifier.fillMaxWidth().padding(vertical=4.dp).background(if(set.completed)OF.green.copy(alpha=0.08f) else Color.Transparent,RoundedCornerShape(8.dp)),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-        Box {TextButton({options=true},Modifier.width(28.dp),contentPadding=PaddingValues(0.dp)) {Text(if(set.warmup)"W" else "${index+1}",fontSize=13.sp)};DropdownMenu(options,{options=false}){DropdownMenuItem(text={Text(if(set.warmup)"Mark as Working Set" else "Mark as Warm-Up")},onClick={options=false;onChange(set.copy(warmup=!set.warmup))});DropdownMenuItem(text={Text("Remove Set")},onClick={options=false;onRemove()})}}
-        OutlinedTextField(weight,{weight=it;it.toWeightKg(prefs.pounds)?.let {kg->onChange(set.copy(weightKg=kg))}},Modifier.weight(1f),singleLine=true,isError=weightError,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),textStyle=MaterialTheme.typography.bodyMedium)
-        OutlinedTextField(reps,{reps=it;it.toIntOrNull()?.takeIf {n->n in 1..9999}?.let {n->onChange(set.copy(reps=n))}},Modifier.weight(1f),singleLine=true,isError=repsError,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),textStyle=MaterialTheme.typography.bodyMedium)
-        if(prefs.showRir)OutlinedTextField(rir,{rir=it;if(it.isBlank())onChange(set.copy(rir=null)) else it.toIntOrNull()?.takeIf {n->n in 0..10}?.let {n->onChange(set.copy(rir=n))}},Modifier.weight(0.65f),singleLine=true,isError=rirError,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),textStyle=MaterialTheme.typography.bodyMedium)
-        IconButton(onComplete,Modifier.size(48.dp).background(if(set.completed)OF.green else OF.elevated,RoundedCornerShape(8.dp)),enabled=!weightError && !repsError && !rirError){Icon(Icons.Rounded.Check,if(set.completed)"Mark set incomplete" else "Complete set",tint=if(set.completed)Color.Black else OF.muted)}
+
+@Composable
+private fun SetRow(
+    index: Int,
+    set: LoggedSet,
+    prefs: Preferences,
+    onChange: (LoggedSet) -> Unit,
+    onComplete: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    var options by remember { mutableStateOf(false) }
+    var weight by
+        remember(set.id, prefs.pounds) { mutableStateOf(set.weightKg.displayWeight(prefs.pounds)) }
+    var reps by remember(set.id) { mutableStateOf(set.reps.toString()) }
+    var rir by remember(set.id) { mutableStateOf(set.rir?.toString() ?: "") }
+    val weightError = weight.toWeightKg(prefs.pounds) == null
+    val repsValue = reps.toIntOrNull()
+    val repsError = repsValue == null || repsValue !in 1..9999
+    val rirValue = rir.toIntOrNull()
+    val rirError = rir.isNotEmpty() && (rirValue == null || rirValue !in 0..10)
+    Row(
+        Modifier.fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .background(
+                if (set.completed) OF.green.copy(alpha = 0.08f) else Color.Transparent,
+                RoundedCornerShape(8.dp),
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box {
+            TextButton(
+                { options = true },
+                Modifier.width(28.dp),
+                contentPadding = PaddingValues(0.dp),
+            ) {
+                Text(if (set.warmup) "W" else "${index+1}", fontSize = 13.sp)
+            }
+            DropdownMenu(options, { options = false }) {
+                DropdownMenuItem(
+                    text = { Text(if (set.warmup) "Mark as Working Set" else "Mark as Warm-Up") },
+                    onClick = {
+                        options = false
+                        onChange(set.copy(warmup = !set.warmup))
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Remove Set") },
+                    onClick = {
+                        options = false
+                        onRemove()
+                    },
+                )
+            }
+        }
+        OutlinedTextField(
+            weight,
+            {
+                weight = it
+                it.toWeightKg(prefs.pounds)?.let { kg -> onChange(set.copy(weightKg = kg)) }
+            },
+            Modifier.weight(1f),
+            singleLine = true,
+            isError = weightError,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            textStyle = MaterialTheme.typography.bodyMedium,
+        )
+        OutlinedTextField(
+            reps,
+            {
+                reps = it
+                it.toIntOrNull()
+                    ?.takeIf { n -> n in 1..9999 }
+                    ?.let { n -> onChange(set.copy(reps = n)) }
+            },
+            Modifier.weight(1f),
+            singleLine = true,
+            isError = repsError,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            textStyle = MaterialTheme.typography.bodyMedium,
+        )
+        if (prefs.showRir)
+            OutlinedTextField(
+                rir,
+                {
+                    rir = it
+                    if (it.isBlank()) onChange(set.copy(rir = null))
+                    else
+                        it.toIntOrNull()
+                            ?.takeIf { n -> n in 0..10 }
+                            ?.let { n -> onChange(set.copy(rir = n)) }
+                },
+                Modifier.weight(0.65f),
+                singleLine = true,
+                isError = rirError,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                textStyle = MaterialTheme.typography.bodyMedium,
+            )
+        IconButton(
+            onComplete,
+            Modifier.size(48.dp)
+                .background(if (set.completed) OF.green else OF.elevated, RoundedCornerShape(8.dp)),
+            enabled = !weightError && !repsError && !rirError,
+        ) {
+            Icon(
+                Icons.Rounded.Check,
+                if (set.completed) "Mark set incomplete" else "Complete set",
+                tint = if (set.completed) Color.Black else OF.muted,
+            )
+        }
     }
 }
-@Composable fun HistoryScreen(history:List<Workout>,exercises:List<Exercise>,onBack:()->Unit,onDetail:(String)->Unit) {
-    Column(Modifier.fillMaxSize()) {PageHeading("Workout History",onBack);LazyColumn(Modifier.weight(1f),contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        if(history.isEmpty()) item{EmptyContent(Icons.Rounded.History,"No workouts yet","Finish your first workout to see your history and records.")}
-        items(history,key={it.id}) {w ->Surface(Modifier.fillMaxWidth().clickable {onDetail(w.id)},shape=OF.shape,color=OF.card){Column(Modifier.padding(18.dp)){Text(w.localDate().format(DateTimeFormatter.ofPattern("EEEE, d MMM yyyy")),color=OF.muted,fontSize=12.sp);Text(w.name,Modifier.padding(vertical=8.dp),style=MaterialTheme.typography.titleLarge);Text("${w.exercises.size} exercises · ${w.completedSets()} sets",color=OF.muted);Text(w.exercises.mapNotNull {se->exercises.find {it.id==se.exerciseId}?.name}.joinToString(", "),Modifier.padding(top=12.dp),maxLines=2,color=OF.muted)}}}
-    }}
+
+@Composable
+fun HistoryScreen(
+    history: List<Workout>,
+    exercises: List<Exercise>,
+    onBack: () -> Unit,
+    onDetail: (String) -> Unit,
+) {
+    Column(Modifier.fillMaxSize()) {
+        PageHeading("Workout History", onBack)
+        LazyColumn(
+            Modifier.weight(1f),
+            contentPadding = PaddingValues(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (history.isEmpty())
+                item {
+                    EmptyContent(
+                        Icons.Rounded.History,
+                        "No workouts yet",
+                        "Finish your first workout to see your history and records.",
+                    )
+                }
+            items(history, key = { it.id }) { w ->
+                Surface(
+                    Modifier.fillMaxWidth().clickable { onDetail(w.id) },
+                    shape = OF.shape,
+                    color = OF.card,
+                ) {
+                    Column(Modifier.padding(18.dp)) {
+                        Text(
+                            w.localDate().format(DateTimeFormatter.ofPattern("EEEE, d MMM yyyy")),
+                            color = OF.muted,
+                            fontSize = 12.sp,
+                        )
+                        Text(
+                            w.name,
+                            Modifier.padding(vertical = 8.dp),
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                        Text(
+                            "${w.exercises.size} exercises · ${w.completedSets()} sets",
+                            color = OF.muted,
+                        )
+                        Text(
+                            w.exercises
+                                .mapNotNull { se ->
+                                    exercises.find { it.id == se.exerciseId }?.name
+                                }
+                                .joinToString(", "),
+                            Modifier.padding(top = 12.dp),
+                            maxLines = 2,
+                            color = OF.muted,
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
-@Composable fun WorkoutSummary(w:Workout,exercises:List<Exercise>,prefs:Preferences,onBack:()->Unit,onRepeat:()->Unit,onDelete:()->Unit) {
-    var delete by remember{mutableStateOf(false)}
-    Column(Modifier.fillMaxSize()) {PageHeading("Workout Complete",onBack,actions={IconButton({delete=true}){Icon(Icons.Rounded.DeleteOutline,"Delete workout")}});LazyColumn(Modifier.weight(1f),contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        item{Text(w.name,style=MaterialTheme.typography.headlineMedium);Text(w.localDate().format(DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy")),color=OF.muted)}
-        item {Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {SummaryStat("Duration","${((w.finishedAt ?: w.startedAt)-w.startedAt)/60000} min");SummaryStat("Sets",w.completedSets().toString());SummaryStat("Volume","${w.volumeKg().displayWeight(prefs.pounds)} ${if(prefs.pounds)"lb" else "kg"}")}}
-        item {SectionTitle("Workout Details")}
-        items(w.exercises,key={it.id}) {se->val e=exercises.find {it.id==se.exerciseId};Surface(shape=OF.shape,color=OF.card){Column(Modifier.padding(16.dp)){Row(verticalAlignment=Alignment.CenterVertically){if(e!=null)ExerciseImage(e,Modifier.size(48.dp));Text(e?.name ?: "Exercise",Modifier.padding(start=12.dp),style=MaterialTheme.typography.titleMedium)};se.sets.filter {it.completed}.forEachIndexed {i,s->Row(Modifier.fillMaxWidth().padding(top=12.dp)){Text(if(s.warmup)"Warm-up" else "Set ${i+1}",Modifier.weight(1f),color=OF.muted);Text("${s.weightKg.displayWeight(prefs.pounds)} ${if(prefs.pounds)"lb" else "kg"} × ${s.reps}${s.rir?.let {" · $it RIR"} ?: ""}")}};if(se.notes.isNotBlank())Text(se.notes,Modifier.padding(top=12.dp),color=OF.muted)}}}
-        if(w.notes.isNotBlank())item{SectionTitle("Notes");Text(w.notes,color=OF.muted)}
-    };Box(Modifier.padding(18.dp)){PrimaryAction("Repeat Workout",onRepeat)}}
-    if(delete)ConfirmDialog("Delete Workout?","This permanently removes this workout from your local history.","Delete",{delete=false},onDelete)
+
+@Composable
+fun WorkoutSummary(
+    w: Workout,
+    exercises: List<Exercise>,
+    prefs: Preferences,
+    onBack: () -> Unit,
+    onRepeat: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var delete by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxSize()) {
+        PageHeading(
+            "Workout Complete",
+            onBack,
+            actions = {
+                IconButton({ delete = true }) {
+                    Icon(Icons.Rounded.DeleteOutline, "Delete workout")
+                }
+            },
+        )
+        LazyColumn(
+            Modifier.weight(1f),
+            contentPadding = PaddingValues(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            item {
+                Text(w.name, style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    w.localDate().format(DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy")),
+                    color = OF.muted,
+                )
+            }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    SummaryStat(
+                        "Duration",
+                        "${((w.finishedAt ?: w.startedAt)-w.startedAt)/60000} min",
+                    )
+                    SummaryStat("Sets", w.completedSets().toString())
+                    SummaryStat(
+                        "Volume",
+                        "${w.volumeKg().displayWeight(prefs.pounds)} ${if(prefs.pounds)"lb" else "kg"}",
+                    )
+                }
+            }
+            item { SectionTitle("Workout Details") }
+            items(w.exercises, key = { it.id }) { se ->
+                val e = exercises.find { it.id == se.exerciseId }
+                Surface(shape = OF.shape, color = OF.card) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (e != null) ExerciseImage(e, Modifier.size(48.dp))
+                            Text(
+                                e?.title ?: "Exercise",
+                                Modifier.padding(start = 12.dp),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                        se.sets
+                            .filter { it.completed }
+                            .forEachIndexed { i, s ->
+                                Row(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                                    Text(
+                                        if (s.warmup) "Warm-up" else "Set ${i+1}",
+                                        Modifier.weight(1f),
+                                        color = OF.muted,
+                                    )
+                                    Text(
+                                        "${s.weightKg.displayWeight(prefs.pounds)} ${if(prefs.pounds)"lb" else "kg"} × ${s.reps}${s.rir?.let {" · $it RIR"} ?: ""}"
+                                    )
+                                }
+                            }
+                        if (se.notes.isNotBlank())
+                            Text(se.notes, Modifier.padding(top = 12.dp), color = OF.muted)
+                    }
+                }
+            }
+            if (w.notes.isNotBlank())
+                item {
+                    SectionTitle("Notes")
+                    Text(w.notes, color = OF.muted)
+                }
+        }
+        Box(Modifier.padding(18.dp)) { PrimaryAction("Repeat Workout", onRepeat) }
+    }
+    if (delete)
+        ConfirmDialog(
+            "Delete Workout?",
+            "This permanently removes this workout from your local history.",
+            "Delete",
+            { delete = false },
+            onDelete,
+        )
 }
-@Composable private fun SummaryStat(label:String,value:String) {Column {Text(value,style=MaterialTheme.typography.titleLarge);Text(label,color=OF.muted,fontSize=12.sp)}}
+
+@Composable
+private fun SummaryStat(label: String, value: String) {
+    Column {
+        Text(value, style = MaterialTheme.typography.titleLarge)
+        Text(label, color = OF.muted, fontSize = 12.sp)
+    }
+}
