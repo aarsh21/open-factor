@@ -1,0 +1,473 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-21T15:06:54.108367+00:00",
+  "title": "Design System: Open Factor",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "White foreground",
+        "tonalRamp": [
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
+        ]
+      },
+      "on-primary": {
+        "role": "neutral",
+        "displayName": "Black ink",
+        "tonalRamp": [
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Base charcoal",
+        "tonalRamp": [
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface charcoal",
+        "tonalRamp": [
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
+        ]
+      },
+      "elevated": {
+        "role": "neutral",
+        "displayName": "Raised charcoal",
+        "tonalRamp": [
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted gray",
+        "tonalRamp": [
+          "oklch(15% 0.00560 286.27)",
+          "oklch(26% 0.00560 286.27)",
+          "oklch(38% 0.00560 286.27)",
+          "oklch(49% 0.00560 286.27)",
+          "oklch(61% 0.00560 286.27)",
+          "oklch(72% 0.00560 286.27)",
+          "oklch(84% 0.00560 286.27)",
+          "oklch(95% 0.00560 286.27)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Separator gray",
+        "tonalRamp": [
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
+        ]
+      },
+      "blue": {
+        "role": "secondary",
+        "displayName": "Training blue",
+        "tonalRamp": [
+          "oklch(15% 0.20007 260.44)",
+          "oklch(26% 0.20007 260.44)",
+          "oklch(38% 0.20007 260.44)",
+          "oklch(49% 0.20007 260.44)",
+          "oklch(61% 0.20007 260.44)",
+          "oklch(72% 0.20007 260.44)",
+          "oklch(84% 0.20007 260.44)",
+          "oklch(95% 0.20007 260.44)"
+        ]
+      },
+      "complete": {
+        "role": "secondary",
+        "displayName": "Completion green",
+        "tonalRamp": [
+          "oklch(15% 0.09384 157.03)",
+          "oklch(26% 0.09384 157.03)",
+          "oklch(38% 0.09384 157.03)",
+          "oklch(49% 0.09384 157.03)",
+          "oklch(61% 0.09384 157.03)",
+          "oklch(72% 0.09384 157.03)",
+          "oklch(84% 0.09384 157.03)",
+          "oklch(95% 0.09384 157.03)"
+        ]
+      },
+      "error": {
+        "role": "secondary",
+        "displayName": "Validation rose",
+        "tonalRamp": [
+          "oklch(15% 0.12651 20.33)",
+          "oklch(26% 0.12651 20.33)",
+          "oklch(38% 0.12651 20.33)",
+          "oklch(49% 0.12651 20.33)",
+          "oklch(61% 0.12651 20.33)",
+          "oklch(72% 0.12651 20.33)",
+          "oklch(84% 0.12651 20.33)",
+          "oklch(95% 0.12651 20.33)"
+        ]
+      },
+      "navigation": {
+        "role": "neutral",
+        "displayName": "Navigation",
+        "tonalRamp": [
+          "oklch(15% 0.00382 286.09)",
+          "oklch(26% 0.00382 286.09)",
+          "oklch(38% 0.00382 286.09)",
+          "oklch(49% 0.00382 286.09)",
+          "oklch(61% 0.00382 286.09)",
+          "oklch(72% 0.00382 286.09)",
+          "oklch(84% 0.00382 286.09)",
+          "oklch(95% 0.00382 286.09)"
+        ]
+      },
+      "navigation-selected": {
+        "role": "neutral",
+        "displayName": "Navigation selected",
+        "tonalRamp": [
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
+        ]
+      },
+      "navigation-icon-muted": {
+        "role": "neutral",
+        "displayName": "Navigation icon muted",
+        "tonalRamp": [
+          "oklch(15% 0.00997 258.35)",
+          "oklch(26% 0.00997 258.35)",
+          "oklch(38% 0.00997 258.35)",
+          "oklch(49% 0.00997 258.35)",
+          "oklch(61% 0.00997 258.35)",
+          "oklch(72% 0.00997 258.35)",
+          "oklch(84% 0.00997 258.35)",
+          "oklch(95% 0.00997 258.35)"
+        ]
+      },
+      "navigation-label-muted": {
+        "role": "neutral",
+        "displayName": "Navigation label muted",
+        "tonalRamp": [
+          "oklch(15% 0.00931 264.51)",
+          "oklch(26% 0.00931 264.51)",
+          "oklch(38% 0.00931 264.51)",
+          "oklch(49% 0.00931 264.51)",
+          "oklch(61% 0.00931 264.51)",
+          "oklch(72% 0.00931 264.51)",
+          "oklch(84% 0.00931 264.51)",
+          "oklch(95% 0.00931 264.51)"
+        ]
+      },
+      "navigation-rim-top": {
+        "role": "neutral",
+        "displayName": "Navigation rim top",
+        "tonalRamp": [
+          "oklch(15% 0.04665 36.52)",
+          "oklch(26% 0.04665 36.52)",
+          "oklch(38% 0.04665 36.52)",
+          "oklch(49% 0.04665 36.52)",
+          "oklch(61% 0.04665 36.52)",
+          "oklch(72% 0.04665 36.52)",
+          "oklch(84% 0.04665 36.52)",
+          "oklch(95% 0.04665 36.52)"
+        ]
+      },
+      "navigation-rim-bottom": {
+        "role": "neutral",
+        "displayName": "Navigation rim bottom",
+        "tonalRamp": [
+          "oklch(15% 0.00738 17.59)",
+          "oklch(26% 0.00738 17.59)",
+          "oklch(38% 0.00738 17.59)",
+          "oklch(49% 0.00738 17.59)",
+          "oklch(61% 0.00738 17.59)",
+          "oklch(72% 0.00738 17.59)",
+          "oklch(84% 0.00738 17.59)",
+          "oklch(95% 0.00738 17.59)"
+        ]
+      },
+      "settings-background": {
+        "role": "neutral",
+        "displayName": "Settings background",
+        "tonalRamp": [
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
+        ]
+      },
+      "settings-group": {
+        "role": "neutral",
+        "displayName": "Settings group",
+        "tonalRamp": [
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
+        ]
+      },
+      "settings-border": {
+        "role": "neutral",
+        "displayName": "Settings border",
+        "tonalRamp": [
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
+        ]
+      },
+      "settings-divider": {
+        "role": "neutral",
+        "displayName": "Settings divider",
+        "tonalRamp": [
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
+        ]
+      },
+      "settings-icon": {
+        "role": "neutral",
+        "displayName": "Settings icon",
+        "tonalRamp": [
+          "oklch(15% 0.00000 0.00)",
+          "oklch(26% 0.00000 0.00)",
+          "oklch(38% 0.00000 0.00)",
+          "oklch(49% 0.00000 0.00)",
+          "oklch(61% 0.00000 0.00)",
+          "oklch(72% 0.00000 0.00)",
+          "oklch(84% 0.00000 0.00)",
+          "oklch(95% 0.00000 0.00)"
+        ]
+      },
+      "settings-muted": {
+        "role": "neutral",
+        "displayName": "Settings muted",
+        "tonalRamp": [
+          "oklch(15% 0.00943 264.50)",
+          "oklch(26% 0.00943 264.50)",
+          "oklch(38% 0.00943 264.50)",
+          "oklch(49% 0.00943 264.50)",
+          "oklch(61% 0.00943 264.50)",
+          "oklch(72% 0.00943 264.50)",
+          "oklch(84% 0.00943 264.50)",
+          "oklch(95% 0.00943 264.50)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Root workout heading",
+        "purpose": "Local MacroSans 700; public Android SansSerif fallback is not equivalent."
+      },
+      "headline": {
+        "displayName": "Settings title",
+        "purpose": "Explicit Nuvio exception; local DM Sans or Android sans fallback."
+      },
+      "title": {
+        "displayName": "Detail heading",
+        "purpose": "Back-route heading, distinct from inherited Material section/title defaults."
+      },
+      "body": {
+        "displayName": "Reading text",
+        "purpose": "Regular DM Sans mapped to bodyLarge/bodyMedium; dimensions inherited from Material."
+      },
+      "label": {
+        "displayName": "Navigation label",
+        "purpose": "Fixed destination labels; selected bold, inactive regular."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "navigation-selection-duration",
+        "value": "300ms",
+        "purpose": "Ui.kt animateDpAsState tween(300); Compose default easing is not redefined. Web preview timing is illustrative."
+      }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Native white full-width action; library padding is represented, not extracted as a token.",
+      "html": "<button class=\"ds-primary\">Start Workout</button>",
+      "css": ".ds-primary{font-family:\"DM Sans\",sans-serif;display:block;width:100%;min-height:52px;border:0;border-radius:8px;background:#fff;color:#000;font-size:16px;font-weight:500;padding:10px 24px;cursor:pointer}.ds-primary:hover{background:#ededed}.ds-primary:focus-visible{outline:2px solid #fff;outline-offset:3px}.ds-primary:active{background:#d8d8d8}.ds-primary:disabled{background:#353535;color:#B8B8BC;cursor:default}"
+    },
+    {
+      "name": "Outlined action",
+      "kind": "button",
+      "refersTo": "button-outlined",
+      "description": "Logger Add Exercise variant; placement is not source logger canon.",
+      "html": "<button class=\"ds-outlined\">Add Exercise</button>",
+      "css": ".ds-outlined{font-family:\"DM Sans\",sans-serif;width:100%;min-height:50px;border:1px solid #414141;border-radius:8px;background:transparent;color:#fff;font-size:14px;font-weight:500;cursor:pointer}.ds-outlined:hover{background:#353535}.ds-outlined:focus-visible{outline:2px solid #fff;outline-offset:3px}.ds-outlined:active{background:#414141}"
+    },
+    {
+      "name": "Text action",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "Subordinate native text action; preview state layers approximate native interaction.",
+      "html": "<button class=\"ds-text\">Add Set</button>",
+      "css": ".ds-text{font-family:\"DM Sans\",sans-serif;min-height:48px;padding:0 12px;border:0;border-radius:24px;background:transparent;color:#fff;font-size:14px;font-weight:500;cursor:pointer}.ds-text:hover{background:#353535}.ds-text:focus-visible{outline:2px solid #fff;outline-offset:2px}.ds-text:active{background:#414141}"
+    },
+    {
+      "name": "Search field",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "Capsule search outline; system sans renders when the local font is unavailable.",
+      "html": "<label class=\"ds-search\"><svg viewBox=\"0 0 24 24\" width=\"24\" height=\"24\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M9.5 3a6.5 6.5 0 1 0 3.98 11.64L19.85 21 21 19.85l-6.36-6.37A6.5 6.5 0 0 0 9.5 3m0 2a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9\"/></svg><input aria-label=\"Search exercises\" placeholder=\"Search exercises\"></label>",
+      "css": ".ds-search{display:flex;align-items:center;gap:12px;border:1px solid #414141;border-radius:999px;padding:0 16px;min-height:56px;color:#fff;background:#202020}.ds-search input{font-family:\"DM Sans\",sans-serif;min-width:0;width:100%;border:0;outline:0;background:transparent;color:#fff;font-size:16px}.ds-search input::placeholder{color:#B8B8BC}.ds-search:hover{border-color:#B8B8BC}.ds-search:focus-within{outline:2px solid #fff;outline-offset:1px}"
+    },
+    {
+      "name": "Metric field",
+      "kind": "input",
+      "refersTo": "input-metric",
+      "description": "Basic native outlined numeric field; not the unresolved source keypad/targets UI.",
+      "html": "<label class=\"ds-metric\">Weight (kg)<input type=\"number\" min=\"0\" max=\"5000\" value=\"20\" aria-label=\"Exercise set 1 weight (kg)\"></label>",
+      "css": ".ds-metric{font-family:\"DM Sans\",sans-serif;display:flex;flex-direction:column;gap:6px;color:#B8B8BC;font-size:12px}.ds-metric input{font-family:\"DM Sans\",sans-serif;min-width:0;width:100%;max-width:160px;min-height:56px;padding:0 12px;border:1px solid #414141;border-radius:4px;background:transparent;color:#fff;font-size:14px}.ds-metric input:hover{border-color:#B8B8BC}.ds-metric input:focus-visible{outline:2px solid #fff;outline-offset:1px}.ds-metric input:invalid{border-color:#FF9696;color:#FF9696}"
+    },
+    {
+      "name": "Selected filter chip",
+      "kind": "chip",
+      "refersTo": "chip-selected",
+      "description": "Theme-selected native FilterChip; library geometry is represented for the panel.",
+      "html": "<button class=\"ds-chip\" aria-pressed=\"true\">Favorites</button>",
+      "css": ".ds-chip{font-family:\"DM Sans\",sans-serif;min-height:32px;border:1px solid transparent;border-radius:8px;background:#fff;color:#000;padding:6px 12px;font-size:14px;font-weight:500;cursor:pointer}.ds-chip:hover{background:#ededed}.ds-chip:focus-visible{outline:2px solid #fff;outline-offset:3px}.ds-chip:active{background:#d8d8d8}.ds-chip[aria-pressed=\"false\"]{background:transparent;color:#fff;border-color:#414141}"
+    },
+    {
+      "name": "Tonal card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Shared flat container vocabulary; this does not approve the current logger card composition.",
+      "html": "<article class=\"ds-card\"><strong>Workout</strong><p>3 exercises</p></article>",
+      "css": ".ds-card{font-family:\"DM Sans\",sans-serif;border-radius:16px;background:#202020;color:#fff;padding:16px}.ds-card strong{font-size:16px;font-weight:500}.ds-card p{margin:8px 0 0;color:#B8B8BC;font-size:14px}"
+    },
+    {
+      "name": "Floating navigation",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Fixed native destinations and shared moving capsule. Panel focus/hover illustrates offsets; it does not persist navigation or emulate Android semantics.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Main\"><div class=\"ds-nav-track\" role=\"tablist\"><span class=\"ds-nav-selection\"></span><button role=\"tab\" aria-selected=\"true\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3 3h8v8H3zm10 0h8v5h-8zm0 7h8v11h-8zM3 13h8v8H3z\"/></svg><span>Dashboard</span></button><button role=\"tab\" aria-selected=\"false\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m20.57 14.86 1.43-1.43-1.43-1.43L17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14 4.14 5.57 2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z\"/></svg><span>Workout</span></button><button role=\"tab\" aria-selected=\"false\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M9.5 3a6.5 6.5 0 1 0 3.98 11.64L19.85 21 21 19.85l-6.36-6.37A6.5 6.5 0 0 0 9.5 3m0 2a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9\"/></svg><span>Exercises</span></button><button role=\"tab\" aria-selected=\"false\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill-rule=\"evenodd\" d=\"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20m0 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6m-6 11c0-2 4-3.1 6-3.1s6 1.1 6 3.1a8 8 0 0 1-12 0\"/></svg><span>Settings</span></button></div></nav>",
+      "css": ".ds-nav{max-width:440px;border:1px solid transparent;border-radius:999px;background:linear-gradient(#1C1C1E,#1C1C1E) padding-box,linear-gradient(#9B786E,#2E2929) border-box}.ds-nav-track{height:66px;position:relative;display:flex;padding:0 4px}.ds-nav-selection{position:absolute;top:4px;left:4px;width:calc((100% - 8px)/4);height:58px;border-radius:999px;background:#393939;transition:transform 300ms}.ds-nav-track button{font-family:\"DM Sans\",sans-serif;z-index:1;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:0;border:0;border-radius:999px;background:transparent;color:#A1A4AA;font-size:12px;line-height:16px;cursor:pointer}.ds-nav-track svg{fill:#92969C}.ds-nav-track button[aria-selected=\"true\"]{color:#fff;font-weight:700}.ds-nav-track button[aria-selected=\"true\"] svg{fill:#fff}.ds-nav-track button:hover{color:#fff}.ds-nav-track button:focus-visible{outline:2px solid #fff;outline-offset:-2px}.ds-nav-track:has(button:nth-of-type(2):hover) .ds-nav-selection,.ds-nav-track:has(button:nth-of-type(2):focus-visible) .ds-nav-selection{transform:translateX(100%)}.ds-nav-track:has(button:nth-of-type(3):hover) .ds-nav-selection,.ds-nav-track:has(button:nth-of-type(3):focus-visible) .ds-nav-selection{transform:translateX(200%)}.ds-nav-track:has(button:nth-of-type(4):hover) .ds-nav-selection,.ds-nav-track:has(button:nth-of-type(4):focus-visible) .ds-nav-selection{transform:translateX(300%)}"
+    },
+    {
+      "name": "Grouped Settings rows",
+      "kind": "custom",
+      "refersTo": "settings-group",
+      "description": "Scoped Nuvio settings treatment with monochrome icon wells and inset separators.",
+      "html": "<section class=\"ds-settings\"><button class=\"ds-settings-row\"><span class=\"ds-settings-icon\"><svg viewBox=\"0 0 24 24\" width=\"24\" height=\"24\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M9.5 3a6.5 6.5 0 1 0 3.98 11.64L19.85 21 21 19.85l-6.36-6.37A6.5 6.5 0 0 0 9.5 3m0 2a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9\"/></svg></span><span><span class=\"ds-settings-title\">Exercises</span><span class=\"ds-settings-subtitle\">Browse the exercise library</span></span></button><div class=\"ds-settings-divider\"></div><button class=\"ds-settings-row\"><span class=\"ds-settings-icon\"><svg viewBox=\"0 0 24 24\" width=\"24\" height=\"24\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 7 7 6.95 6.95 0 0 1-4.95-2.05l-1.42 1.42A9 9 0 1 0 13 3m-1 5v5l4.25 2.52.77-1.28-3.52-2.09V8z\"/></svg></span><span><span class=\"ds-settings-title\">Workout History</span><span class=\"ds-settings-subtitle\">Review your training</span></span></button></section>",
+      "css": ".ds-settings{background:#1A1A1A;border:.5px solid #272727;border-radius:14px;overflow:hidden}.ds-settings-row{font-family:\"DM Sans\",sans-serif;display:flex;align-items:center;gap:15px;width:100%;text-align:left;padding:15px 16px;border:0;background:transparent;color:#fff;cursor:pointer}.ds-settings-icon{display:flex;align-items:center;justify-content:center;width:40px;height:40px;flex-shrink:0;border-radius:12px;background:#343434}.ds-settings-icon svg{width:25px;height:25px}.ds-settings-title{display:block;font-size:17px}.ds-settings-subtitle{display:block;color:#96999F;font-size:14px;line-height:21px}.ds-settings-divider{margin-left:71px;height:.5px;background:#252525}.ds-settings-row:hover{background:#202020}.ds-settings-row:focus-visible{outline:2px solid #fff;outline-offset:-3px}.ds-settings-row:active{background:#353535}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Source Workouts with Nuvio navigation and settings",
+    "overview": "Preserve the inherited Workouts visual hierarchy: neutral charcoal fields, white foreground, wide geometric workout headings, DM Sans reading text, blue training diagrams and real exercise photography. The interface serves recording and reviewing training. Density comes from aligned metrics and clear groups, rather than ornamental content.\n\nThe user's two explicit exceptions are Nuvio's floating navigation capsule and grouped Settings presentation. Their warmer navigation rim, moving selected surface, oversized Settings title and monochrome icon tiles belong to those components. They do not replace the workout world's neutral surfaces. Qualitative direction is already pinned in [PRODUCT.md](PRODUCT.md) and the [workouts contract](.impeccable/surfaces/workouts.md); this document records reused implementation rules, not a redesign or complete source acceptance.\n\nEvidence sampled: `openfactor/app/src/main/java/org/openfactor/app/Ui.kt`, `MainActivity.kt`, `Dashboard.kt`, `Settings.kt`, `WorkoutSession.kt`, exercise filters/search in `Exercises.kt`, and selection/auto-next in `Data.kt`. Existing API 26 logger dashboard, session and settings PNGs were visually inspected, alongside the private source live/empty logger originals outside this repository. Captures support the rendered checkpoint, not every later behavior correction. No new device, font-scaling, IME or TalkBack test was performed. The investigation ledger records later duration/auto-next corrections; older review findings must be reconciled against current code.",
+    "keyCharacteristics": [
+      "Neutral charcoal hierarchy with white primary actions and restrained semantic color.",
+      "Geometric workout headings and DM Sans text when the local reference pack is present.",
+      "Flat tonal grouping with rounded controls and a component-specific Nuvio capsule.",
+      "Native selection, safe-area handling and persistent training state."
+    ],
+    "rules": [
+      {
+        "name": "The Neutral Foreground Rule",
+        "body": "Primary workout lettering and primary actions stay white; blue communicates training information and green communicates completion.",
+        "section": "colors"
+      },
+      {
+        "name": "The Font Provenance Rule",
+        "body": "Local reference fonts describe the inspected appearance; the public source-only build falls back to Android sans and is not font-equivalent to the source.",
+        "section": "typography"
+      },
+      {
+        "name": "The Safe Space Rule",
+        "body": "Keep content clear of system bars and the floating navigation; retain scrollable content and native IME handling rather than fixing a whole screen to capture dimensions.",
+        "section": "layout"
+      },
+      {
+        "name": "The Tonal Depth Rule",
+        "body": "Separate ordinary custom surfaces with the existing charcoal levels and restrained lines; keep the Nuvio gradient confined to the navigation rim.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Fixed Targets Rule",
+        "body": "Animate one shared selected capsule beneath fixed icon and label targets; preserve the native selection semantics and safe-area padding.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "**Do** preserve the pinned Workouts hierarchy and the user's Nuvio navigation/settings exceptions.",
+      "**Do** use the Neutral Foreground Rule for action, training-information and completion colors.",
+      "**Do** distinguish locally imported MacroSans/DM Sans appearance from the public Android sans fallback.",
+      "**Do** retain fixed navigation targets, native selection semantics, system insets and persistent session state.",
+      "**Do** keep source parity and spoken accessibility claims bounded by their actual evidence."
+    ],
+    "donts": [
+      "**Don't** spread the navigation rim gradient or Settings-specific palette across workout content.",
+      "**Don't** promote the logger's remaining add-tile, notes/card, rest-bar or Finish-footer differences into source canon.",
+      "**Don't** treat system-font leakage in unmapped roles as an approved typography choice.",
+      "**Don't** substitute decorative imagery, fabricated video or glyph text for the real media and vector-icon vocabulary.",
+      "**Don't** infer successful TalkBack, large-font, tablet or IME verification from screenshots or semantics alone."
+    ]
+  }
+}

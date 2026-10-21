@@ -1,0 +1,244 @@
+---
+name: Open Factor
+description: Inherited Workouts charcoal system with Nuvio navigation and grouped settings.
+colors:
+  primary: "#FFFFFF"
+  on-primary: "#000000"
+  background: "#131313"
+  surface: "#202020"
+  elevated: "#353535"
+  muted: "#B8B8BC"
+  line: "#414141"
+  blue: "#3982FF"
+  complete: "#91D8AD"
+  error: "#FF9696"
+  navigation: "#1C1C1E"
+  navigation-selected: "#393939"
+  navigation-icon-muted: "#92969C"
+  navigation-label-muted: "#A1A4AA"
+  navigation-rim-top: "#9B786E"
+  navigation-rim-bottom: "#2E2929"
+  settings-background: "#0D0D0D"
+  settings-group: "#1A1A1A"
+  settings-border: "#272727"
+  settings-divider: "#252525"
+  settings-icon: "#343434"
+  settings-muted: "#96999F"
+typography:
+  display:
+    fontFamily: "MacroSans, sans-serif"
+    fontSize: "25sp"
+    fontWeight: 700
+  headline:
+    fontFamily: "DM Sans, sans-serif"
+    fontSize: "40sp"
+    fontWeight: 700
+    lineHeight: "46sp"
+    letterSpacing: "-1sp"
+  title:
+    fontFamily: "DM Sans, sans-serif"
+    fontSize: "20sp"
+    fontWeight: 700
+  body:
+    fontFamily: "DM Sans, sans-serif"
+    fontWeight: 400
+  label:
+    fontFamily: "DM Sans, sans-serif"
+    fontSize: "12sp"
+    lineHeight: "16sp"
+rounded:
+  control: "8dp"
+  settings-icon: "12dp"
+  settings-group: "14dp"
+  surface: "16dp"
+  capsule: "50%"
+spacing:
+  micro: "4dp"
+  tight: "6dp"
+  compact: "8dp"
+  inline: "10dp"
+  small: "12dp"
+  medium: "14dp"
+  inset: "16dp"
+  page: "18dp"
+  section: "24dp"
+components:
+  button-primary:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    rounded: "{rounded.control}"
+  button-outlined:
+    textColor: "{colors.primary}"
+    rounded: "{rounded.control}"
+  button-text:
+    textColor: "{colors.primary}"
+  input-search:
+    textColor: "{colors.primary}"
+    rounded: "{rounded.capsule}"
+  input-metric:
+    textColor: "{colors.primary}"
+  chip-selected:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+  card:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.primary}"
+    rounded: "{rounded.surface}"
+    padding: "16dp"
+  navigation:
+    backgroundColor: "{colors.navigation}"
+    rounded: "{rounded.capsule}"
+    height: "66dp"
+    padding: "4dp"
+  navigation-selected:
+    backgroundColor: "{colors.navigation-selected}"
+    textColor: "{colors.primary}"
+    rounded: "{rounded.capsule}"
+    height: "58dp"
+  settings-group:
+    backgroundColor: "{colors.settings-group}"
+    textColor: "{colors.primary}"
+    rounded: "{rounded.settings-group}"
+---
+
+# Design System: Open Factor
+
+## Overview
+
+**Creative North Star: "Source Workouts with Nuvio navigation and settings"**
+
+Preserve the inherited Workouts visual hierarchy: neutral charcoal fields, white foreground, wide geometric workout headings, DM Sans reading text, blue training diagrams and real exercise photography. The interface serves recording and reviewing training. Density comes from aligned metrics and clear groups, rather than ornamental content.
+
+The user's two explicit exceptions are Nuvio's floating navigation capsule and grouped Settings presentation. Their warmer navigation rim, moving selected surface, oversized Settings title and monochrome icon tiles belong to those components. They do not replace the workout world's neutral surfaces. Qualitative direction is already pinned in [PRODUCT.md](PRODUCT.md) and the [workouts contract](.impeccable/surfaces/workouts.md); this document records reused implementation rules, not a redesign or complete source acceptance.
+
+Evidence sampled: `openfactor/app/src/main/java/org/openfactor/app/Ui.kt`, `MainActivity.kt`, `Dashboard.kt`, `Settings.kt`, `WorkoutSession.kt`, exercise filters/search in `Exercises.kt`, and selection/auto-next in `Data.kt`. Existing API 26 logger dashboard, session and settings PNGs were visually inspected, alongside the private source live/empty logger originals outside this repository. Captures support the rendered checkpoint, not every later behavior correction. No new device, font-scaling, IME or TalkBack test was performed. The investigation ledger records later duration/auto-next corrections; older review findings must be reconciled against current code.
+
+**Key Characteristics:**
+- Neutral charcoal hierarchy with white primary actions and restrained semantic color.
+- Geometric workout headings and DM Sans text when the local reference pack is present.
+- Flat tonal grouping with rounded controls and a component-specific Nuvio capsule.
+- Native selection, safe-area handling and persistent training state.
+
+## Colors
+
+The palette is achromatic at rest, with blue for training information and semantic colors for completion and errors. Frontmatter values are normative; identical header/card colors share `surface` because `OF.top` and `OF.card` are equal.
+
+### Primary
+
+- **White foreground** (`primary`): primary text, active selection, primary button fill and selected dashboard scope.
+- **Black ink** (`on-primary`): text and icons on white primary actions and completed-set controls.
+
+### Secondary
+
+- **Training blue** (`blue`): weekly progress arcs and muscle/Levels information; it is the theme's secondary, not the default action fill.
+- **Completion green** (`complete`): completed set check control. The logger also applies an eight-percent green wash to the completed row; that local row treatment is not a universal container style.
+- **Validation rose** (`error`): theme error foreground for invalid fields. These state colors do not establish extra decorative accents.
+
+### Neutral
+
+- **Base charcoal** (`background`), **surface charcoal** (`surface`) and **raised charcoal** (`elevated`): page, header/card and control/rest-region layering.
+- **Muted gray** (`muted`) and **separator gray** (`line`): supporting copy, field outlines and dividers. Do not use muted text to hide primary values.
+- **Nuvio navigation neutrals** (`navigation`, `navigation-selected`, icon/label muted tokens): shell, moving selection and inactive destinations. The two `navigation-rim-*` colors form the observed vertical border gradient; their warmth stays in that rim.
+- **Nuvio settings neutrals** (`settings-*`): darker page, grouped rows, faint group border/divider, icon tile and supporting labels. These tokens are scoped to Settings.
+
+**The Neutral Foreground Rule.** Primary workout lettering and primary actions stay white; blue communicates training information and green communicates completion.
+
+## Typography
+
+**Display Font:** locally imported MacroSans variable, weight 700, for root workout page headings; runtime fallback is Android `FontFamily.SansSerif`.
+
+**Body Font:** locally imported DM Sans variable, explicitly loaded at weights 400, 500 and 700; runtime fallback is Android `FontFamily.SansSerif`.
+
+**Character:** broad geometric workout headings sit above plain, readable training labels and figures. Settings uses the larger DM Sans title as the Nuvio exception. The family stacks in frontmatter express the native load/fallback sequence; they do not mean web fonts are shipped.
+
+### Hierarchy
+
+- **Display:** root `PageHeading` uses the frontmatter display role. Local MacroSans produces the uppercase geometric appearance from title-case strings; code does not globally uppercase text.
+- **Headline:** frontmatter headline describes the explicit Settings title, not every Material headline. Workout summaries and other text still use named Material typography roles.
+- **Title:** detail/back headings use the explicit frontmatter title role. Shared section headings use Material `titleLarge` with the imported bold family and a declared semibold weight; exercise titles and primary actions use `titleMedium` with the medium family. Keep those roles distinct.
+- **Body:** `bodyLarge` and `bodyMedium` are mapped to the imported regular family; their sizes, line heights and tracking remain inherited from the app's Material 3 defaults. No new global body ramp or scale ratio is established here. Settings rows explicitly use titles (17sp) and subtitles (14sp, line height 21sp).
+- **Label:** the frontmatter label size and line height describe navigation; selected labels are bold and inactive labels regular. Workout supporting labels commonly use 12sp, but do not all establish a 16sp line height. Weekly ring labels explicitly use bold outer labels (18sp) and a stronger center label (20sp); values use bold outer (24sp) and center (30sp) sizes.
+
+**The Font Provenance Rule.** Local reference fonts describe the inspected appearance; the public source-only build falls back to Android sans and is not font-equivalent to the source.
+
+Fonts live under `openfactor/app/src/main/assets/reference/fonts/`; the local importer and provenance are described in [ASSETS.md](docs/open-factor/ASSETS.md). The reference pack is ignored and its ownership is separate from GPL application code. No downloadable font, public font bundle or redistribution permission is implied. `headlineSmall`, `bodySmall`, `labelSmall` and other untouched roles are not comprehensively remapped by `OpenFactorTheme`; their system-font leakage is implementation drift, not a second approved type system. Exact fallback display typography remains unresolved rather than canonized as a system display face.
+
+## Layout
+
+Native Compose uses density-independent geometry (`dp`) and scalable type (`sp`); no web breakpoint system was found. Primary screens fill the available width and scroll vertically. Common page gutters are `page`; cards commonly use `inset` or `page` padding, and gaps draw from the compact through medium steps. `SectionTitle` separates groups with section space above and medium space below. Do not infer a rigid four-point grid from these mixed observed values.
+
+The app Scaffold reserves status/bottom space. On primary destinations it includes the navigation bar's measured height; detail routes omit the pill and reserve system navigation insets. The capsule adds its own system-navigation padding, horizontal margins (28dp) and bottom gap (14dp), with a maximum width (440dp). Those are navigation constraints, not a global content width. There is no implemented tablet rearrangement or validated large-font layout to record as canon. `RoundAction` has explicit compact geometry (44dp), and calendar day chips are also narrow (44dp); neither establishes compliance with the pinned effective touch-target minimum (48dp). Native hit-area expansion has not been checked here, and the compact measurements are not promoted into touch-target tokens.
+
+**The Safe Space Rule.** Keep content clear of system bars and the floating navigation; retain scrollable content and native IME handling rather than fixing a whole screen to capture dimensions.
+
+Dashboard rings retain the observed small/large/small relationship, equal center alignment and stronger central metric. Source-specific dashboard composition stays in the surface contract. The session uses a compact timer header, horizontal exercise selection and one selected exercise body. This topology is established; its remaining card/notes/rest/footer composition is a documented parity gap, not a template for future source-matching loggers.
+
+## Elevation & Depth
+
+Shared custom surfaces use tonal layering rather than explicit drop shadows. Surface tint is transparent. Cards and action wells separate by charcoal levels; outlines separate fields and fine Settings rows. The navigation rim provides a thin structural edge, not an ambient glow. Material dialogs, menus, sheets and ripple/state layers remain native library behavior; their exact elevations are not independently extracted into custom tokens.
+
+**The Tonal Depth Rule.** Separate ordinary custom surfaces with the existing charcoal levels and restrained lines; keep the Nuvio gradient confined to the navigation rim.
+
+Only explicit custom animation sampled is the shared navigation selection's `animateDpAsState` with `tween(300)`; its easing is left at the Compose default in source. No broader motion language, custom spring, hover animation or reduced-motion behavior is evidenced.
+
+## Shapes
+
+Use the shared rounded surface for reusable cards, the smaller control radius for primary actions and exercise images, and full capsules for navigation and the exercise search field. Settings uses its own group and icon-tile radii. Small muscle/media containers also have a local radius (10dp); that isolated value is not promoted to a general scale step.
+
+Navigation clips to a capsule, with a fine gradient border (1dp); Settings groups have faint borders and inset dividers (0.5dp). Ordinary cards are flat fills rather than universally bordered panels. Native Material field/chip shapes remain library defaults where the source does not override them. Do not copy the navigation silhouette onto every surface.
+
+## Components
+
+### Buttons
+
+White primary actions are direct and readable. `PrimaryAction` fills available width, uses the control radius and a minimum height (52dp), and accepts an optional leading icon (20dp) separated from text by compact space. Its internal content padding and disabled treatment remain Material defaults; there is no invented fixed button padding token.
+
+Outlined and text actions provide subordinate choices. The logger's Add Exercise outlined variant uses the control radius and minimum height (50dp); other outlined buttons retain their native defaults. Text actions retain the theme foreground, with muted color where explicitly set. Native click/ripple, focus and disabled behavior are inherited; no custom hover color or focus-ring value has been verified. The Finish footer's placement is a logger parity difference, not a required primary-action layout.
+
+### Chips
+
+Exercise filters use native `FilterChip` and `InputChip` with visible selection. The selected container follows the white secondary-container theme with black text; shape, padding and state layers remain Material defaults. Gym/type/laterality/filters/favorites are filter contexts, not a new navigation system. The dashboard's two-part scope selector is separate: white selected segment on raised charcoal, persisting the data scope.
+
+### Cards / Containers
+
+Reusable analytics, routine and history containers use surface charcoal, the shared surface radius, and inset/page padding without custom shadows. Metrics remain aligned with their units and supporting labels. The current logger wraps its selected exercise and notes in a similar card, but source evidence shows a different logger treatment; do not generalize that placement as source canon.
+
+### Inputs / Fields
+
+Search uses an outlined native field clipped to a capsule, with a search icon and contextual clear action. Metric/name/notes fields use `OutlinedTextField` defaults unless explicitly overridden. Set weight and reps use numeric keyboards, unit-bearing descriptions, visible/semantic validation and completion guards; RIR is optional. The sidecar's input preview represents their basic outline vocabulary, not source keypad or target-editor equivalence. No custom error border thickness, focus animation or disabled opacity is established.
+
+### Navigation
+
+The Nuvio-derived capsule carries four fixed icon/label destinations and a single moving selected surface beneath them. Shell and selected heights are in frontmatter; selected offset starts at (4dp), and slot width is `(available width - 8dp) / 4`. Selection animates over (300ms). Icons are (26dp), labels use the label role, selected foreground is white and inactive icon/text tones are distinct. Each target uses `Role.Tab` in a selectable group; the moving surface does not move the targets. The pill appears on primary destinations and yields to detail/session routes.
+
+**The Fixed Targets Rule.** Animate one shared selected capsule beneath fixed icon and label targets; preserve the native selection semantics and safe-area padding.
+
+### Grouped Settings
+
+Settings retains its own dark canvas, oversized title, monochrome icon tiles and grouped rows. Rows have horizontal padding (16dp), vertical padding (15dp), and a gap (15dp); icon tiles are (40dp) with icons (25dp). Dividers begin after the icon column (71dp). Existing uppercase category labels organize native settings groups; they do not license decorative eyebrows on other surfaces. The captured default frame supports this exception, not all settings branches or accessibility states.
+
+### Selected Exercise Logger
+
+The strip presents photographed exercise tiles (80dp by 104dp) with a selected white underline (3dp); only the selected exercise's set editor is shown. Set option/completion controls use a (48dp) column. Completing sets uses a green check control plus a state change, with invalid metrics preventing completion. Pause/resume and minimize preserve training continuity; summaries now share pause-excluding elapsed calculation. Exercise Auto-Next is persisted and can be disabled in Settings. Circular selection for larger exercise lists is a reconstruction policy, not a fully recovered source algorithm.
+
+Not canonized: the bright add tile, exercise notes/card treatment, inline rest bar and fixed Finish footer differ from the private source logger. Target editing, custom keypad, metric-specific layouts, complete set types, rest sheet and exact spacing remain unresolved. The older logger review's saved-duration defect is corrected in current source; do not perpetuate it as an outstanding finding. Actual TalkBack speech, enlarged type, validation recovery and source summary equivalence are not established by these still captures or code inspection.
+
+The schema-v2 sidecar translates sampled native primitives into self-contained HTML/CSS previews, using one CSS pixel per native dp/sp only for panel illustration. It embeds no reference fonts or photos. Browser hover/focus treatments are preview affordances, not assertions about tested Android rendering; native input/chip library defaults are representative rather than measured web equivalents. Synthetic tonal ramps are panel metadata, not additional application palette tokens.
+
+## Do's and Don'ts
+
+### Do:
+
+- **Do** preserve the pinned Workouts hierarchy and the user's Nuvio navigation/settings exceptions.
+- **Do** use the Neutral Foreground Rule for action, training-information and completion colors.
+- **Do** distinguish locally imported MacroSans/DM Sans appearance from the public Android sans fallback.
+- **Do** retain fixed navigation targets, native selection semantics, system insets and persistent session state.
+- **Do** keep source parity and spoken accessibility claims bounded by their actual evidence.
+
+### Don't:
+
+- **Don't** spread the navigation rim gradient or Settings-specific palette across workout content.
+- **Don't** promote the logger's remaining add-tile, notes/card, rest-bar or Finish-footer differences into source canon.
+- **Don't** treat system-font leakage in unmapped roles as an approved typography choice.
+- **Don't** substitute decorative imagery, fabricated video or glyph text for the real media and vector-icon vocabulary.
+- **Don't** infer successful TalkBack, large-font, tablet or IME verification from screenshots or semantics alone.

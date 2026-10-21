@@ -11,8 +11,14 @@ def adb(*args,raw=False):
  r=subprocess.run(['adb','-s',a.serial,*args],stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True,timeout=20)
  return r.stdout if raw else r.stdout.decode()
 def nodes():
- adb('shell','uiautomator','dump','/sdcard/of-smoke.xml')
- return list(ET.fromstring(adb('shell','cat','/sdcard/of-smoke.xml')).iter('node'))
+ for attempt in range(6):
+  try:
+   result=adb('shell','uiautomator','dump','/sdcard/of-smoke.xml')
+   if 'dumped to:' not in result:raise ValueError('Android UI tree is not ready')
+   return list(ET.fromstring(adb('shell','cat','/sdcard/of-smoke.xml')).iter('node'))
+  except (subprocess.CalledProcessError,ET.ParseError,ValueError):
+   if attempt==5:raise
+   time.sleep(.5)
 def find(value,attr='text',prefix=False):
  for attempt in range(6):
   ns=nodes()
@@ -36,7 +42,7 @@ if any(n.get('text') == 'Resume Workout' for n in nodes()):
  tap('Resume Workout');tap('Workout options','content-desc');tap('Discard Workout');tap('Discard')
  adb('shell','am','force-stop','org.openfactor.app');launch();find('Dashboard')
 capture('phone-dashboard')
-tap('Workout');tap('New workout','content-desc');tap('Empty Workout')
+tap('Workout',last=True);tap('New workout','content-desc');tap('Empty Workout')
 tap('Add Exercise');tap('Search exercises');adb('shell','input','text','barbell% sbench% spress'.replace('% s','%s'))
 adb('shell','input','keyevent','4')  # Expose results on short API-26 emulator viewports.
 tap('Add ','content-desc',prefix=True);find('Complete set','content-desc',prefix=True)
