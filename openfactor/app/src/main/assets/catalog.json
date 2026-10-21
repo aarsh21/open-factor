@@ -1,0 +1,170 @@
+[
+  {
+    "id": "of-1",
+    "name": "Barbell Back Squat",
+    "muscle": "Quads",
+    "equipment": "Barbell",
+    "instructions": ""
+  },
+  {
+    "id": "of-2",
+    "name": "Barbell Bench Press",
+    "muscle": "Chest",
+    "equipment": "Barbell",
+    "instructions": ""
+  },
+  {
+    "id": "of-3",
+    "name": "Barbell Deadlift",
+    "muscle": "Glutes",
+    "equipment": "Barbell",
+    "instructions": ""
+  },
+  {
+    "id": "of-4",
+    "name": "Romanian Deadlift",
+    "muscle": "Hamstrings",
+    "equipment": "Barbell",
+    "instructions": ""
+  },
+  {
+    "id": "of-5",
+    "name": "Dumbbell Bench Press",
+    "muscle": "Chest",
+    "equipment": "Dumbbell",
+    "instructions": ""
+  },
+  {
+    "id": "of-6",
+    "name": "Incline Dumbbell Bench Press",
+    "muscle": "Chest",
+    "equipment": "Dumbbell",
+    "instructions": ""
+  },
+  {
+    "id": "of-7",
+    "name": "Lat Pulldown",
+    "muscle": "Lats",
+    "equipment": "Cable",
+    "instructions": ""
+  },
+  {
+    "id": "of-8",
+    "name": "Pull-Up",
+    "muscle": "Lats",
+    "equipment": "Bodyweight",
+    "instructions": ""
+  },
+  {
+    "id": "of-9",
+    "name": "Seated Cable Row",
+    "muscle": "Upper back",
+    "equipment": "Cable",
+    "instructions": ""
+  },
+  {
+    "id": "of-10",
+    "name": "Barbell Row",
+    "muscle": "Upper back",
+    "equipment": "Barbell",
+    "instructions": ""
+  },
+  {
+    "id": "of-11",
+    "name": "Overhead Press",
+    "muscle": "Front delts",
+    "equipment": "Barbell",
+    "instructions": ""
+  },
+  {
+    "id": "of-12",
+    "name": "Dumbbell Lateral Raise",
+    "muscle": "Side delts",
+    "equipment": "Dumbbell",
+    "instructions": ""
+  },
+  {
+    "id": "of-13",
+    "name": "Dumbbell Curl",
+    "muscle": "Biceps",
+    "equipment": "Dumbbell",
+    "instructions": ""
+  },
+  {
+    "id": "of-14",
+    "name": "Cable Triceps Pushdown",
+    "muscle": "Triceps",
+    "equipment": "Cable",
+    "instructions": ""
+  },
+  {
+    "id": "of-15",
+    "name": "Leg Press",
+    "muscle": "Quads",
+    "equipment": "Machine",
+    "instructions": ""
+  },
+  {
+    "id": "of-16",
+    "name": "Leg Extension",
+    "muscle": "Quads",
+    "equipment": "Machine",
+    "instructions": ""
+  },
+  {
+    "id": "of-17",
+    "name": "Seated Leg Curl",
+    "muscle": "Hamstrings",
+    "equipment": "Machine",
+    "instructions": ""
+  },
+  {
+    "id": "of-18",
+    "name": "Standing Calf Raise",
+    "muscle": "Calves",
+    "equipment": "Machine",
+    "instructions": ""
+  },
+  {
+    "id": "of-19",
+    "name": "Plank",
+    "muscle": "Abs",
+    "equipment": "Bodyweight",
+    "instructions": ""
+  },
+  {
+    "id": "of-20",
+    "name": "Push-Up",
+    "muscle": "Chest",
+    "equipment": "Bodyweight",
+    "instructions": ""
+  },
+  {
+    "id": "of-21",
+    "name": "Bulgarian Split Squat",
+    "muscle": "Quads",
+    "equipment": "Dumbbell",
+    "instructions": ""
+  },
+  {
+    "id": "of-22",
+    "name": "Hip Thrust",
+    "muscle": "Glutes",
+    "equipment": "Barbell",
+    "instructions": ""
+  },
+  {
+    "id": "of-23",
+    "name": "Face Pull",
+    "muscle": "Rear delts",
+    "equipment": "Cable",
+    "instructions": ""
+  },
+  {
+    "id": "of-24",
+    "name": "Hammer Curl",
+    "muscle": "Biceps",
+    "equipment": "Dumbbell",
+    "instructions": ""
+  }
+]
