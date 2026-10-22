@@ -197,6 +197,7 @@ try:
         assert saved[key] == baseline[key], key
     tap('Scale Weight'); tap('View Charts')
     target('About body charts'); capture('chart-first-entry'); tap('Got it')
+    target('Body Charts', scroll=False)
     expected_tutorials = sorted(set(baseline['preferences'].get('dismissedTutorials', [])) | {'bodyCharts'})
     saved['preferences']['dismissedTutorials'] = expected_tutorials
     assert state() == saved
@@ -260,6 +261,7 @@ try:
     adb('shell', 'settings', 'put', 'system', 'font_scale', '1.3')
     target('All', scroll=False)
     capture('chart-font-130')
+    tap('About body charts', 'content-desc'); capture('chart-help-130'); tap('Got it')
     for label in ('1W', '1M', '3M', '6M', '1Y', 'All'):
         tap(label)
         check_range_checked(label)

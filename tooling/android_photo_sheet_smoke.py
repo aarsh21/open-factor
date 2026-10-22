@@ -296,6 +296,7 @@ try:
         if root == 'Settings':
             capture('photo-return-settings')
         tap('Shortcuts', 'content-desc'); tap('Log Measurements'); target('Full Body')
+        assert not any(n.get('class') == 'android.widget.EditText' and n.get('text') for n in nodes()), 'Dismissed quick-log drafts must not reopen'
         enter('Visual Body Fat', '37.25')
         if root == 'Exercises':
             adb('shell', 'settings', 'put', 'system', 'font_scale', '1.3'); target('37.25')
