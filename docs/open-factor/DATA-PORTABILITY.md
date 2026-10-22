@@ -125,6 +125,37 @@ and Body visibility/tutorial consumers. The app APK SHA-256 is
 Build logs, eight test reports, and lint results remain in the locally excluded
 `.amp/in/artifacts/` directory.
 
-Device tests, native Save/Cancel/Back, tutorial reset, and inspected normal/1.3x
-UI results are pending the allocated emulator slot. The implementation is
-locally committed and unpushed.
+Allocated emulator-5582 acceptance passed with independently expected Quick and
+Granular contents. Asymmetric fixtures place records immediately outside and
+on both boundaries, retain a saved 0% value, and distinguish the active program
+from another saved program. Native checks also passed scoped-file rejection,
+hidden measurement and original-byte retention, tutorial dismissal/reopening,
+reset and cancellation, and complete SAF backup restoration onto an empty store
+followed by process restart. Three distinct synthetic originals ensure photo
+checks are not vacuous when incoming records have no photos. The extended
+`ProgressPhotoStorageTest` passed separately on Android.
+
+This DocumentsUI version has no separate Cancel or Navigate up action. Back
+returns cancellation both before and after a filename edit; neither case saves
+a file or changes app records. Reset confirmation has a separate Cancel action,
+which also passed. Normal and 1.3x captures were inspected for export selection,
+visibility, tutorial review/reset, and offline help with search/no-results.
+Additional scrolled captures confirm final switches, instructions, and reset
+notes remain reachable above the preserved floating navigation.
+
+The first setup attempt used the wrong installed APK after Android rejected a
+different debug certificate. Validation copies were re-signed with the retained
+emulator key without uninstalling. Harness corrections use synchronous verified
+private-file copies and inspect the disabled button's action node, not its
+enabled text child. No app behavior correction was needed during acceptance.
+The native app APK SHA-256 is
+`fae851e2454840606839515f15a29c80a662665fbbe7b677ade69d6a46397e6d`.
+
+The exact incoming 33,004-byte preference XML and all 12 private original files
+were restored byte-for-byte. Font scale is 1.0, Wi-Fi and mobile data are off,
+and the original private Body APK was reinstated with SHA-256
+`012bddd60a38615df9e183f174f5c1485d3dc06bbc4a7f0da2d20989c63ce34d`.
+The app is stopped and the emulator lease is explicitly released. Native logs,
+inspected captures, `result.json`, and `handoff.json` stay in locally excluded
+artifacts. No source media or private backup is published. Changes are locally
+committed and unpushed; the parent owns combined integration.

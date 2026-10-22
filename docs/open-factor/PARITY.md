@@ -74,6 +74,18 @@ See [manual programs](PROGRAMS.md) and the private `program-recovery/REPORT.md`.
 ## Combined integration checkpoint
 
 The latest source-only snapshot at
+[`c663f01d`](https://github.com/aarsh21/open-factor/commit/c663f01df672c5aabb7996649ebe27ef49c38abd)
+adds action-specific accessibility names and selected-color states to shortcut
+color controls without changing their appearance. All 88 maintained JVM tests,
+lint with no errors and eleven warnings, and both APK assemblies pass. All 75
+tracked `openfactor/` files byte-match the build copy. The public APK contains
+only the three factual JSON assets and has SHA-256
+`d9e1b8e4845ec6f65a8603fdb8846f095ef712170c67b4202e688bf10c65adaa`.
+Evidence is under `.amp/in/artifacts/parallel-parity/settings-semantics/`.
+The Settings owner has this exact candidate for the allocated semantic-only
+native check; that follow-up is not yet accepted.
+
+The preceding source-only snapshot at
 [`41cfff2b`](https://github.com/aarsh21/open-factor/commit/41cfff2b38e2d65c98a21eee2e1e86aaa1374586)
 includes the Dashboard side-caption and Health dialog-inset corrections. All 88 maintained JVM
 tests, lint with no errors and eleven warnings, and both APK assemblies pass.
@@ -89,7 +101,9 @@ this same APK at normal and 1.3× font, with both side captions on one line and
 equal 80-pixel heights at 1.3×. Parent inspected those captures and the enlarged
 grouped Levels rows. Full Dashboard functional acceptance remains pinned to the
 earlier APK below. Exact baseline restoration is verified after both runs;
-emulator-5584 is released. Settings and export checks remain in progress.
+emulator-5584 is released. Export's bounded worker-APK native checks also pass,
+with exact baseline restoration and emulator-5582 released. Settings retains
+emulator-5580 for its remaining checks and the semantic follow-up.
 
 The Health-inclusive product source at
 [`73c34e46`](https://github.com/aarsh21/open-factor/commit/73c34e461b5d994080ab8b69a416fd3fa3f57f45)
@@ -168,8 +182,8 @@ below is not an acceptance pass.
 | Body data/photos | The worker's complete photo/visibility/SAF and chart flows pass on its recorded consumer APK. Cases include four caller returns, history return, reachable scrim, hidden precision/photo bytes, all-hidden Save, six ranges, selection, units, first-entry help dismissal/reentry and restart. Separate Back/outside dismissal persistence and private-font/SVG/keyboard probes pass. All nine opt-in SVGs decode. Parent inspected affected normal/1.3× renders and final receipts. Exact incoming 33,004-byte XML, all twelve private photo files, font and offline settings are restored; 5582 is released to Export | These worker flows are not a combined-parent native acceptance pass. Earlier failed driver attempts remain retained. The 48 dp clearance and first-entry raw-chart help are local adaptations. Weight Trend, source aggregation, initialization/estimation and reference conversion remain unrecovered. Source Save, same-day record policy and populated trend outcomes remain unobserved. |
 | Levels | Source-backed primary 1/secondary 0.5 weighting, primary precedence and ×7/days normalization for 7/30/90 days are implemented. Upper-body row order and Time Period sheet are recovered. The exact earlier combined APK passes native weighting controls, period-sheet recreation, exact list bounds, header/system Back and duplicate Create→Back. The separate fresh-dump recreation check passes. Parent inspected readable grouped upper-body rows at 1.3× on the newer pinned APK | Complete eligibility/date rules, lower-body order and map colors remain local. Binary recovery and local synthetic fixtures are not a populated source comparison. |
 | Onboarding | Local defer/resume, validation and gym/program handoff exist | Source post-login forms were not captured sufficiently for parity. Onboarding body values are not dated body-data records. Account/login gates are intentionally omitted. |
-| Settings | Grouped Nuvio appearance is retained. Height, distance and clock choices, theme, shortcut configuration, workout controls, visibility and offline help are implemented. The corrected worker run passes 58 JVM tests, lint and both APK assemblies | Native persistence, theme, shortcut, KeepAlive and accessibility checks are pending. Language and energy units remain explicitly unavailable. Propagation, auto-RIR and source scrolling rules are unrecovered. |
-| Data export | Complete backups retain photos, hidden data, all new preferences and imported scale provenance. Quick/Granular analysis exports have six time frames and explicit category mappings. Analysis documents reject Restore. Native SAF uses truncating writes. See [data portability](DATA-PORTABILITY.md) | Combined native export/reset/help checks are pending. Calendar boundaries and category mappings are disclosed local policies, not executed source outcomes. Steps, Weight Trend and Period are not fabricated. |
+| Settings | Grouped Nuvio appearance is retained. Height, distance and clock choices, theme, shortcut configuration, workout controls, visibility and offline help are implemented. The corrected worker run passes 58 JVM tests, lint and both APK assemblies. Native checks are active on the pinned combined APK; an action-specific shortcut-color accessibility correction is integrated and combined-build-verified | Final native completion, exact restoration and the new semantic check remain pending. Language and energy units remain explicitly unavailable. Propagation, auto-RIR and source scrolling rules are unrecovered. |
+| Data export | Complete backups retain photos, hidden data, all new preferences and imported scale provenance. The recorded export APK passes offline native Quick/Granular Save contents and date boundaries, Back cancellation before/after filename edit, scoped Restore rejection, hidden records/original-byte retention, tutorial dismissal/reopening/reset/cancel, complete SAF backup into an empty store and restore/restart, and offline help search/no-results. One Android photo-storage test passes. Parent inspected representative normal/1.3× captures and restoration receipts; exact incoming XML, twelve originals, Body APK and settings are restored and 5582 released. See [data portability](DATA-PORTABILITY.md) | This worker-APK pass does not cover the newer Workout Settings keys or Health provenance. The picker exposes Back cancellation, not a separate Cancel control. Earlier setup/driver failures remain separate. Calendar boundaries and category mappings are local policies, not executed source outcomes. Steps, Weight Trend and Period are not fabricated. |
 | Integrations | Optional device-local Health Connect panel, per-action permissions, manual-first scale merge, steps reads and stable-ID exports are implemented. Combined builds include eight no-store contract tests. The final pinned APK passes native UI-only Settings/onboarding entry and return, rationale and no-transfer checks at normal/1.3×. Parent inspected corrected gesture-inset coverage and complete footer/rationale endings; exact baseline APK/test/XML/profile/private-file hashes and settings are restored. See [Health Connect](HEALTH-CONNECT.md) | No grant or health-store operation ran. Actual unavailable/denied displays and provider transfer/idempotence compatibility remain unaccepted. The 1.3× Settings-entry capture partly positions the row subtitle behind navigation; it proves entry, not full-row clearance or persistent clipping. The earlier UI-only pass, inset defect and correction remain separate evidence, not an uninterrupted aggregate pass. |
 
 ## Local body-data policy

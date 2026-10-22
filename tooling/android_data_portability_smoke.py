@@ -221,7 +221,13 @@ try:
         target(label, scroll=False)
     back()
     tap('Export'); target('Save'); capture('native-save'); back(); target('Data Export'); assert state() == before
-    tap('Export'); target('Save'); tap('Navigate up', 'content-desc'); target('Data Export'); assert state() == before
+    tap('Export'); target('Save')
+    cancelled = tag+'-cancelled.json'
+    enter_field(next(n for n in nodes() if n.get('class') == 'android.widget.EditText'), cancelled)
+    # This DocumentsUI version has no Cancel or Navigate up action. Back returns
+    # RESULT_CANCELED, including after a filename edit and keyboard dismissal.
+    back(); target('Data Export'); assert state() == before
+    adb('shell', 'test', '!', '-e', '/sdcard/Download/'+cancelled)
     tap('Export'); target('Save')
     name = tag+'-quick.json'; downloads.append(name); save_as(name); target('Data Export')
     quick = json.loads(adb('shell', 'cat', '/sdcard/Download/'+name))
@@ -231,7 +237,9 @@ try:
     assert quick['data']['workoutLog'][0]['notes'] == 'Synthetic notes -6'
     assert 'schemaVersion' not in quick and state() == before
     tap('Granular Export'); capture('granular-empty-normal')
-    assert target('Export').get('enabled') == 'false'
+    actions = [n for n in nodes() if n.get('clickable') == 'true'
+               and any(child.get('text') == 'Export' for child in n.iter('node'))]
+    assert len(actions) == 1 and actions[0].get('enabled') == 'false'
     tap('Scale Weight'); capture('granular-selected-normal'); tap('Export'); target('Save')
     name = tag+'-granular.json'; downloads.append(name); save_as(name); target('Data Export')
     granular = json.loads(adb('shell', 'cat', '/sdcard/Download/'+name))
@@ -302,7 +310,8 @@ try:
         settings(); tap('Tutorials'); capture('tutorials-font-130'); tap('Reset Tutorials'); capture('reset-font-130'); tap('Cancel')
         settings(); tap('Knowledge Base & Support'); tap('Restore on another device'); capture('help-font-130')
     result = {'status': 'passed', 'serial': args.serial, 'offline': True,
-              'native_save_back_cancel': True, 'independent_quick_and_granular_contents': True,
+              'native_save_and_back_cancel': True, 'separate_native_cancel_control': False,
+              'independent_quick_and_granular_contents': True,
               'scoped_document_rejected_by_restore': True, 'hidden_records_and_photo_bytes_retained': True,
               'tutorial_first_dismiss_manual_reopen_reset': True, 'complete_backup_empty_store_restore_restart': True,
               'normal_and_130_percent_captures': True, 'source_executed_outcomes_claimed': False}
