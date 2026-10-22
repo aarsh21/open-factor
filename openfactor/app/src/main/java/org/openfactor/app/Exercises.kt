@@ -515,6 +515,7 @@ fun ExerciseDetail(
         PageHeading(
             e.title,
             if (closeable) null else onBack,
+            displayTitle = false,
             actions = {
                 if (closeable) IconButton(onBack) { Icon(Icons.Rounded.Close, "Close Info") }
                 IconButton({ vm.favorite(e.id) }) {

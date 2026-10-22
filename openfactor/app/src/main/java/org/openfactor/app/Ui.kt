@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -280,6 +281,7 @@ fun workoutDisplayFont(): FontFamily {
 fun PageHeading(
     title: String,
     back: (() -> Unit)? = null,
+    displayTitle: Boolean = back == null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val display = workoutDisplayFont()
@@ -293,10 +295,11 @@ fun PageHeading(
             title,
             Modifier.weight(1f),
             fontFamily =
-                if (back == null) display else MaterialTheme.typography.titleLarge.fontFamily,
-            fontSize = if (back == null) 25.sp else 20.sp,
+                if (displayTitle) display else MaterialTheme.typography.titleLarge.fontFamily,
+            fontSize = if (displayTitle) 25.sp else 20.sp,
             fontWeight = FontWeight.Bold,
-            maxLines = 2,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
         )
         actions()
     }
