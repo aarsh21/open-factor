@@ -132,9 +132,9 @@ fun CustomExercise(data: AppData, catalog: EquipmentCatalog, onBack: () -> Unit,
                         ChoiceField("Primary Joint Action", draft.primaryJoint.ifBlank { "None" }) { choice = CustomChoice.JOINT1 }
                         ChoiceField("Secondary Joint Action", draft.secondaryJoint.ifBlank { "None" }) { choice = CustomChoice.JOINT2 }
                         OutlinedTextField(
-                            draft.alternateNames, { if (it.length <= 300 || it.length < draft.alternateNames.length) draft = draft.copy(alternateNames = it) }, Modifier.fillMaxWidth(),
-                            isError = draft.alternateNames.length > 300, minLines = 2, maxLines = 4,
-                            label = { Text("Alternate Names") }, supportingText = { Text("${draft.alternateNames.length}/300 · Separate names with commas") },
+                            draft.alternateNames, { draft = draft.copy(alternateNames = it) }, Modifier.fillMaxWidth(),
+                            minLines = 2, maxLines = 4,
+                            label = { Text("Alternate Names") }, supportingText = { Text("Separate names with commas") },
                         )
                         OutlinedTextField(draft.instructions, { draft = draft.copy(instructions = it) }, Modifier.fillMaxWidth(), label = { Text("Instructions and technique notes") }, minLines = 2, maxLines = 6)
                     }

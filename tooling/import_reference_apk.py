@@ -41,22 +41,25 @@ def make_browse_classifier(index):
         return result or ['Other']
     return classify
 
-def build(apk: Path, dest: Path, video_directory: Path | None = None, public_data_output: Path | None = None):
+def build(apk: Path, dest: Path, video_directory: Path | None = None, public_data_output: Path | None = None, facts_only: bool = False):
+    if facts_only and (public_data_output is None or video_directory is not None):
+        raise ValueError('--facts-only requires --public-data-output and excludes --video-directory')
     if dest.exists() and any(dest.iterdir()):
         raise ValueError(f'Refusing to overwrite an existing pack: {dest}; choose a new --output')
     dest.mkdir(parents=True, exist_ok=True)
     provenance=[]
     with ZipFile(apk) as z:
-        manifest=json.loads(z.read('assets/flutter_assets/FontManifest.json'))
+        manifest=[] if facts_only else json.loads(z.read('assets/flutter_assets/FontManifest.json'))
         extra_fonts={'assets/flutter_assets/'+f['asset']:PurePosixPath('fonts')/PurePosixPath(f['asset']).name
             for family in manifest for f in family['fonts']}
-        (dest/'font-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+        if not facts_only:
+            (dest/'font-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
         raw=z.read(CATALOG)
         catalog=json.loads(raw)
         index=catalog['uuidIndex']
         pictures={}
         markdown={}
-        for member in z.infolist():
+        for member in ([] if facts_only else z.infolist()):
             name=member.filename
             local=None
             if name.startswith(ASSETS) and not member.is_dir():
@@ -113,7 +116,7 @@ def build(apk: Path, dest: Path, video_directory: Path | None = None, public_dat
             projected.append({'id':eid,'name':record['name'],'muscle':muscles[0] if muscles else 'Other',
                 'muscles':muscles,'secondary':entities(record,'secondaryFeatureMuscle'),
                 'properties':{label: ', '.join(str(index[i]['name']) for i in (record.get(field,[]) if isinstance(record.get(field),list) else [record.get(field)]) if i in index) or 'None'
-                    for label,field in [('Type','exerciseType'),('Laterality','laterality'),('Primary Joint Action','primaryJointAction'),('Secondary Joint Action','secondaryJointAction'),('Metrics','exerciseMetrics'),('Range of Motion','rom'),('Stability','stability')]},
+                    for label,field in [('Type','exerciseType'),('Region','regionTrained'),('Laterality','laterality'),('Primary Joint Action','primaryJointAction'),('Secondary Joint Action','secondaryJointAction'),('Metrics','exerciseMetrics'),('Range of Motion','rom'),('Stability','stability')]},
                 'bodyweight':record.get('bodyweight') or 0.0,'searchBoost':record.get('searchBoostValue') or 0.0,
                 'browseCategories':classify_browse(record),
                 'equipment':equipment(record),'equipmentOptions':entities(record,'resistanceEquipmentGroupIds'),
@@ -122,8 +125,9 @@ def build(apk: Path, dest: Path, video_directory: Path | None = None, public_dat
                 'frames':frames,'clips':clips,'videoObjectPaths':objects,
                 'instructions':next(iter(markdown.get(eid,[])),''),
                 'video':None,'videoStatus':'local' if any(clips) else 'static-path-only'})
-        (dest/'catalog.json').write_text(json.dumps(projected,ensure_ascii=False,indent=2)+'\n')
-        (dest/'source-catalog.json').write_bytes(raw)
+        if not facts_only:
+            (dest/'catalog.json').write_text(json.dumps(projected,ensure_ascii=False,indent=2)+'\n')
+            (dest/'source-catalog.json').write_bytes(raw)
         if public_data_output is not None:
             # Descriptive exercise/equipment facts only. No instruction prose, media, fonts or animations.
             public_data_output.mkdir(parents=True,exist_ok=True)
@@ -155,5 +159,6 @@ if __name__=='__main__':
     parser.add_argument('--output',type=Path,default=Path(__file__).resolve().parents[1]/'openfactor/app/src/main/assets/reference')
     parser.add_argument('--video-directory',type=Path,help='Optional authorized local MP4 export, flat or videos/ subdirectory')
     parser.add_argument('--public-data-output',type=Path,help='Optional directory for descriptive facts only; no source prose/media/fonts')
+    parser.add_argument('--facts-only',action='store_true',help='Write only public facts and provenance; do not extract source media, prose, fonts or raw catalog')
     args=parser.parse_args()
-    build(args.apk,args.output,args.video_directory,args.public_data_output)
+    build(args.apk,args.output,args.video_directory,args.public_data_output,args.facts_only)

@@ -323,43 +323,52 @@ assert entries[1]['exerciseId'] == duplicate['id'] and entries[1]['notes'] == ''
 assert entries[1]['sets'][0].get('assistanceKg') is None and entries[1]['sets'][0].get('durationSeconds') is None
 capture('17-duplicate-contextual-add')
 
-# The catalog omits Region: require the type instead of inventing upper/lower.
-# Its 515-character aliases must support incremental deletion before bulk replacement.
+# Source Region prefills the type; all 515 alias characters must reach Create unchanged.
+catalog_source = next(e for e in json.loads((root / 'openfactor/app/src/main/assets/catalog.json').read_text())
+                      if e['name'] == 'Weighted Roman chair hip hinge')
+assert len(', '.join(catalog_source['aliases'])) == 515
 back()
 enter('Synthetic Supported Hold', 'weighted roman chair hip hinge')
 tap('Weighted Roman Chair Hip Hinge', node_class='android.widget.TextView')
 catalog_before = state()
 tap('Edit Duplicate')
-find('Select type')
-assert disabled('Next')
-capture('18-catalog-missing-type')
-tap('Type', 'content-desc')
-tap('Isolation Lower')
+find('Isolation Lower')
+assert not disabled('Next')
+capture('18-catalog-type-prefilled')
 tap('Next')
 tap('Next')
 tap('Next')
 tap('Alternate Names')
 fields = [n for n in nodes() if n.get('class') == 'android.widget.EditText' and n.get('focused') == 'true']
-assert len(fields) == 1 and len(fields[0].get('text')) == 515
-adb('shell', 'input', 'keyevent', '123')
-adb('shell', 'input', 'keyevent', '67')
-fields = [n for n in nodes() if n.get('class') == 'android.widget.EditText' and n.get('focused') == 'true']
-assert len(fields[0].get('text')) == 514, 'Over-limit copied aliases could not be shortened one character at a time'
+assert len(fields) == 1 and fields[0].get('text') == ', '.join(catalog_source['aliases'])
 back()
-assert disabled('Next')
-capture('19-over-limit-alias-recovery')
-enter('Alternate Names', 'Roman Variation')
+assert not disabled('Next'), 'Valid source aliases must not require shortening'
+capture('19-all-source-aliases')
 tap('Next')
 find('Does everything look correct?')
-capture('20-catalog-review-recovered')
-for _ in range(5):
-    tap('Back', 'content-desc')
-find('Edit Duplicate')
-assert state() == catalog_before, 'Cancelling a catalog duplicate mutated saved records'
+tap('Alternate Names')
+find(', '.join(catalog_source['aliases']))
+capture('20-all-aliases-review')
+assert state() == catalog_before, 'Reviewing a catalog duplicate mutated saved records'
+tap('Create')
+saved = state()
+assert len(saved['customExercises']) == len(catalog_before['customExercises']) + 1
+catalog_copy = saved['customExercises'][-1]
+assert catalog_copy['id'] not in [catalog_source['id']] + [e['id'] for e in catalog_before['customExercises']]
+assert catalog_copy['aliases'] == catalog_source['aliases']
+assert {**saved, 'customExercises': catalog_before['customExercises']} == catalog_before, 'Create changed existing/default/active/body/photo records'
+assert saved['customExercises'][:-1] == catalog_before['customExercises']
+tap('Details')
+tap('Alternative Names')
+find(', '.join(catalog_source['aliases']))
+capture('21-all-aliases-saved')
+adb('shell', 'am', 'force-stop', 'org.openfactor.app')
+launch()
+assert state() == saved, 'Saved aliases or unrelated records changed on restart'
 for key in ['scaleWeights', 'bodyMeasurements', 'progressPhotos', 'history']:
     assert state().get(key) == before.get(key), (key, 'Duplicate changed unrelated records')
 assert 'Active default network: none' in adb('shell', 'dumpsys', 'connectivity')
 (args.output / 'state.json').write_text(json.dumps(state(), indent=2) + '\n')
 (args.output / 'apk-sha256.txt').write_text(adb('shell', 'sha256sum', adb('shell', 'pm', 'path', 'org.openfactor.app').strip().removeprefix('package:')))
-(args.output / 'result.json').write_text(json.dumps(dict(status='passed', serial=args.serial, five_step_flow=True, no_save_before_create=True, recreation=True, required_fields_and_recovery=True, structured_metadata_and_restart=True, gym_requirements=True, alias_search=True, contextual_add=True, metric_logging=True, duplicate_prefill_cancel_create=True, duplicate_recreation=True, original_and_overrides_unchanged=True, duplicate_contextual_add=True, catalog_missing_type_required=True, copied_alias_overflow_recovery=True, body_and_photos_unchanged=True, offline=True), indent=2) + '\n')
+(args.output / 'result.json').write_text(json.dumps(dict(status='passed', serial=args.serial, five_step_flow=True, no_save_before_create=True, recreation=True, required_fields_and_recovery=True, structured_metadata_and_restart=True, gym_requirements=True, alias_search=True, contextual_add=True, metric_logging=True, duplicate_prefill_cancel_create=True, duplicate_recreation=True, original_and_overrides_unchanged=True, duplicate_contextual_add=True, catalog_type_prefilled=True, all_source_aliases_review_create_restart=True, body_and_photos_unchanged=True, offline=True), indent=2) + '\n')
 print((args.output / 'result.json').read_text())

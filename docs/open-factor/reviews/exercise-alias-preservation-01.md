@@ -1,0 +1,21 @@
+# Lossless duplicate aliases, 22 October 2026
+
+The inherited 300-character alias limit prevented duplicating a valid source catalog exercise unchanged. The earlier incremental-shortening workaround did not satisfy the retention contract: it forced alias loss. This follow-up removes the unsupported restriction from both draft validation and the editor, for ordinary custom creation and duplication alike. It adds no per-copy exception or replacement limit. The editor retains two-to-four visible lines and internal scrolling.
+
+## Regression and evidence
+
+The retained factual catalog entry **Weighted Roman chair hip hinge** has eight aliases totaling 515 characters when joined for editing. Its Region now prefills Isolation Lower through [the separately committed source projection](catalog-region-01.md). Source duplicate/Create outcomes remain unobserved; the defect here is demonstrated local data loss, not a claim about those source outcomes.
+
+The extended existing `duplicateIsAnEditableNewExerciseWithoutChangingTheOriginal` JVM test failed before the fix at duplicate creation with `IllegalArgumentException` (`.amp/in/artifacts/parity-implementation-08/alias-before.log`). It now checks all aliases unchanged, a fresh identity, original preservation, further editing beyond that length and backup round-trip. No snapshot or private-helper assertions were added.
+
+[CustomExerciseData.kt](../../../openfactor/app/src/main/java/org/openfactor/app/CustomExerciseData.kt) no longer rejects alias length. [CustomExercise.kt](../../../openfactor/app/src/main/java/org/openfactor/app/CustomExercise.kt) accepts text directly and no longer labels valid source data as over-limit. [The existing UI smoke](../../../tooling/android_custom_exercise_smoke.py) carries the original 515 characters through Details, Review, explicit Create and process restart, comparing saved aliases and fresh ID and asserting unchanged existing exercises/defaults/active/body/photo records.
+
+Public/private assembly and lint, 51 JVM tests and six public native tests passed after a clean rebuild. The executor replacement interrupted an earlier build; that log is retained as `build-interrupted.log` and is not a pass. Only the owned disposable emulator-5584 was restarted. Its old synthetic preferences were retained before reinstalling after a debug-signature mismatch. No phone, parent/body emulator or private source media was changed.
+
+The final uninterrupted offline custom/duplicate UI flow passed on 5584 (`final/result.json`, `final.log`). Captures `final/19-all-source-aliases.png`, `final/20-all-aliases-review.png` and `final/21-all-aliases-saved.png` were inspected: the editor remains bounded without an error/cap, all eight aliases are readable in Review, Create stays accessible and the saved Copy detail is legible. Normal mid-scroll clipping at the content boundary is not evidence of truncated stored aliases; exact persisted-list assertions establish retention.
+
+A separate populated control passed (`populated-control/result.json`, `populated-control.log`). It seeded asymmetric body measurements, a generated synthetic PNG, existing scale weights, an active workout and a nonempty catalog note/93-second/Do Not Recommend override. Review changed no saved data; Create added only a fresh custom exercise with all original aliases. Existing custom exercises/defaults/active/history/body/photo metadata and exact PNG bytes were unchanged through restart. It then restored the exact prior synthetic preference bytes/state and removed only its generated image. This supplements, rather than disguises, the full smoke's empty photo/measurement arrays.
+
+Build/test evidence is `build-public.log`, `build-full-pack.log` and `android-public-tests.log` in the same artifact directory. The source catalog contains no alias entries with embedded comma/newline delimiters; the existing comma-separated custom editor therefore preserves this specimen's list boundaries as well as text.
+
+This follow-up corrects the alias-limit defect in [the duplicate unit](exercise-duplicate-01.md). Modified/Archived, source combined type presentation, equipment/left-right rest policies and the wider functional/UX parity backlog remain open. Changes are local and unpushed.

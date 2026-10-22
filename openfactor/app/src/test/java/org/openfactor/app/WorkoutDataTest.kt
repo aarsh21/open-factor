@@ -62,6 +62,8 @@ class WorkoutDataTest {
 
     @Test
     fun duplicateIsAnEditableNewExerciseWithoutChangingTheOriginal() {
+        val aliases = listOf("Supported Hold", "Independent " + "x".repeat(487))
+        assertEquals(515, aliases.joinToString(", ").length)
         val original = CustomExerciseDraft(
             name = "Hold", metric1 = SetMetric.ASSISTANCE, metric2 = SetMetric.DURATION,
             type = CustomExerciseType.ISOLATION_LOWER, laterality = "Unilateral",
@@ -69,15 +71,16 @@ class WorkoutDataTest {
             resistance = listOf(setOf("machine"), setOf("bar", "plates")), support = listOf(setOf("bench", "rack")),
             bodyPercent = "7.6", rom = 2, stability = 4,
             primaryJoint = "Knee Flexion", alternateNames = "Supported Hold", instructions = "Keep still",
-        ).toExercise(emptyList(), "original").copy(frames = listOf("original.png"), clips = listOf("original.mp4"))
+        ).toExercise(emptyList(), "original").copy(aliases = aliases, frames = listOf("original.png"), clips = listOf("original.mp4"))
         val draft = original.duplicateDraft()
         assertEquals("7.6", draft.bodyPercent)
         assertEquals(CustomExerciseType.ISOLATION_LOWER, draft.type)
-        val duplicate = draft.copy(name = "Edited Hold", bodyPercent = "81").toExercise(emptyList(), "copy")
+        val duplicate = draft.copy(name = "Edited Hold", bodyPercent = "81").toExercise(emptyList())
         assertEquals("original", original.id)
         assertEquals("Hold", original.name)
         assertEquals(.076, original.bodyweight, 0.0)
-        assertEquals("copy", duplicate.id)
+        assertEquals(aliases, original.aliases)
+        assertNotEquals(original.id, duplicate.id)
         assertEquals("Edited Hold", duplicate.name)
         assertEquals(.81, duplicate.bodyweight, 0.0)
         assertEquals(listOf(setOf("machine"), setOf("bar", "plates")), duplicate.resistanceEquipment)
@@ -85,11 +88,15 @@ class WorkoutDataTest {
         assertEquals(listOf(SetMetric.ASSISTANCE, SetMetric.DURATION), duplicate.loggingMetrics())
         assertEquals(listOf("Hamstrings"), duplicate.muscles)
         assertEquals(listOf("Glutes"), duplicate.secondary)
+        assertEquals(aliases, duplicate.aliases)
         assertEquals("Keep still", duplicate.instructions)
         assertTrue(duplicate.frames.isEmpty() && duplicate.clips.isEmpty())
         assertFalse(original.copy(properties = original.properties - "Region").duplicateDraft().validBasics)
         assertFalse(draft.copy(resistance = emptyList()).validDetails)
-        assertFalse(draft.copy(alternateNames = "a".repeat(301)).validDetails)
+        val extended = draft.copy(alternateNames = draft.alternateNames + ", Additional hold").toExercise(emptyList())
+        assertEquals(aliases + "Additional hold", extended.aliases)
+        assertNotEquals(duplicate.id, extended.id)
+        assertEquals(listOf(duplicate, extended), DataCodec.decode(DataCodec.encode(AppData(customExercises = listOf(duplicate, extended)))).customExercises)
     }
 
     @Test

@@ -158,8 +158,22 @@ class TrainingFlowTest {
         val (resistance, supports) = equipment.requirementsFor(bench)
         assertEquals(listOf(setOf(bar, plates)), resistance)
         assertEquals(5, supports.size)
-        val duplicateDraft = bench.duplicateDraft(resistance, supports)
-        val duplicate = duplicateDraft.copy(type = CustomExerciseType.COMPOUND_UPPER).toExercise(equipment.items)
+        val resolved = WorkoutViewModel(context.applicationContext as android.app.Application).catalog
+        assertEquals(1345, resolved.size)
+        for ((name, type) in mapOf(
+            "Barbell bench press" to CustomExerciseType.COMPOUND_UPPER,
+            "Weighted Roman chair hip hinge" to CustomExerciseType.ISOLATION_LOWER,
+            "Burpee" to CustomExerciseType.COMPOUND_FULL,
+        )) {
+            assertEquals(name, type, resolved.single { it.name == name }.duplicateDraft().type)
+        }
+        imported?.forEach { source ->
+            val actual = resolved.single { it.id == source.id }
+            assertEquals(source, actual.copy(properties = source.properties))
+            source.properties["Region"]?.let { assertEquals(it, actual.properties["Region"]) }
+        }
+        val duplicateDraft = resolved.single { it.id == bench.id }.duplicateDraft(resistance, supports)
+        val duplicate = duplicateDraft.toExercise(equipment.items)
         assertEquals(.076, duplicate.bodyweight, 0.0)
         assertFalse(equipment.available(duplicate, GymProfile(name = "No support", equipmentIds = setOf(bar, plates))))
         assertTrue(equipment.available(duplicate, GymProfile(name = "Everything", equipmentIds = equipment.prefill("everything"))))

@@ -502,6 +502,13 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     val photoStore = ProgressPhotoStore(application)
     private val _data = MutableStateFlow(store.load())
     val data = _data.asStateFlow()
+    private val bundled =
+        runCatching {
+                application.assets.open("catalog.json").bufferedReader().use {
+                    DataCodec.catalog(it.readText())
+                }
+            }
+            .getOrElse { emptyList() }
     private val imported =
         runCatching {
                 application.assets.open("reference/catalog.json").bufferedReader().use {
@@ -510,13 +517,14 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
             }
             .getOrElse { emptyList() }
     val catalog: List<Exercise> =
-        imported.ifEmpty {
-            runCatching {
-                    application.assets.open("catalog.json").bufferedReader().use {
-                        DataCodec.catalog(it.readText())
-                    }
-                }
-                .getOrElse { emptyList() }
+        if (imported.isEmpty()) bundled
+        else {
+            val regions = bundled.associate { it.id to it.properties["Region"] }
+            imported.map { exercise ->
+                val region = regions[exercise.id]
+                if (region == null || "Region" in exercise.properties) exercise
+                else exercise.copy(properties = exercise.properties + ("Region" to region))
+            }
         }
 
     val equipmentCatalog = EquipmentCatalog(application)

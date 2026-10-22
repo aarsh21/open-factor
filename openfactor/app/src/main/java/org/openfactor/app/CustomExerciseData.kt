@@ -37,7 +37,7 @@ data class CustomExerciseDraft(
         metrics.count { it == SetMetric.DURATION || it == SetMetric.DURATION_PER_SIDE } <= 1 &&
         metrics.count { it in listOf(SetMetric.DISTANCE_LONG, SetMetric.DISTANCE_SHORT, SetMetric.DISTANCE_PER_SIDE) } <= 1
     val contribution get() = bodyPercent.replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() && it in 0.0..100.0 }
-    val validDetails get() = contribution != null && resistance.isNotEmpty() && rom in 0..5 && stability in 0..5 && alternateNames.length <= 300
+    val validDetails get() = contribution != null && resistance.isNotEmpty() && rom in 0..5 && stability in 0..5
 
     fun cycleMuscle(name: String): CustomExerciseDraft = when (name) {
         in primary -> copy(primary = primary - name, secondary = secondary + name)
