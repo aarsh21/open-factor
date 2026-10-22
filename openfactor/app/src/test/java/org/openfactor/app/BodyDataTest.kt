@@ -23,7 +23,8 @@ class BodyDataTest {
                 scaleWeights =
                     listOf(
                         ScaleWeightRecord(date = date, weightKg = 82.35, bodyFatPercent = 18.7),
-                        ScaleWeightRecord(date = date, weightKg = 82.1),
+                        ScaleWeightRecord(date = date, weightKg = 82.1,
+                            healthConnectOrigin = "test.scale"),
                     ),
                 bodyMeasurements =
                     listOf(
@@ -89,6 +90,25 @@ class BodyDataTest {
                 remove("bodyMeasurements")
             }
         assertEquals(data, DataCodec.decode(legacy.toString()))
+    }
+
+    @Test
+    fun manualScaleSaveClearsOnlyItsImportProvenanceAndLegacyRecordsStayManual() {
+        val imported = ScaleWeightRecord("import", date, 76.4, 17.2, "test.scale")
+        val manual = ScaleWeightRecord("manual", date.minusDays(1), 78.2)
+        val data = AppData(scaleWeights = listOf(imported, manual))
+        assertEquals(data, DataCodec.decode(DataCodec.encode(data)))
+        // The manual editor reconstructs these four values rather than copying import metadata.
+        val edited = ScaleWeightRecord(imported.id, date, 75.6, imported.bodyFatPercent)
+        val saved = data.withScaleWeight(edited)
+        assertNull(saved.scaleWeights.first().healthConnectOrigin)
+        assertEquals(listOf(edited, manual), saved.scaleWeights)
+        val old = JSONObject(DataCodec.encode(AppData(scaleWeights = listOf(manual))))
+        old.getJSONArray("scaleWeights").getJSONObject(0).remove("healthConnectOrigin")
+        assertEquals(listOf(manual), DataCodec.decode(old.toString()).scaleWeights)
+        assertThrows(IllegalArgumentException::class.java) {
+            imported.copy(healthConnectOrigin = " ").validate()
+        }
     }
 
     @Test

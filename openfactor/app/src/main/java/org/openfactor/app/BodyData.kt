@@ -12,9 +12,13 @@ data class ScaleWeightRecord(
     val date: LocalDate = LocalDate.now(),
     val weightKg: Double,
     val bodyFatPercent: Double? = null,
+    val healthConnectOrigin: String? = null,
 ) {
     fun validate() {
         require(id.isNotBlank()) { "Missing weight record ID" }
+        require(healthConnectOrigin == null || healthConnectOrigin.isNotBlank()) {
+            "Missing Health Connect origin"
+        }
         require(weightKg.isFinite() && weightKg > 0 && weightKg <= 5000) {
             "Weight must be greater than 0 and at most 5000 kg"
         }
@@ -105,6 +109,7 @@ object BodyDataCodec {
                     .put("date", it.date.toString())
                     .put("weightKg", it.weightKg)
                     .put("bodyFatPercent", it.bodyFatPercent)
+                    .put("healthConnectOrigin", it.healthConnectOrigin)
             }
         )
 
@@ -134,6 +139,8 @@ object BodyDataCodec {
                         value.getDouble("weightKg"),
                         if (value.isNull("bodyFatPercent")) null
                         else value.getDouble("bodyFatPercent"),
+                        if (value.isNull("healthConnectOrigin")) null
+                        else value.getString("healthConnectOrigin"),
                     )
                     .also { it.validate() }
             }
