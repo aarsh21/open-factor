@@ -5,6 +5,30 @@ import org.junit.Test
 
 class WorkoutDataTest {
     @Test
+    fun exerciseDefaultsRoundTripWithoutChangingSavedEntries() {
+        val defaults = ExerciseDefaults("Global note", 75, true)
+        val session = SessionExercise(exerciseId = "chin", notes = "Session note", restSeconds = 0)
+        val historical = SessionExercise(exerciseId = "chin", notes = "Old note", restSeconds = 20)
+        val draft = SessionExercise(exerciseId = "chin", notes = "Draft note", restSeconds = 44)
+        val data = AppData(
+            exerciseDefaults = mapOf("chin" to defaults),
+            active = Workout(name = "Active", exercises = listOf(session)),
+            history = listOf(Workout(name = "History", exercises = listOf(historical))),
+            workoutDraft = WorkoutDraft(exercises = listOf(draft)),
+        )
+        assertEquals(data, DataCodec.decode(DataCodec.encode(data)))
+        val fresh = newSessionExercise("chin", defaults)
+        assertEquals("Global note", fresh.notes)
+        assertEquals(75, fresh.restSeconds)
+        assertNull(fresh.sets.single().reps)
+        assertNull(fresh.sets.single().weightKg)
+        assertTrue(DataCodec.decode("""{"schemaVersion":1}""").exerciseDefaults.isEmpty())
+        for (invalid in listOf("-1", "1801", "1.5", "\"30\"")) assertThrows(IllegalArgumentException::class.java) {
+            DataCodec.decode("""{"schemaVersion":1,"exerciseDefaults":{"chin":{"restSeconds":$invalid}}}""")
+        }
+    }
+
+    @Test
     fun customExerciseMetadataDrivesLoggingAndSurvivesBackup() {
         val draft = CustomExerciseDraft(
             name = " Assisted Hold ", metric1 = SetMetric.ASSISTANCE, metric2 = SetMetric.DURATION,

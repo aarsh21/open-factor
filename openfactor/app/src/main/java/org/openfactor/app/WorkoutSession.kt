@@ -272,6 +272,12 @@ fun WorkoutSession(
                             TextButton({ warmup = true }) { Text("Warm Up") }
                             TextButton({ targets = true }) { Text("Targets") }
                         }
+                        if (se.notes.isNotBlank()) Text(
+                            se.notes,
+                            Modifier.fillMaxWidth().clickable(onClickLabel = "Edit exercise notes") { exerciseNotes = true }
+                                .padding(vertical = 12.dp),
+                            style = MaterialTheme.typography.bodyLarge, color = OF.muted,
+                        )
                         if (targets)
                             WorkoutTargetsDialog(se, { targets = false }) { values, rest ->
                                 vm.saveExerciseTargets(se.id, values, rest)

@@ -49,15 +49,16 @@ fun ProgramDay.addExercise(exerciseId: String, cycleCount: Int, workoutName: Str
                 ),
     )
 
-fun TrainingProgram.toWorkout(dayId: String, cycle: Int, now: Long): Workout? {
+fun TrainingProgram.toWorkout(dayId: String, cycle: Int, now: Long, defaults: Map<String, ExerciseDefaults> = emptyMap()): Workout? {
     val day = days.find { it.id == dayId } ?: return null
     if (cycle !in 0 until cycleCount) return null
     val session =
         day.exercises.mapNotNull { planned ->
             val targets = planned.cycles.getOrNull(cycle) ?: return@mapNotNull null
             if (targets.skip || targets.sets.isEmpty()) return@mapNotNull null
-            SessionExercise(
+            newSessionExercise(
                 exerciseId = planned.exerciseId,
+                defaults = defaults[planned.exerciseId],
                 sets =
                     targets.sets.map {
                         LoggedSet(

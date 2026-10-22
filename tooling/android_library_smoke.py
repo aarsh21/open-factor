@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check library query/scroll and resistance filters using disposable synthetic data."""
+"""Check library filters, exercise defaults and scoped return using synthetic data."""
 import argparse
 import json
 from pathlib import Path
@@ -63,7 +63,8 @@ def field(label, value):
     assert len(focused) == 1, label
     old = focused[0].get('text', '')
     adb('shell', 'for i in ' + ' '.join(str(i) for i in range(len(old) + 3)) + '; do input keyevent 67; input keyevent 112; done')
-    adb('shell', 'input', 'text', value.replace(' ', '%s'))
+    if value:
+        adb('shell', 'input', 'text', value.replace(' ', '%s'))
     focused = [n for n in nodes() if n.get('class') == 'android.widget.EditText' and n.get('focused') == 'true']
     assert focused[0].get('text') == value, (label, value)
     adb('shell', 'input', 'keyevent', '4')
@@ -107,6 +108,19 @@ def select_resistance(query, label):
     tap(label, first=True)
 
 
+def select_scope(current, target):
+    for _ in range(8):
+        if matching(current):
+            tap(current)
+            tap(target)
+            return
+        row = next(n for n in nodes() if n.get('scrollable') == 'true' and bounds(n)[2] - bounds(n)[0] > 2 * (bounds(n)[3] - bounds(n)[1]))
+        left, top, right, bottom = bounds(row)
+        inset = (right - left) // 5
+        adb('shell', 'input', 'swipe', str(left + inset), str((top + bottom) // 2), str(right - inset), str((top + bottom) // 2), '300')
+    raise AssertionError('Library scope was not reachable')
+
+
 root = Path(__file__).resolve().parents[1]
 index = json.loads((root / 'openfactor/app/src/main/assets/equipment.json').read_text())['uuidIndex']
 ids = {v['name']: key for key, v in index.items() if v.get('type') == 'equipment'}
@@ -123,6 +137,9 @@ fixture = dict(schemaVersion=1, onboarding={'completed': True}, customExercises=
                gyms=[dict(id='all', name='Everything Gym', equipmentIds=list(ids.values()))],
                scaleWeights=[dict(id='existing', date='2026-10-21', weightKg=83.0)],
                bodyMeasurements=[], progressPhotos=[],
+               history=[dict(id='history', name='Prior', startedAt=1000, finishedAt=2000,
+                             exercises=[dict(id='old-entry', exerciseId='synthetic-001', notes='Old note', restSeconds=31,
+                                             sets=[dict(id='old-set', reps=7, completed=True)])])],
                preferences=dict(autoRest=False))
 adb('shell', 'svc', 'wifi', 'disable')
 adb('shell', 'svc', 'data', 'disable')
@@ -133,7 +150,19 @@ adb('shell', 'run-as', 'org.openfactor.app', 'mkdir', '-p', 'shared_prefs')
 adb('shell', 'run-as', 'org.openfactor.app', 'tee', 'shared_prefs/open_factor.xml', input=ET.tostring(xml, encoding='utf-8'))
 adb('shell', 'am', 'start', '-n', 'org.openfactor.app/.MainActivity')
 tap('Exercises')
+# Canonicalize the deliberately minimal legacy fixture through a reversible UI action.
+# Subsequent snapshots compare values, not absent legacy fields versus encoded defaults.
+tap('Needle 000')
+tap('Info')
+tap('Toggle favorite', 'content-desc')
+tap('Toggle favorite', 'content-desc')
+tap('Close Info', 'content-desc')
+tap('Back', 'content-desc')
 before = state()
+assert not before['favorites'] and not before['exerciseDefaults']
+assert before['history'][0]['exercises'][0]['notes'] == 'Old note'
+assert before['history'][0]['exercises'][0]['restSeconds'] == 31
+assert before['history'][0]['exercises'][0]['sets'][0]['reps'] == 7
 assert matching('Needle 000')
 tap(next(n.get('text') for n in nodes() if re.fullmatch(r'See \d+ More', n.get('text', ''))))
 for _ in range(3):
@@ -150,6 +179,10 @@ scroll_list()
 visible = [n.get('text') for n in nodes() if re.fullmatch(r'Needle \d{3}', n.get('text', ''))]
 assert visible and 'Needle 000' not in visible
 tap(visible[0])
+tap('Info')
+assert matching('Instructions') and not matching('Add Exercise')
+capture('03-info-sheet')
+tap('Close Info', 'content-desc')
 tap('Back', 'content-desc')
 assert matching(visible[0]) and not matching('Needle 000'), 'Detail return reset unchanged search position'
 capture('03-returned-scroll')
@@ -195,9 +228,99 @@ assert adb('shell', 'pidof', 'org.openfactor.app').strip() != old_pid
 assert state() == before, 'Read-only library filtering mutated persisted training/body/exercise data'
 assert 'Active default network: none' in adb('shell', 'dumpsys', 'connectivity')
 capture('09-recreated-filter')
+
+# Defaults save/cancel and validation must affect new entries, never historical records.
+select_resistance('', 'All Resistance')
+tap('Needle 000')
+capture('10-exercise-settings-default')
+tap('Exercise Note')
+field('Note', 'Discard this edit')
+tap('Cancel')
+assert state() == before
+tap('Exercise Note')
+field('Note', 'Brace then pause')
+tap('Save')
+tap('Rest Timer')
+field('Rest seconds', '1801')
+assert any(n.get('enabled') == 'false' and any(c.get('text') == 'Save' for c in n.iter('node')) for n in nodes())
+capture('11-invalid-rest')
+field('1801', '75')
+tap('Save')
+tap('Do Not Recommend')
+saved = state()
+assert saved['exerciseDefaults']['synthetic-000'] == dict(note='Brace then pause', restSeconds=75, doNotRecommend=True)
+assert {k: v for k, v in saved.items() if k != 'exerciseDefaults'} == {k: v for k, v in before.items() if k != 'exerciseDefaults'}
+capture('12-saved-defaults')
+
+# A partially edited note survives OS process recreation, but remains unsaved until Save.
+tap('Exercise Note')
+field('Brace then pause', 'Unsaved replacement')
+adb('shell', 'input', 'keyevent', '3')
+time.sleep(1)
+old_pid = adb('shell', 'pidof', 'org.openfactor.app').strip()
+adb('shell', 'am', 'kill', 'org.openfactor.app')
+time.sleep(1)
+assert not adb('shell', 'pidof org.openfactor.app || true').strip()
+adb('shell', 'am', 'start', '-n', 'org.openfactor.app/.MainActivity')
+assert matching('Unsaved replacement') and adb('shell', 'pidof', 'org.openfactor.app').strip() != old_pid
+assert state() == saved
+capture('13-recreated-unsaved-note')
+tap('Cancel')
+assert matching('Brace then pause')
+adb('shell', 'settings', 'put', 'system', 'font_scale', '1.3')
+time.sleep(2)
+capture('14-settings-large-text')
+adb('shell', 'settings', 'put', 'system', 'font_scale', '1.0')
+tap('Back', 'content-desc')
+select_scope('All', 'Deprioritized')
+assert matching('Needle 000') and not matching('Needle 001')
+capture('15-deprioritized')
+select_scope('Deprioritized', 'Performed')
+assert matching('Needle 001') and not matching('Needle 000')
+capture('16-performed')
+
+# A library scope must not hide the same exercise from the independent workout picker.
+tap('Shortcuts', 'content-desc')
+tap('Empty Workout')
+tap('Add Exercises', 'content-desc')
+field('Search exercises', 'Needle 000')
+tap('Needle 000', first=True)
+assert matching('Instructions') and matching('Add Exercise')
+tap('Add Exercise')
+entry = state()['workoutDraft']['exercises'][0]
+assert entry['notes'] == 'Brace then pause' and entry['restSeconds'] == 75
+assert entry['sets'][0]['reps'] is None
+tap('Start Workout')
+assert state()['active']['exercises'][0] == entry
+assert matching('Brace then pause'), 'The copied exercise note is hidden from the logger'
+assert state()['history'] == before['history']
+assert state()['scaleWeights'] == before['scaleWeights'] and state()['progressPhotos'] == before['progressPhotos']
+capture('17-defaults-in-logger')
+
+# Clearing each override restores defaults without rewriting the now-active entry.
+active = state()['active']
+adb('shell', 'input', 'keyevent', '4')
+select_scope('Performed', 'All')
+field('Needle', 'Needle 000')
+tap('Needle 000', first=True)
+tap('Rest Timer')
+field('75', '')
+tap('Save')
+assert matching('Default · 120s')
+tap('Exercise Note')
+field('Brace then pause', '')
+tap('Save')
+tap('Do Not Recommend')
+assert 'synthetic-000' not in state()['exerciseDefaults']
+assert state()['active'] == active and state()['history'] == before['history']
+capture('18-cleared-defaults-existing-entry-unchanged')
 (args.output / 'apk-sha256.txt').write_text(adb('shell', 'sha256sum', adb('shell', 'pm', 'path', 'org.openfactor.app').strip().removeprefix('package:')))
 (args.output / 'result.json').write_text(json.dumps(dict(status='passed', serial=args.serial,
     query_resets_scroll=True, detail_return_preserves_scroll=True, resistance_entity_alternatives=True,
     sheet_search_cancel=True, combined_filter_empty_and_clear=True, recreation=True,
-    persisted_data_unchanged=True, offline=True), indent=2) + '\n')
+    read_only_filters_do_not_mutate_data=True, defaults_save_cancel_validation=True,
+    unsaved_note_recreation=True, performed_and_deprioritized_scopes=True,
+    info_sheet_and_contextual_add=True, defaults_in_new_entry_and_logger=True,
+    clear_defaults_preserves_existing_entry=True,
+    body_history_unchanged=True, offline=True), indent=2) + '\n')
 print((args.output / 'result.json').read_text())

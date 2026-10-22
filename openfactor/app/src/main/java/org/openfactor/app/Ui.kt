@@ -1,5 +1,6 @@
 package org.openfactor.app
 
+import android.content.res.Configuration
 import android.graphics.Typeface
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
@@ -22,6 +23,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -48,6 +50,13 @@ object OF {
 @Composable
 fun OpenFactorTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val darkConfiguration = remember(configuration) {
+        Configuration(configuration).apply {
+            uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
+                Configuration.UI_MODE_NIGHT_YES
+        }
+    }
     fun importedFamily(path: String, weight: Int): FontFamily =
         runCatching {
                 FontFamily(
@@ -106,7 +115,9 @@ fun OpenFactorTheme(content: @Composable () -> Unit) {
                     labelLarge = t.labelLarge.copy(fontFamily = medium),
                 )
             },
-        content = content,
+        content = {
+            CompositionLocalProvider(LocalConfiguration provides darkConfiguration, content = content)
+        },
     )
 }
 

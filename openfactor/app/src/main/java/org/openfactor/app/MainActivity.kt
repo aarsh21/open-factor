@@ -51,6 +51,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
     var route by rememberSaveable { mutableStateOf("") }
     var detailId by rememberSaveable { mutableStateOf("") }
     var previousRoute by rememberSaveable { mutableStateOf("") }
+    var exerciseInfo by rememberSaveable { mutableStateOf(false) }
     var customReturnRoute by rememberSaveable { mutableStateOf("") }
     var programDayId by rememberSaveable { mutableStateOf("") }
     var programExit by remember { mutableStateOf(false) }
@@ -288,6 +289,21 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                 GymEditorScreen(gym, data, vm, { route = "gyms" }) { detailId = it }
                             }
                     "levels" -> LevelsScreen(data, exercises, { route = "" }, ::openExercise)
+                    "exercise-settings" -> exercises.firstOrNull { it.id == detailId }?.let { e ->
+                        ExerciseSettingsScreen(
+                            e, data.exerciseDefaults[e.id] ?: ExerciseDefaults(), data.preferences.restSeconds,
+                            { route = "" }, { vm.saveExerciseDefaults(e.id, it) }, { exerciseInfo = true },
+                        )
+                        if (exerciseInfo) ModalBottomSheet(
+                            onDismissRequest = { exerciseInfo = false },
+                            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                            containerColor = OF.background, dragHandle = null,
+                        ) {
+                            Box(Modifier.fillMaxHeight(.95f)) {
+                                ExerciseDetail(e, data, vm, { exerciseInfo = false }, null, closeable = true)
+                            }
+                        }
+                    }
                     "exercise" ->
                         exercises
                             .firstOrNull { it.id == detailId }
@@ -439,10 +455,12 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                     exercises,
                                     data.favorites,
                                     vm::favorite,
-                                    ::openExercise,
+                                    { detailId = it; route = "exercise-settings" },
                                     onCustom = ::openCustom,
                                     gyms = data.gyms,
                                     equipmentCatalog = vm.equipmentCatalog,
+                                    performedIds = data.history.flatMap { w -> w.exercises.filter { entry -> entry.sets.any { it.completed } }.map { it.exerciseId } }.toSet(),
+                                    deprioritizedIds = data.exerciseDefaults.filterValues { it.doNotRecommend }.keys,
                                 )
                             }
                             3 ->

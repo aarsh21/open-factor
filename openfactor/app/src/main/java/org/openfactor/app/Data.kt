@@ -109,6 +109,7 @@ data class AppData(
     val bodyMeasurements: List<BodyMeasurementRecord> = emptyList(),
     val workoutDraft: WorkoutDraft? = null,
     val progressPhotos: List<ProgressPhotoRecord> = emptyList(),
+    val exerciseDefaults: Map<String, ExerciseDefaults> = emptyMap(),
 )
 
 fun newId() = UUID.randomUUID().toString()
@@ -330,6 +331,7 @@ object DataCodec {
             )
             .put("favorites", JSONArray(d.favorites.toList()))
             .put("customExercises", JSONArray(d.customExercises.map { it.json() }))
+            .put("exerciseDefaults", ExerciseDefaultsCodec.encode(d.exerciseDefaults))
             .put(
                 "preferences",
                 JSONObject()
@@ -443,6 +445,7 @@ object DataCodec {
                 )
             },
             progressPhotos = ProgressPhotoCodec.decode(j),
+            exerciseDefaults = ExerciseDefaultsCodec.decode(j.optJSONObject("exerciseDefaults")),
         )
     }
 
@@ -654,10 +657,10 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         d.copy(workoutDraft = d.workoutDraft?.let(block))
     }
 
-    fun addDraftExercise(id: String) = editWorkoutDraft {
-        it.copy(exercises = it.exercises + SessionExercise(
-            exerciseId = id,
-        ))
+    fun addDraftExercise(id: String) = update { d ->
+        d.copy(workoutDraft = d.workoutDraft?.let {
+            it.copy(exercises = it.exercises + newSessionExercise(id, d.exerciseDefaults[id]))
+        })
     }
 
     fun discardWorkoutDraft() = update { it.copy(workoutDraft = null) }
@@ -676,7 +679,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                     active =
                         Workout(
                             name = name,
-                            exercises = ids.map { id -> SessionExercise(exerciseId = id) },
+                            exercises = ids.map { id -> newSessionExercise(id, it.exerciseDefaults[id]) },
                         )
                 )
             }
@@ -713,11 +716,12 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun startProgramDay(programId: String, dayId: String, cycle: Int): Boolean {
-        if (_data.value.active != null) return false
+        val d = _data.value
+        if (d.active != null) return false
         val workout =
-            _data.value.programs
+            d.programs
                 .find { it.id == programId }
-                ?.toWorkout(dayId, cycle, System.currentTimeMillis()) ?: return false
+                ?.toWorkout(dayId, cycle, System.currentTimeMillis(), d.exerciseDefaults) ?: return false
         update { it.copy(active = workout) }
         return true
     }
@@ -748,9 +752,11 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         d.copy(active = d.active?.let(block))
     }
 
-    fun addExercise(id: String) = editActive {
-        val exercise = SessionExercise(exerciseId = id)
-        it.copy(exercises = it.exercises + exercise, selectedExerciseId = exercise.id)
+    fun addExercise(id: String) = update { d ->
+        d.copy(active = d.active?.let {
+            val exercise = newSessionExercise(id, d.exerciseDefaults[id])
+            it.copy(exercises = it.exercises + exercise, selectedExerciseId = exercise.id)
+        })
     }
 
     fun removeExercise(id: String) = editActive {
@@ -857,6 +863,10 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun settings(block: (Preferences) -> Preferences) = update {
         it.copy(preferences = block(it.preferences))
+    }
+
+    fun saveExerciseDefaults(id: String, value: ExerciseDefaults) = update { d ->
+        d.copy(exerciseDefaults = if (value == ExerciseDefaults()) d.exerciseDefaults - id else d.exerciseDefaults + (id to value))
     }
 
     fun addCustom(draft: CustomExerciseDraft): String {

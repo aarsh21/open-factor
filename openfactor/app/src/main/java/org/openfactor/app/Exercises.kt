@@ -35,6 +35,8 @@ fun ExerciseLibrary(
     picking: Boolean = false,
     gyms: List<GymProfile> = emptyList(),
     equipmentCatalog: EquipmentCatalog? = null,
+    performedIds: Set<String> = emptySet(),
+    deprioritizedIds: Set<String> = emptySet(),
 ) {
     var gymId by rememberSaveable { mutableStateOf("") }
     var gymMenu by remember { mutableStateOf(false) }
@@ -48,8 +50,9 @@ fun ExerciseLibrary(
     var expandedGroups by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var onlyFavorites by rememberSaveable { mutableStateOf(false) }
     var filter by remember { mutableStateOf(false) }
+    var scope by rememberSaveable { mutableStateOf("All") }
     val listState = rememberLazyListState()
-    val filters = listOf(query, muscle, resistanceId, gym?.id.orEmpty(), type, laterality, onlyFavorites.toString())
+    val filters = listOf(query, muscle, resistanceId, gym?.id.orEmpty(), type, laterality, onlyFavorites.toString(), scope)
     var previousFilters by rememberSaveable { mutableStateOf(filters) }
     LaunchedEffect(filters) {
         if (filters != previousFilters) {
@@ -73,9 +76,14 @@ fun ExerciseLibrary(
             gym,
             type,
             laterality,
+            scope,
+            performedIds,
+            deprioritizedIds,
         ) {
             exercises
                 .filter { e ->
+                    (scope == "All" || (scope == "Performed" && e.id in performedIds) ||
+                        (scope == "Deprioritized" && e.id in deprioritizedIds)) &&
                     (equipmentCatalog?.available(e, gym) != false) &&
                         (type == "All types" || e.properties["Type"] == type) &&
                         (laterality == "All lateralities" ||
@@ -165,6 +173,7 @@ fun ExerciseLibrary(
                     .padding(horizontal = 18.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (!picking) FilterChooser("Scope", listOf("All", "Performed", "Deprioritized"), scope) { scope = it }
                 Box {
                     FilterChip(
                         true,
@@ -309,6 +318,7 @@ fun ExerciseLibrary(
                                 onlyFavorites = false
                                 type = "All types"
                                 laterality = "All lateralities"
+                                scope = "All"
                             },
                         )
                     }
@@ -486,7 +496,8 @@ fun ExerciseDetail(
     data: AppData,
     vm: WorkoutViewModel,
     onBack: () -> Unit,
-    onAdd: () -> Unit,
+    onAdd: (() -> Unit)?,
+    closeable: Boolean = false,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var collapsedSections by rememberSaveable(e.id) { mutableStateOf(emptyList<Int>()) }
@@ -503,8 +514,9 @@ fun ExerciseDetail(
     Column(Modifier.fillMaxSize()) {
         PageHeading(
             e.title,
-            onBack,
+            if (closeable) null else onBack,
             actions = {
+                if (closeable) IconButton(onBack) { Icon(Icons.Rounded.Close, "Close Info") }
                 IconButton({ vm.favorite(e.id) }) {
                     Icon(
                         if (e.id in data.favorites) Icons.Rounded.Star
@@ -648,7 +660,7 @@ fun ExerciseDetail(
                 }
             }
         }
-        Box(Modifier.padding(18.dp)) {
+        if (onAdd != null) Box(Modifier.padding(18.dp)) {
             PrimaryAction(
                 "Add Exercise",
                 onAdd,

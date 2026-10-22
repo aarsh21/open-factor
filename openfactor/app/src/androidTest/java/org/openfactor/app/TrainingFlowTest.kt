@@ -48,6 +48,56 @@ class TrainingFlowTest {
     }
 
     @Test
+    fun exerciseDefaultsAffectOnlyNewEntriesAndSurviveStorageAndBackup() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val vm = WorkoutViewModel(context.applicationContext as android.app.Application)
+        val backup = vm.export()
+        val before = vm.data.value
+        val id = "19f5c6f170d8808bb424e98de4472a7e"
+        try {
+            vm.discard()
+            vm.discardWorkoutDraft()
+            vm.saveExerciseDefaults(id, ExerciseDefaults("First default", 75, true))
+            vm.prepareWorkout()
+            vm.addDraftExercise(id)
+            val draftEntry = vm.data.value.workoutDraft!!.exercises.single()
+            assertEquals("First default", draftEntry.notes)
+            assertEquals(75, draftEntry.restSeconds)
+            vm.saveExerciseDefaults(id, ExerciseDefaults("Next default", 90, false))
+            assertEquals(draftEntry, vm.data.value.workoutDraft!!.exercises.single())
+            vm.startWorkoutDraft()
+            assertEquals(draftEntry, vm.data.value.active!!.exercises.single())
+            vm.addExercise(id)
+            assertEquals(draftEntry, vm.data.value.active!!.exercises.first())
+            assertEquals("Next default", vm.data.value.active!!.exercises.last().notes)
+            assertEquals(90, vm.data.value.active!!.exercises.last().restSeconds)
+            assertEquals(vm.data.value, WorkoutViewModel(context.applicationContext as android.app.Application).data.value)
+            assertEquals(vm.data.value, DataCodec.decode(vm.export()))
+            vm.discard()
+            vm.start("Fresh", listOf(id))
+            assertEquals("Next default", vm.data.value.active!!.exercises.single().notes)
+            assertEquals(90, vm.data.value.active!!.exercises.single().restSeconds)
+            vm.discard()
+            val day = ProgramDay(exercises = listOf(PlannedExercise(exerciseId = id)))
+            val program = TrainingProgram(name = "Defaults contract", days = listOf(day))
+            vm.beginProgram(program)
+            vm.saveProgram(false)
+            assertTrue(vm.startProgramDay(program.id, day.id, 0))
+            assertEquals("Next default", vm.data.value.active!!.exercises.single().notes)
+            assertEquals(90, vm.data.value.active!!.exercises.single().restSeconds)
+            assertNull(vm.data.value.active!!.exercises.single().sets.first().weightKg)
+            assertEquals(before.history, vm.data.value.history)
+            assertEquals(before.scaleWeights, vm.data.value.scaleWeights)
+            assertEquals(before.bodyMeasurements, vm.data.value.bodyMeasurements)
+            assertEquals(before.progressPhotos, vm.data.value.progressPhotos)
+            vm.saveExerciseDefaults(id, ExerciseDefaults())
+            assertFalse(id in vm.data.value.exerciseDefaults)
+        } finally {
+            vm.restore(backup)
+        }
+    }
+
+    @Test
     fun fullCatalogHasResolvableLocalMedia() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val imported =

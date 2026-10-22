@@ -89,7 +89,7 @@ class ProgramDataTest {
                         ProgramDay(id = "rest"),
                     ),
             )
-        val w = p.toWorkout("day", 2, 1000)!!
+        val w = p.toWorkout("day", 2, 1000, mapOf("press" to ExerciseDefaults("Default note", 75)))!!
         assertEquals("plan", w.programId)
         assertEquals("day", w.programDayId)
         assertEquals(2, w.programCycle)
@@ -104,6 +104,7 @@ class ProgramDataTest {
         assertNull(set.rir)
         assertFalse(set.completed)
         assertEquals(45, e.restSeconds)
+        assertEquals("Default note", e.notes)
         val entered = w.copy(exercises = listOf(e.copy(sets = listOf(set.copy(weightKg = 37.5, reps = 9)))))
         val complete = entered.toggleSetCompletion(e.id, set.id, Preferences(restSeconds = 120), 2000)
         assertEquals(47000L, complete.restUntil)
@@ -127,19 +128,22 @@ class ProgramDataTest {
                                 listOf(
                                     PlannedExercise(
                                         exerciseId = "press",
-                                        cycles = List(7) { CycleTarget(restSeconds = 0) },
+                                        cycles = List(7) { CycleTarget(restSeconds = if (it == 0) 0 else null) },
                                     )
                                 )
                         )
                     ),
             )
-        val w = p.toWorkout(p.days.first().id, 0, 1000)!!
+        val defaults = mapOf("press" to ExerciseDefaults(restSeconds = 75))
+        val w = p.toWorkout(p.days.first().id, 0, 1000, defaults)!!
         val e = w.exercises.single()
         val entered = w.copy(exercises = listOf(e.copy(sets = listOf(e.sets.single().copy(weightKg = 37.5, reps = 9)))))
         assertEquals(
             0L,
             entered.toggleSetCompletion(e.id, e.sets.single().id, Preferences(), 2000).restUntil,
         )
+        val fallback = p.toWorkout(p.days.first().id, 1, 1000, defaults)!!
+        assertEquals(75, fallback.exercises.single().restSeconds)
     }
 
     @Test(expected = IllegalArgumentException::class)
