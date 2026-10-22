@@ -26,8 +26,8 @@ private enum class CustomChoice { METRIC1, METRIC2, TYPE, LATERALITY, JOINT1, JO
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CustomExercise(data: AppData, catalog: EquipmentCatalog, onBack: () -> Unit, onSave: (CustomExerciseDraft) -> Unit) {
-    var draft by rememberSaveable { mutableStateOf(CustomExerciseDraft()) }
+fun CustomExercise(data: AppData, catalog: EquipmentCatalog, onBack: () -> Unit, initialDraft: CustomExerciseDraft? = null, onSave: (CustomExerciseDraft) -> Unit) {
+    var draft by rememberSaveable { mutableStateOf(initialDraft ?: CustomExerciseDraft()) }
     var step by rememberSaveable { mutableIntStateOf(0) }
     var choice by rememberSaveable { mutableStateOf<CustomChoice?>(null) }
     var equipmentIndex by rememberSaveable { mutableIntStateOf(-1) }
@@ -54,6 +54,10 @@ fun CustomExercise(data: AppData, catalog: EquipmentCatalog, onBack: () -> Unit,
                 )
                 when (step) {
                     0 -> {
+                        if (initialDraft != null) Text(
+                            "Review the copied properties before creating a separate exercise. Choose any missing type or equipment. Demonstration media, history and exercise overrides are not copied.",
+                            color = OF.muted,
+                        )
                         OutlinedTextField(draft.name, { draft = draft.copy(name = it) }, Modifier.fillMaxWidth(),
                             label = { Text("Exercise Name") }, supportingText = { Text("Required") }, singleLine = true)
                         Text("Trackable Metric · Required", style = MaterialTheme.typography.titleMedium)
@@ -61,9 +65,9 @@ fun CustomExercise(data: AppData, catalog: EquipmentCatalog, onBack: () -> Unit,
                             ChoiceField("Trackable Metric 1", draft.metric1?.customLabel ?: "None", Modifier.weight(1f), showLabel = false) { choice = CustomChoice.METRIC1 }
                             ChoiceField("Trackable Metric 2", draft.metric2?.customLabel ?: "None", Modifier.weight(1f), showLabel = false) { choice = CustomChoice.METRIC2 }
                         }
-                        if (draft.metrics.isNotEmpty() && !draft.copy(name = "check").validBasics)
+                        if (draft.metrics.isNotEmpty() && !draft.copy(name = "check", type = CustomExerciseType.COMPOUND_UPPER).validBasics)
                             Text("Choose different metric types for the two fields.", color = MaterialTheme.colorScheme.error)
-                        ChoiceField("Type", draft.type.label) { choice = CustomChoice.TYPE }
+                        ChoiceField("Type", draft.type?.label ?: "Select type") { choice = CustomChoice.TYPE }
                         ChoiceField("Laterality", draft.laterality) { choice = CustomChoice.LATERALITY }
                     }
                     1 -> {
@@ -95,6 +99,7 @@ fun CustomExercise(data: AppData, catalog: EquipmentCatalog, onBack: () -> Unit,
                         }
                     }
                     2 -> {
+                        if (draft.resistance.isEmpty()) Text("Select resistance equipment or Bodyweight Only to continue.", color = MaterialTheme.colorScheme.error)
                         draft.resistance.forEachIndexed { index, group ->
                             EquipmentRequirementRow(if (index == 0) "Resistance" else "Alternate Resistance ${index + 1}", groupName(group),
                                 { equipmentIndex = index; supportEdit = false },
@@ -127,10 +132,11 @@ fun CustomExercise(data: AppData, catalog: EquipmentCatalog, onBack: () -> Unit,
                         ChoiceField("Primary Joint Action", draft.primaryJoint.ifBlank { "None" }) { choice = CustomChoice.JOINT1 }
                         ChoiceField("Secondary Joint Action", draft.secondaryJoint.ifBlank { "None" }) { choice = CustomChoice.JOINT2 }
                         OutlinedTextField(
-                            draft.alternateNames, { if (it.length <= 300) draft = draft.copy(alternateNames = it) }, Modifier.fillMaxWidth(),
+                            draft.alternateNames, { if (it.length <= 300 || it.length < draft.alternateNames.length) draft = draft.copy(alternateNames = it) }, Modifier.fillMaxWidth(),
+                            isError = draft.alternateNames.length > 300, minLines = 2, maxLines = 4,
                             label = { Text("Alternate Names") }, supportingText = { Text("${draft.alternateNames.length}/300 · Separate names with commas") },
                         )
-                        OutlinedTextField(draft.instructions, { draft = draft.copy(instructions = it) }, Modifier.fillMaxWidth(), label = { Text("Instructions and technique notes") })
+                        OutlinedTextField(draft.instructions, { draft = draft.copy(instructions = it) }, Modifier.fillMaxWidth(), label = { Text("Instructions and technique notes") }, minLines = 2, maxLines = 6)
                     }
                     4 -> {
                         Surface(color = Color(0xFF443500), contentColor = Color.White, shape = OF.shape) {
@@ -144,7 +150,7 @@ fun CustomExercise(data: AppData, catalog: EquipmentCatalog, onBack: () -> Unit,
                         }
                         ReviewField("Exercise Name", draft.name)
                         ReviewField("Trackable Metric · Final", draft.metrics.joinToString(", ") { it.customLabel })
-                        ReviewField("Type", draft.type.label)
+                        ReviewField("Type", draft.type?.label ?: "Select type")
                         ReviewField("Laterality · Final", draft.laterality)
                         ReviewField("Target Muscles", (draft.primary.map { "$it (Primary)" } + draft.secondary.map { "$it (Secondary)" }).joinToString(", ").ifEmpty { "None" })
                         ReviewField("Resistance", draft.resistance.joinToString(" or ") { groupName(it) })
@@ -164,11 +170,11 @@ fun CustomExercise(data: AppData, catalog: EquipmentCatalog, onBack: () -> Unit,
             if (step == 1) Text("${draft.primary.size} primary, ${draft.secondary.size} secondary")
             if (step == 2) OutlinedButton(
                 { equipmentIndex = draft.resistance.size; supportEdit = false }, Modifier.fillMaxWidth().heightIn(min = 52.dp),
-            ) { Text("Add Alternate Resistance") }
+            ) { Text(if (draft.resistance.isEmpty()) "Add Resistance" else "Add Alternate Resistance") }
             PrimaryAction(
                 if (step == 4) "Create" else if (step == 1 && draft.primary.isEmpty() && draft.secondary.isEmpty()) "Skip" else "Next",
                 { if (step == 4) onSave(draft) else step++ },
-                enabled = when (step) { 0 -> draft.validBasics; 3 -> draft.validDetails; 4 -> draft.validBasics && draft.validDetails; else -> true },
+                enabled = when (step) { 0 -> draft.validBasics; 2 -> draft.resistance.isNotEmpty(); 3 -> draft.validDetails; 4 -> draft.validBasics && draft.validDetails; else -> true },
             )
         }
     }
@@ -187,7 +193,7 @@ fun CustomExercise(data: AppData, catalog: EquipmentCatalog, onBack: () -> Unit,
         val current = when (selected) {
             CustomChoice.METRIC1 -> draft.metric1?.customLabel ?: "None"
             CustomChoice.METRIC2 -> draft.metric2?.customLabel ?: "None"
-            CustomChoice.TYPE -> draft.type.label
+            CustomChoice.TYPE -> draft.type?.label ?: ""
             CustomChoice.LATERALITY -> draft.laterality
             CustomChoice.JOINT1 -> draft.primaryJoint.ifBlank { "None" }
             CustomChoice.JOINT2 -> draft.secondaryJoint.ifBlank { "None" }

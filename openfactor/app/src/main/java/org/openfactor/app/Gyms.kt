@@ -145,6 +145,12 @@ class EquipmentCatalog(context: Context) {
         return (0 until a.length()).map { i -> resolveEquipmentRequirement(index, a.getString(i)) }
     }
 
+    fun requirementsFor(e: Exercise): Pair<List<Set<String>>, List<Set<String>>> =
+        if (e.custom) e.resistanceEquipment to e.supportEquipment
+        else exerciseRequirements[e.id]?.let { (resistance, support) ->
+            resistance.ifEmpty { listOf(emptySet()) } to support
+        } ?: (e.resistanceEquipment to e.supportEquipment)
+
     fun available(e: Exercise, gym: GymProfile?): Boolean {
         if (gym == null) return true
         val (resistance, support) = if (e.custom) e.resistanceEquipment to e.supportEquipment

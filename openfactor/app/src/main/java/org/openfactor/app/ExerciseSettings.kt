@@ -24,6 +24,7 @@ fun ExerciseSettingsScreen(
     onBack: () -> Unit,
     onSave: (ExerciseDefaults) -> Unit,
     onInfo: () -> Unit,
+    onDuplicate: () -> Unit,
 ) {
     var editor by rememberSaveable(exercise.id) { mutableStateOf("") }
     Column(Modifier.fillMaxSize()) {
@@ -58,6 +59,15 @@ fun ExerciseSettingsScreen(
                         modifier = Modifier.toggleable(defaults.doNotRecommend, role = Role.Switch) {
                             onSave(defaults.copy(doNotRecommend = it))
                         },
+                        colors = ListItemDefaults.colors(containerColor = OF.card),
+                    )
+                    HorizontalDivider(color = OF.line)
+                    ListItem(
+                        headlineContent = { Text("Edit Duplicate") },
+                        supportingContent = { Text("To edit all available exercise properties, create a duplicate.") },
+                        leadingContent = { Icon(Icons.Rounded.ContentCopy, null) },
+                        trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
+                        modifier = Modifier.clickable(onClick = onDuplicate),
                         colors = ListItemDefaults.colors(containerColor = OF.card),
                     )
                 }

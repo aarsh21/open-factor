@@ -16,7 +16,7 @@ data class CustomExerciseDraft(
     val name: String = "",
     val metric1: SetMetric? = null,
     val metric2: SetMetric? = null,
-    val type: CustomExerciseType = CustomExerciseType.COMPOUND_UPPER,
+    val type: CustomExerciseType? = CustomExerciseType.COMPOUND_UPPER,
     val laterality: String = "Bilateral",
     val primary: List<String> = emptyList(),
     val secondary: List<String> = emptyList(),
@@ -31,13 +31,13 @@ data class CustomExerciseDraft(
     val instructions: String = "",
 ) : Serializable {
     val metrics get() = listOfNotNull(metric1, metric2)
-    val validBasics get() = name.isNotBlank() && metrics.isNotEmpty() &&
+    val validBasics get() = name.isNotBlank() && type != null && metrics.isNotEmpty() &&
         metrics.distinct().size == metrics.size &&
         metrics.count { it.isLoad } <= 1 && metrics.count { it.isReps } <= 1 &&
         metrics.count { it == SetMetric.DURATION || it == SetMetric.DURATION_PER_SIDE } <= 1 &&
         metrics.count { it in listOf(SetMetric.DISTANCE_LONG, SetMetric.DISTANCE_SHORT, SetMetric.DISTANCE_PER_SIDE) } <= 1
     val contribution get() = bodyPercent.replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() && it in 0.0..100.0 }
-    val validDetails get() = contribution != null && rom in 0..5 && stability in 0..5 && alternateNames.length <= 300
+    val validDetails get() = contribution != null && resistance.isNotEmpty() && rom in 0..5 && stability in 0..5 && alternateNames.length <= 300
 
     fun cycleMuscle(name: String): CustomExerciseDraft = when (name) {
         in primary -> copy(primary = primary - name, secondary = secondary + name)
@@ -48,6 +48,7 @@ data class CustomExerciseDraft(
     fun toExercise(equipment: List<EquipmentItem>, id: String = newId()): Exercise {
         require(validBasics && validDetails) { "Complete the exercise name, metrics and body weight contribution" }
         require(resistance.isNotEmpty() && primary.intersect(secondary.toSet()).isEmpty())
+        val selectedType = requireNotNull(type)
         val names = equipment.associate { it.id to it.name }
         val resistanceNames = resistance.map { group ->
             group.map { names[it] ?: it }.sorted().joinToString(" + ").ifEmpty { "Bodyweight Only" }
@@ -68,8 +69,8 @@ data class CustomExerciseDraft(
             equipmentOptions = resistanceNames,
             properties = buildMap {
                 put("Metrics", metrics.joinToString(", ") { it.catalogName })
-                put("Type", type.catalogType)
-                put("Region", type.region)
+                put("Type", selectedType.catalogType)
+                put("Region", selectedType.region)
                 put("Laterality", laterality)
                 put("Range of Motion", rom.toString())
                 put("Stability", stability.toString())
@@ -81,4 +82,27 @@ data class CustomExerciseDraft(
             resistanceEquipment = resistance, supportEquipment = support,
         )
     }
+}
+
+fun Exercise.duplicateDraft(
+    resistance: List<Set<String>> = resistanceEquipment,
+    support: List<Set<String>> = supportEquipment,
+    instructionText: String = instructions,
+): CustomExerciseDraft {
+    val metrics = loggingMetrics()
+    return CustomExerciseDraft(
+        name = "$title (Copy)", metric1 = metrics.getOrNull(0), metric2 = metrics.getOrNull(1),
+        type = CustomExerciseType.entries.find {
+            it.catalogType == properties["Type"] && (it == CustomExerciseType.CORE || it.region == properties["Region"])
+        },
+        laterality = properties["Laterality"] ?: "Bilateral",
+        primary = muscles, secondary = secondary,
+        resistance = resistance, support = support,
+        rom = properties["Range of Motion"]?.toIntOrNull() ?: 0,
+        stability = properties["Stability"]?.toIntOrNull() ?: 0,
+        bodyPercent = java.math.BigDecimal.valueOf(bodyweight).movePointRight(2).stripTrailingZeros().toPlainString(),
+        primaryJoint = properties["Primary Joint Action"].orEmpty(),
+        secondaryJoint = properties["Secondary Joint Action"].orEmpty(),
+        alternateNames = aliases.joinToString(", "), instructions = instructionText,
+    )
 }

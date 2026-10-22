@@ -21,6 +21,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
@@ -53,6 +54,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
     var previousRoute by rememberSaveable { mutableStateOf("") }
     var exerciseInfo by rememberSaveable { mutableStateOf(false) }
     var customReturnRoute by rememberSaveable { mutableStateOf("") }
+    var duplicateId by rememberSaveable { mutableStateOf("") }
     var programDayId by rememberSaveable { mutableStateOf("") }
     var programExit by remember { mutableStateOf(false) }
     var shortcuts by rememberSaveable { mutableStateOf(false) }
@@ -64,12 +66,14 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
     val exercises = vm.exercises(data)
     val snackbar = remember { SnackbarHostState() }
     val routeState = rememberSaveableStateHolder()
+    val context = LocalContext.current
     fun openExercise(id: String) {
         previousRoute = route
         detailId = id
         route = "exercise"
     }
     fun openCustom() {
+        duplicateId = ""
         customReturnRoute = route
         route = "custom"
     }
@@ -293,6 +297,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                         ExerciseSettingsScreen(
                             e, data.exerciseDefaults[e.id] ?: ExerciseDefaults(), data.preferences.restSeconds,
                             { route = "" }, { vm.saveExerciseDefaults(e.id, it) }, { exerciseInfo = true },
+                            { duplicateId = e.id; customReturnRoute = route; route = "custom" },
                         )
                         if (exerciseInfo) ModalBottomSheet(
                             onDismissRequest = { exerciseInfo = false },
@@ -333,13 +338,23 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                             equipmentCatalog = vm.equipmentCatalog,
                         )
                     }
-                    "custom" ->
-                        CustomExercise(data, vm.equipmentCatalog, { route = customReturnRoute }) { draft ->
+                    "custom" -> {
+                        val initial = remember(duplicateId) {
+                            exercises.find { it.id == duplicateId }?.let { e ->
+                                val (resistance, support) = vm.equipmentCatalog.requirementsFor(e)
+                                val instructions = if (e.instructions.startsWith("reference/"))
+                                    runCatching { context.assets.open(e.instructions).bufferedReader().use { it.readText() } }.getOrDefault("")
+                                else e.instructions
+                                e.duplicateDraft(resistance, support, instructions)
+                            }
+                        }
+                        CustomExercise(data, vm.equipmentCatalog, { route = customReturnRoute }, initial) { draft ->
                             val id = vm.addCustom(draft)
                             previousRoute = customReturnRoute
                             detailId = id
                             route = "exercise"
                         }
+                    }
                     "draft-picker" -> routeState.SaveableStateProvider("draft-picker") {
                         ExerciseLibrary(
                             exercises,

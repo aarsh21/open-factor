@@ -155,6 +155,14 @@ class TrainingFlowTest {
         assertTrue(equipment.usesResistance(bench, plates))
         assertFalse(equipment.usesResistance(bench, support))
         assertFalse(equipment.usesResistance(bench, dumbbells))
+        val (resistance, supports) = equipment.requirementsFor(bench)
+        assertEquals(listOf(setOf(bar, plates)), resistance)
+        assertEquals(5, supports.size)
+        val duplicateDraft = bench.duplicateDraft(resistance, supports)
+        val duplicate = duplicateDraft.copy(type = CustomExerciseType.COMPOUND_UPPER).toExercise(equipment.items)
+        assertEquals(.076, duplicate.bodyweight, 0.0)
+        assertFalse(equipment.available(duplicate, GymProfile(name = "No support", equipmentIds = setOf(bar, plates))))
+        assertTrue(equipment.available(duplicate, GymProfile(name = "Everything", equipmentIds = equipment.prefill("everything"))))
         val custom = bench.copy(custom = true,
             resistanceEquipment = listOf(setOf(bar, plates), setOf(dumbbells)),
             supportEquipment = listOf(setOf(support)))

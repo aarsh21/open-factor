@@ -56,10 +56,10 @@ def find(label, attr='text', prefix=False):
     raise AssertionError((label, attr))
 
 
-def tap(label, attr='text', prefix=False):
+def tap(label, attr='text', prefix=False, node_class=None):
     for _ in range(12):
         tree = nodes()
-        matches = [n for n in tree if (n.get(attr, '').startswith(label) if prefix else n.get(attr, '').strip() == label) and bounds(n)[3] - bounds(n)[1] >= 30]
+        matches = [n for n in tree if (n.get(attr, '').startswith(label) if prefix else n.get(attr, '').strip() == label) and bounds(n)[3] - bounds(n)[1] >= 30 and (node_class is None or n.get('class') == node_class)]
         if matches:
             left, top, right, bottom = bounds(matches[-1])
             adb('shell', 'input', 'tap', str((left + right) // 2), str((top + bottom) // 2))
@@ -87,7 +87,7 @@ def enter(label, value, attr='text', prefix=False):
     fields = [n for n in nodes() if n.get('class') == 'android.widget.EditText' and n.get('focused') == 'true']
     assert len(fields) == 1, label
     old = fields[0].get('text', '')
-    adb('shell', 'for i in ' + ' '.join(str(i) for i in range(len(old) + 3)) + '; do input keyevent 67; input keyevent 112; done')
+    adb('shell', 'input', 'keyevent', *(['67', '112'] * (len(old) + 3)))
     if value:
         adb('shell', 'input', 'text', value.replace(' ', '%s'))
     fields = [n for n in nodes() if n.get('class') == 'android.widget.EditText' and n.get('focused') == 'true']
@@ -262,8 +262,104 @@ assert state()['customExercises'] == created
 assert state()['active']['exercises'][0]['sets'][0] == row
 for key in ['scaleWeights', 'bodyMeasurements', 'progressPhotos']:
     assert state().get(key) == before.get(key), (key, 'Custom creation changed body/photo data')
+
+# Edit Duplicate copies into an unsaved wizard, not an existing exercise or active entry.
+tap('Exercises')
+enter('Search exercises', 'Synthetic Supported Hold')
+tap('Synthetic Supported Hold', node_class='android.widget.TextView')
+tap('Exercise Note')
+enter('Note', 'Original reminder')
+tap('Save')
+original_state = state()
+capture('12-duplicate-entry')
+tap('Edit Duplicate')
+find('Synthetic Supported Hold (Copy)')
+find('Compound Upper')
+capture('13-duplicate-prefilled')
+enter('Exercise Name', 'Discarded copy')
+back()
+find('Edit Duplicate')
+assert state() == original_state
+tap('Edit Duplicate')
+find('Synthetic Supported Hold (Copy)')
+enter('Exercise Name', 'Edited Supported Hold')
+tap('Next')
+find('1 primary, 1 secondary')
+tap('Next')
+find('Barbell + Weight plates')
+find('Flat bench')
+capture('14-copied-equipment')
+tap('Next')
+find('73')
+enter('Body Weight Contribution', '61')
+tap('Next')
+find('Does everything look correct?')
+assert state() == original_state, 'Duplicate wizard saved before explicit Create'
+capture('15-duplicate-review')
+adb('shell', 'input', 'keyevent', '3')
+time.sleep(1)
+old_pid = adb('shell', 'pidof', 'org.openfactor.app').strip()
+adb('shell', 'am', 'kill', 'org.openfactor.app')
+time.sleep(1)
+assert not adb('shell', 'pidof org.openfactor.app || true').strip()
+launch()
+find('Does everything look correct?')
+assert adb('shell', 'pidof', 'org.openfactor.app').strip() != old_pid
+tap('Create')
+find('Edited Supported Hold')
+copies = state()['customExercises']
+assert len(copies) == 2 and copies[0] == custom
+duplicate = copies[1]
+assert duplicate['id'] != custom['id']
+assert duplicate == {**custom, 'id': duplicate['id'], 'name': 'Edited Supported Hold', 'bodyweight': .61}
+assert state()['active'] == original_state['active']
+assert state()['exerciseDefaults'] == original_state['exerciseDefaults']
+tap('Details')
+capture('16-created-duplicate')
+tap('Add Exercise')
+entries = state()['active']['exercises']
+assert entries[0] == original_state['active']['exercises'][0]
+assert entries[1]['exerciseId'] == duplicate['id'] and entries[1]['notes'] == ''
+assert entries[1]['sets'][0].get('assistanceKg') is None and entries[1]['sets'][0].get('durationSeconds') is None
+capture('17-duplicate-contextual-add')
+
+# The catalog omits Region: require the type instead of inventing upper/lower.
+# Its 515-character aliases must support incremental deletion before bulk replacement.
+back()
+enter('Synthetic Supported Hold', 'weighted roman chair hip hinge')
+tap('Weighted Roman Chair Hip Hinge', node_class='android.widget.TextView')
+catalog_before = state()
+tap('Edit Duplicate')
+find('Select type')
+assert disabled('Next')
+capture('18-catalog-missing-type')
+tap('Type', 'content-desc')
+tap('Isolation Lower')
+tap('Next')
+tap('Next')
+tap('Next')
+tap('Alternate Names')
+fields = [n for n in nodes() if n.get('class') == 'android.widget.EditText' and n.get('focused') == 'true']
+assert len(fields) == 1 and len(fields[0].get('text')) == 515
+adb('shell', 'input', 'keyevent', '123')
+adb('shell', 'input', 'keyevent', '67')
+fields = [n for n in nodes() if n.get('class') == 'android.widget.EditText' and n.get('focused') == 'true']
+assert len(fields[0].get('text')) == 514, 'Over-limit copied aliases could not be shortened one character at a time'
+back()
+assert disabled('Next')
+capture('19-over-limit-alias-recovery')
+enter('Alternate Names', 'Roman Variation')
+tap('Next')
+find('Does everything look correct?')
+capture('20-catalog-review-recovered')
+for _ in range(5):
+    tap('Back', 'content-desc')
+find('Edit Duplicate')
+assert state() == catalog_before, 'Cancelling a catalog duplicate mutated saved records'
+for key in ['scaleWeights', 'bodyMeasurements', 'progressPhotos', 'history']:
+    assert state().get(key) == before.get(key), (key, 'Duplicate changed unrelated records')
 assert 'Active default network: none' in adb('shell', 'dumpsys', 'connectivity')
 (args.output / 'state.json').write_text(json.dumps(state(), indent=2) + '\n')
 (args.output / 'apk-sha256.txt').write_text(adb('shell', 'sha256sum', adb('shell', 'pm', 'path', 'org.openfactor.app').strip().removeprefix('package:')))
-(args.output / 'result.json').write_text(json.dumps(dict(status='passed', serial=args.serial, five_step_flow=True, no_save_before_create=True, recreation=True, required_fields_and_recovery=True, structured_metadata_and_restart=True, gym_requirements=True, alias_search=True, contextual_add=True, metric_logging=True, body_and_photos_unchanged=True, offline=True), indent=2) + '\n')
+(args.output / 'result.json').write_text(json.dumps(dict(status='passed', serial=args.serial, five_step_flow=True, no_save_before_create=True, recreation=True, required_fields_and_recovery=True, structured_metadata_and_restart=True, gym_requirements=True, alias_search=True, contextual_add=True, metric_logging=True, duplicate_prefill_cancel_create=True, duplicate_recreation=True, original_and_overrides_unchanged=True, duplicate_contextual_add=True, catalog_missing_type_required=True, copied_alias_overflow_recovery=True, body_and_photos_unchanged=True, offline=True), indent=2) + '\n')
 print((args.output / 'result.json').read_text())
