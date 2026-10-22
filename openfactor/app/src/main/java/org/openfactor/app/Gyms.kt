@@ -152,6 +152,17 @@ class EquipmentCatalog(context: Context) {
         return equipmentRequirementsMet(resistance, support, gym.equipmentIds)
     }
 
+    fun usesResistance(e: Exercise, equipmentId: String): Boolean {
+        val item = items.find { it.id == equipmentId } ?: return false
+        val resistance = if (e.custom) e.resistanceEquipment else exerciseRequirements[e.id]?.first.orEmpty()
+        if (resistance.isNotEmpty()) return resistance.any {
+            equipmentId in it || (it.isEmpty() && item.name.equals("Bodyweight only", true))
+        }
+        return e.equipmentOptions.ifEmpty { listOf(e.equipment) }.any {
+            it.equals(item.name, true) || (it.equals("Bodyweight", true) && item.name.equals("Bodyweight only", true))
+        }
+    }
+
     fun prefill(key: String): Set<String> =
         if (key == "everything") items.map { it.id }.toSet()
         else items.filter { key in it.presets }.map { it.id }.toSet()

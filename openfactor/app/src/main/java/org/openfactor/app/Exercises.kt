@@ -4,6 +4,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -20,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.SubcomposeAsyncImage
 
 @Composable
 fun ExerciseLibrary(
@@ -41,16 +43,31 @@ fun ExerciseLibrary(
     val gym = gyms.find { it.id == gymId } ?: gyms.firstOrNull()
     var query by rememberSaveable { mutableStateOf("") }
     var muscle by rememberSaveable { mutableStateOf("All muscles") }
-    var equipment by rememberSaveable { mutableStateOf("All equipment") }
+    var resistanceId by rememberSaveable { mutableStateOf("") }
+    var resistanceSheet by rememberSaveable { mutableStateOf(false) }
     var expandedGroups by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var onlyFavorites by rememberSaveable { mutableStateOf(false) }
     var filter by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    val filters = listOf(query, muscle, resistanceId, gym?.id.orEmpty(), type, laterality, onlyFavorites.toString())
+    var previousFilters by rememberSaveable { mutableStateOf(filters) }
+    LaunchedEffect(filters) {
+        if (filters != previousFilters) {
+            listState.scrollToItem(0)
+            previousFilters = filters
+        }
+    }
+    val resistanceItems = remember(exercises, equipmentCatalog) {
+        equipmentCatalog?.items.orEmpty().filter { item ->
+            exercises.any { equipmentCatalog?.usesResistance(it, item.id) == true }
+        }
+    }
     val filtered =
         remember(
             exercises,
             query,
             muscle,
-            equipment,
+            resistanceId,
             onlyFavorites,
             favorites,
             gym,
@@ -67,7 +84,7 @@ fun ExerciseLibrary(
                             e.name.contains(query, true) ||
                             e.aliases.any { it.contains(query, true) }) &&
                         (muscle == "All muscles" || muscle in e.muscles) &&
-                        (equipment == "All equipment" || equipment == e.equipment) &&
+                        (resistanceId.isEmpty() || equipmentCatalog?.usesResistance(e, resistanceId) == true) &&
                         (!onlyFavorites || e.id in favorites)
                 }
                 .sortedWith(
@@ -184,8 +201,15 @@ fun ExerciseLibrary(
                 ) {
                     laterality = it
                 }
+                if (equipmentCatalog != null) FilterChip(
+                    resistanceId.isNotEmpty(),
+                    { resistanceSheet = true },
+                    label = { Text(resistanceItems.find { it.id == resistanceId }?.name ?: "Resistance") },
+                    trailingIcon = { Icon(Icons.Rounded.ExpandMore, null) },
+                    modifier = Modifier.semantics { contentDescription = "Resistance filter" },
+                )
                 FilterChip(
-                    filter || equipment != "All equipment",
+                    filter,
                     { filter = !filter },
                     label = { Text("Filters") },
                     leadingIcon = { Icon(Icons.Rounded.Tune, null, Modifier.size(18.dp)) },
@@ -213,14 +237,6 @@ fun ExerciseLibrary(
                         muscle,
                     ) {
                         muscle = it
-                    }
-                    FilterChooser(
-                        "Equipment",
-                        listOf("All equipment") +
-                            exercises.map { it.equipment }.distinct().sorted(),
-                        equipment,
-                    ) {
-                        equipment = it
                     }
                 }
             Row(
@@ -270,6 +286,7 @@ fun ExerciseLibrary(
             }
             LazyColumn(
                 Modifier.weight(1f),
+                state = listState,
                 contentPadding =
                     PaddingValues(
                         start = 18.dp,
@@ -288,7 +305,7 @@ fun ExerciseLibrary(
                             {
                                 query = ""
                                 muscle = "All muscles"
-                                equipment = "All equipment"
+                                resistanceId = ""
                                 onlyFavorites = false
                                 type = "All types"
                                 laterality = "All lateralities"
@@ -378,6 +395,60 @@ fun ExerciseLibrary(
                     .navigationBarsPadding()
                     .padding(bottom = 88.dp)
             )
+    }
+    if (resistanceSheet) ResistanceFilterSheet(
+        resistanceItems, resistanceId, { resistanceSheet = false },
+    ) { resistanceId = it; resistanceSheet = false }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ResistanceFilterSheet(equipment: List<EquipmentItem>, selected: String, dismiss: () -> Unit, select: (String) -> Unit) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val order = listOf("Personal", "Free Weights", "Loadable Bars", "Fixed Weight Bars", "Bands & Ropes", "Cable Machines", "Cardio", "Plate Loaded Machines", "Pin Loaded Machines")
+    val groups = remember(equipment, query) {
+        equipment.filter { it.name.contains(query, true) }.groupBy { it.category }
+            .toList().sortedBy { order.indexOf(it.first).takeIf { index -> index >= 0 } ?: order.size }
+    }
+    ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.fillMaxWidth().fillMaxHeight(.9f).imePadding()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(dismiss) { Icon(Icons.Rounded.Close, "Close Resistance") }
+                Text("Resistance", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Spacer(Modifier.width(48.dp))
+            }
+            key(query) {
+                LazyColumn(Modifier.weight(1f)) {
+                    item {
+                        ListItem(
+                            headlineContent = { Text("All Resistance") },
+                            trailingContent = { RadioButton(selected.isEmpty(), null) },
+                            modifier = Modifier.clickable { select("") },
+                        )
+                    }
+                    if (groups.isEmpty()) item { Text("No matching equipment", Modifier.padding(18.dp), color = OF.muted) }
+                    groups.forEach { (category, items) ->
+                        item(key = "category-$category") {
+                            Box(Modifier.padding(horizontal = 16.dp)) { SectionTitle(if (category == "Personal") "Bodyweight" else category) }
+                        }
+                        items(items, key = { it.id }) { item ->
+                            ListItem(
+                                headlineContent = { Text(if (item.name.equals("Bodyweight only", true)) "Bodyweight Only" else item.name) },
+                                leadingContent = { SubcomposeAsyncImage("file:///android_asset/reference/equipment/${item.id}.png", null, Modifier.size(48.dp),
+                                    error = { Icon(Icons.Rounded.FitnessCenter, null, tint = OF.muted) }) },
+                                trailingContent = { RadioButton(item.id == selected, null) },
+                                modifier = Modifier.clickable { select(item.id) },
+                            )
+                            HorizontalDivider(color = OF.line)
+                        }
+                    }
+                }
+            }
+            OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().padding(12.dp),
+                placeholder = { Text("Filter equipment by name") }, leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(Icons.Rounded.Close, "Clear equipment search") } },
+                singleLine = true, shape = RoundedCornerShape(50))
+        }
     }
 }
 

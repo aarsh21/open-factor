@@ -96,5 +96,22 @@ class TrainingFlowTest {
                 GymProfile(name = "Everything", equipmentIds = equipment.prefill("everything")),
             )
         )
+        val bar = equipment.items.single { it.name == "Barbell" }.id
+        val plates = equipment.items.single { it.name == "Weight plates" }.id
+        val support = equipment.items.single { it.name == "Flat bench" }.id
+        val dumbbells = equipment.items.single { it.name == "Dumbbells" }.id
+        val bodyweight = equipment.items.single { it.name.equals("Bodyweight only", true) }.id
+        assertTrue(equipment.usesResistance(bench, bar))
+        assertTrue(equipment.usesResistance(bench, plates))
+        assertFalse(equipment.usesResistance(bench, support))
+        assertFalse(equipment.usesResistance(bench, dumbbells))
+        val custom = bench.copy(custom = true,
+            resistanceEquipment = listOf(setOf(bar, plates), setOf(dumbbells)),
+            supportEquipment = listOf(setOf(support)))
+        assertTrue(equipment.usesResistance(custom, dumbbells))
+        assertTrue(equipment.usesResistance(custom, plates))
+        assertFalse(equipment.usesResistance(custom, support))
+        assertFalse(equipment.usesResistance(custom, bodyweight))
+        assertTrue(equipment.usesResistance(custom.copy(resistanceEquipment = listOf(emptySet())), bodyweight))
     }
 }
