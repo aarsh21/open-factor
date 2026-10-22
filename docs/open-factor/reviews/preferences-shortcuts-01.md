@@ -79,9 +79,11 @@ data visibility, scoped export, help, and Health Connect have separate owners.
 
 ## Verification record
 
-Verification is incomplete. All Gradle commands use the shared lock, one worker,
-a 1536 MiB heap, in-process Kotlin, and the allocated JDK/SDK. No ADB command or
-source-device operation has run in this thread.
+The bounded preference checks pass. This does not accept the unrecovered source
+algorithms listed above. All Gradle commands use the shared lock, one worker,
+a 1536 MiB heap, in-process Kotlin, and the allocated JDK/SDK. Native checks used
+only the explicitly allocated offline emulator-5580, Android API 35. No source
+phone, Health provider, grant, store operation, extra AVD, or data clear was used.
 
 - The first build found a photo-slot draw callback reading the newly composable
   muted color. The approved correction captures the color before the callback.
@@ -104,16 +106,76 @@ entry/pinned notes. It also rejects duplicate/unknown actions and unknown colors
 Metric regression checks distinguish miles from yards and preserve metric and
 non-distance controls. The instrumentation test covers fresh ViewModel reload,
 complete backup/restore, rejected-restore atomicity, and original-store cleanup;
-it compiled but has not executed.
+it passed on-device: `PreferenceStorageTest`, one test, zero failures.
 
-Build logs are locally excluded under `.amp/in/artifacts/preferences/`.
-Native persistence, visual inspection, Light/Dark/System combinations,
-Back/Cancel/reset/interruption, enlarged text/IME, accessibility semantics, and
-Keep Alive lifecycle checks await the parent's emulator allocation. There are
-no accepted screenshots yet.
+### Native checks exercised real consumers
+
+Functional acceptance used the parent's source-only public APK from local main
+`41cfff2b`, SHA-256
+`189a0948553cf7ffdf696b75a53389fbbef59e0b279772b2dec3bc900c389b2f`.
+The test APK hash was
+`1112b9d55a08246426629e76fd651f58fc4915c7ab65a5e7cb830e29a7de3ef5`.
+The candidate had three factual catalog assets and no reference originals.
+
+- Dark on a light system, Light on light/dark systems, and System following
+  light/dark all passed. Render pixels and persisted theme values were checked.
+- Pounds, profile-only feet/inches, clock units, and distance units persisted.
+  Profile showed 5 ft 11 in for 180.34 cm. Resume Workout changed from 24-hour
+  time to 12-hour AM/PM through the real Clock control.
+- Real logger input saved 1.7 miles as 2735.8848 meters and 37.5 yards as
+  34.29 meters. Switching to metric showed 2.736 km and 34.29 m without changing
+  the canonical set values.
+- Rest Cancel, Back, disabled invalid Save, saving 137 seconds, restart, and
+  keyboard clearance passed at 1.3× type size.
+- Shortcut Back/Cancel left data unchanged. Background/resume and rotation
+  retained an unsaved draft. Reset affected the draft until Save. History-first
+  ordering, hidden Photos, Teal, and Up Next off survived restart and changed
+  the actual shortcut sheet. History opened the real history route. The
+  expanded default sheet exposed all seven actions in order; Empty Workout
+  correctly displayed Resume Workout for the synthetic active session.
+- Logger timer and bodyweight badge changed on/off/on through actual controls.
+  The separate rest clock stayed present, and stored workout values stayed
+  unchanged. Keep Alive requested the window only for the active logger,
+  cleared on background and route exit, returned on resume, and stayed off
+  after disabling and restart. Settled window dumps verify each state.
+- At normal and 1.3× type, inspected renders showed readable controls. The
+  floating pill intentionally overlays scrolling content; executed scrolling
+  reached Distance, Reset, Cancel, and the last shortcut above the pill/gesture
+  region. The Rest dialog retained its actions above the IME.
+
+Native inspection found identical Default names on shortcut color actions.
+Own correction `25022a9b`, integrated by the parent as `c663f01d`, adds the action
+name and selected-color state without changing appearance. Its exact APK hash
+was `d9e1b8e4845ec6f65a8603fdb8846f095ef712170c67b4202e688bf10c65adaa`.
+The semantic-only follow-up passed: direct `AccessibilityNodeInfo` reads from
+the owning clickable actions returned History color / Teal versus the other
+action names / Default. The contextual action opened the correct color dialog.
+The functional suite was not rerun against this semantic-only candidate.
+
+Initial driver assertions were corrected rather than attributed to the app:
+disabled state belongs to the owning button, not its TextView; window state
+needs a settled frame; minimal seeded JSON gains default fields on its first
+save; the local Empty Workout label becomes Resume for an active session; and
+Compose exports a description proxy separately from its clickable owner. Logs
+retain the driver failures. No product behavior was changed to satisfy them.
+
+### Exact incoming state was restored and the lease released
+
+The incoming application and test APKs were independently pulled and hashed
+before replacement. Restoration used nonstreamed installs, not uninstall or
+data clear. Exact original APK hashes, preference XML bytes, and file manifests
+under files/no_backup/shared_prefs, including both original photo bytes, match.
+Font 1.0, rotation 0 with auto-rotation 1, system night no with secure key absent,
+Wi-Fi 0, and mobile data 0 were restored and read back. The original app remains
+force-stopped. The emulator was explicitly released to the parent.
+
+Logs, inspected screenshots, `native-result.json`, `restoration.json`, and
+`color-state-accessibility.log` are locally excluded under
+`.amp/in/artifacts/preferences/`. No original source media is published.
 
 Own local commits are `fe8abe76` (fields), `12484020` (distance helpers),
 `1c9fd247` (theme/shortcuts and Settings controls), `38644f51` (portability row
 wiring), `6b308c41` (test correction/explicit legacy assertions), and `0f91274d`
-(profile state observation). No commit is pushed. The parent integrates shared
-dependency originals once; local cherry-pick copies are not additional features.
+(profile state observation), plus `25022a9b` (color-action semantics). No commit
+is pushed. The parent integrates shared dependency originals once; local
+cherry-pick copies are not additional features.
