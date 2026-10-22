@@ -98,11 +98,24 @@ def state():
     return json.loads(next(n.text for n in xml if n.get('name') == 'data'))
 
 
+def write_private(path, payload):
+    local = args.output / 'private-transfer'
+    remote = '/data/local/tmp/of-portability-transfer'
+    local.write_bytes(payload)
+    try:
+        adb('push', str(local), remote)
+        adb('shell', 'run-as', package, 'cp', remote, path)
+        assert adb('exec-out', 'run-as', package, 'cat', path, raw=True) == payload
+    finally:
+        adb('shell', 'rm', '-f', remote)
+        local.unlink()
+
+
 def write_state(data):
     adb('shell', 'am', 'force-stop', package)
     xml = ET.fromstring(original_xml)
     next(n for n in xml if n.get('name') == 'data').text = json.dumps(data)
-    adb('exec-in', 'run-as', package, 'tee', 'shared_prefs/open_factor.xml', data=ET.tostring(xml))
+    write_private('shared_prefs/open_factor.xml', ET.tostring(xml))
 
 
 def enter_field(node, value):
@@ -197,7 +210,7 @@ try:
     adb('shell', 'svc', 'wifi', 'disable'); adb('shell', 'svc', 'data', 'disable')
     write_state(fixture)
     for reference, image in fixture_photos.items():
-        adb('exec-in', 'run-as', package, 'tee', 'no_backup/progress-photos/'+reference, data=image)
+        write_private('no_backup/progress-photos/'+reference, image)
     # Normalize the fixture once through the public preference writer before
     # checking that visibility and tutorials leave canonical records unchanged.
     settings(); tap('Units'); tap('Kilograms (kg)'); tap('Back', 'content-desc')
@@ -244,17 +257,19 @@ try:
     assert all(n.get('enabled') == 'false' for n in nodes() if n.get('class') == 'android.widget.Switch')
     assert state() == hidden
     open_chart(); target('About body charts'); capture('tutorial-first-normal'); tap('Got it')
-    assert 'bodyCharts' in state()['preferences']['dismissedTutorials']
+    dismissed = {**hidden, 'preferences': {**hidden['preferences'], 'dismissedTutorials': ['bodyCharts']}}
+    assert state() == dismissed
     tap('Back', 'content-desc'); target('Body Data'); tap('View Charts'); target('Recorded values · kg')
     assert not any(n.get('text') == 'About body charts' for n in nodes())
     tap('About body charts', 'content-desc'); target('About body charts'); tap('Got it')
     tap('Back', 'content-desc'); target('Body Data'); tap('Back', 'content-desc')
     tap('Tutorials'); tap('Reset Tutorials'); target('Reset Tutorials?'); capture('reset-confirm-normal'); tap('Cancel')
-    assert 'bodyCharts' in state()['preferences']['dismissedTutorials']
-    tap('Reset Tutorials'); tap('Reset'); assert 'bodyCharts' not in state()['preferences']['dismissedTutorials']
+    assert state() == dismissed
+    tap('Reset Tutorials'); tap('Reset'); assert state() == hidden
     unchanged_records(before)
     tap('Back', 'content-desc'); tap('Body Data'); tap('View Charts'); target('About body charts'); tap('Got it')
     final = state()
+    assert final == dismissed
     settings(); tap('Export Backup'); target('Save')
     name = tag+'-complete.json'; downloads.append(name); save_as(name); target('Export Backup')
     complete = json.loads(adb('shell', 'cat', '/sdcard/Download/'+name))
@@ -298,10 +313,10 @@ except BaseException:
     raise
 finally:
     adb('shell', 'am', 'force-stop', package)
-    adb('exec-in', 'run-as', package, 'tee', 'shared_prefs/open_factor.xml', data=original_xml)
+    write_private('shared_prefs/open_factor.xml', original_xml)
     adb('shell', 'run-as', package, 'mkdir', '-p', 'no_backup/progress-photos')
     for reference, payload in original_files.items():
-        adb('exec-in', 'run-as', package, 'tee', 'no_backup/progress-photos/'+reference, data=payload)
+        write_private('no_backup/progress-photos/'+reference, payload)
         assert adb('exec-out', 'run-as', package, 'cat', 'no_backup/progress-photos/'+reference, raw=True) == payload
     for reference in set(fixture_photos) - set(original_files):
         adb('shell', 'run-as', package, 'rm', '-f', 'no_backup/progress-photos/'+reference)
