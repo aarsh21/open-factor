@@ -79,6 +79,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
     var shortcuts by rememberSaveable { mutableStateOf(false) }
     var configureShortcuts by rememberSaveable { mutableStateOf(false) }
     var workoutSettings by rememberSaveable { mutableStateOf(false) }
+    var healthConnect by rememberSaveable { mutableStateOf(false) }
     var gymsReturn by rememberSaveable { mutableStateOf("") }
     var bodyDataTab by rememberSaveable { mutableIntStateOf(0) }
     var bodyChartMetric by rememberSaveable { mutableStateOf("weight") }
@@ -146,14 +147,17 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
             }
         }
     }
+    if (healthConnect) HealthConnectPanel(
+        data, vm::importHealthConnectWeights, onClose = { healthConnect = false },
+    )
     if (!data.onboarding.completed && !data.onboarding.deferred) {
-        OnboardingScreen(data, vm) {
+        OnboardingScreen(data, vm, onManualProgram = {
             if (data.programDraft != null) route = "program-editor"
             else {
                 vm.beginProgram(TrainingProgram(name = "My Program"))
                 route = "program-setup"
             }
-        }
+        }, onHealthConnect = { healthConnect = true })
         return
     }
     var scrollEnergy by remember { mutableFloatStateOf(0f) }
@@ -530,6 +534,9 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                     onGyms = {
                                         gymsReturn = ""
                                         route = "gyms"
+                                    },
+                                    integrationSettings = {
+                                        HealthConnectSettingsRow { healthConnect = true }
                                     },
                                 )
                         }

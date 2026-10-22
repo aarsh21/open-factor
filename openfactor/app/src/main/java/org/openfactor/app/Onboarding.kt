@@ -74,12 +74,16 @@ data class OnboardingState(
 }
 
 @Composable
-fun OnboardingScreen(data: AppData, vm: WorkoutViewModel, onManualProgram: () -> Unit) {
+fun OnboardingScreen(
+    data: AppData,
+    vm: WorkoutViewModel,
+    onManualProgram: () -> Unit,
+    onHealthConnect: () -> Unit = {},
+) {
     val s = data.onboarding
     fun edit(block: (OnboardingState) -> OnboardingState) = vm.editOnboarding(block)
     fun next() = edit { it.copy(step = (it.step + 1).coerceAtMost(7)) }
     var exit by remember { mutableStateOf(false) }
-    var syncInfo by remember { mutableStateOf(false) }
     BackHandler { if (s.step > 0) edit { it.copy(step = it.step - 1) } else exit = true }
     Surface(color = OF.top, contentColor = androidx.compose.ui.graphics.Color.White) {
         Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
@@ -224,7 +228,7 @@ fun OnboardingScreen(data: AppData, vm: WorkoutViewModel, onManualProgram: () ->
                             style = MaterialTheme.typography.headlineMedium,
                         )
                         OutlinedCard(
-                            onClick = { syncInfo = true },
+                            onClick = onHealthConnect,
                             colors = CardDefaults.outlinedCardColors(containerColor = OF.top),
                         ) {
                             Row(
@@ -238,11 +242,11 @@ fun OnboardingScreen(data: AppData, vm: WorkoutViewModel, onManualProgram: () ->
                                         style = MaterialTheme.typography.titleLarge,
                                     )
                                     Text(
-                                        "Steps, weight, body metrics, and workouts",
+                                        "Steps, weight, scale body fat, and workouts",
                                         color = OF.muted,
                                     )
                                     Text(
-                                        "Not connected · integration not available yet",
+                                        "Optional · transfers run only when you choose",
                                         color = OF.muted,
                                         modifier = Modifier.padding(top = 8.dp),
                                     )
@@ -444,19 +448,6 @@ fun OnboardingScreen(data: AppData, vm: WorkoutViewModel, onManualProgram: () ->
                 }
             },
             dismissButton = { TextButton({ exit = false }) { Text("Continue setup") } },
-        )
-    if (syncInfo)
-        AlertDialog(
-            onDismissRequest = { syncInfo = false },
-            title = { Text("Health Connect") },
-            text = {
-                Text(
-                    "Health Connect sync is not available in this build. No health-data permissions have been requested. Continue setup without syncing."
-                )
-            },
-            confirmButton = {
-                TextButton({ syncInfo = false }) { Text("Continue without syncing") }
-            },
         )
 }
 

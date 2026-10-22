@@ -629,6 +629,9 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun saveScaleWeight(record: ScaleWeightRecord) = update { it.withScaleWeight(record) }
 
+    fun importHealthConnectWeights(records: List<ScaleWeightRecord>) =
+        update { it.withHealthConnectWeights(records) }
+
     fun deleteScaleWeight(id: String) = update {
         it.copy(scaleWeights = it.scaleWeights.filterNot { record -> record.id == id })
     }
