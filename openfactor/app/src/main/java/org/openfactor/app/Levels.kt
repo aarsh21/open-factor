@@ -80,7 +80,7 @@ fun LevelsScreen(
 ) {
     var days by rememberSaveable { mutableIntStateOf(7) }
     var back by rememberSaveable { mutableStateOf(false) }
-    var periods by remember { mutableStateOf(false) }
+    var periods by rememberSaveable { mutableStateOf(false) }
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     var exerciseDetail by rememberSaveable { mutableStateOf<String?>(null) }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
