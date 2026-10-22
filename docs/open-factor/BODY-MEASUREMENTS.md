@@ -29,6 +29,10 @@ or populated history. A prefilled source percentage does not establish a
 default or an estimator. No calculation or card-to-percentage rule is recovered.
 Source notification interruptions are excluded from behavioral evidence.
 
+Around 80.9 seconds, the tour dismisses Full Body to the same Levels page that
+remained behind the sheet. Local quick-log sheets preserve their caller on
+dismissal. A sheet opened from measurement history returns to Body Data.
+
 ## Local record policy
 
 `BodyMeasurementRecord.visualBodyFatPercent` stores a nullable, manually entered
@@ -87,5 +91,10 @@ Save semantics are implemented or claimed. Reference art is absent from public
 builds. The local reference has a title, explanatory copy, and Close control
 that the captured source sheet does not establish. Native date and keyboard
 controls, exact source typography and spacing, populated history, same-day
-policy, and saved source outcomes remain different or unobserved. The existing
-photo form remains a page rather than the source's compact sheet.
+policy, and saved source outcomes remain different or unobserved. The
+[photo editor](PROGRESS-PHOTOS.md) also uses a compact dated sheet.
+
+The near-full-height Full Body layout can leave its outside-tap area behind
+the display cutout and status bar. On the 5582 emulator, that area ends at
+110 px while the status bar ends at 128 px. Close and Back remain available;
+outside-tap dismissal on that device is not verified or claimed.

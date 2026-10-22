@@ -1,6 +1,5 @@
 package org.openfactor.app
 
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -9,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -17,6 +17,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -25,6 +30,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -106,6 +112,7 @@ fun ProgressPhotoHistory(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProgressPhotoEditor(
     record: ProgressPhotoRecord?,
@@ -123,12 +130,13 @@ fun ProgressPhotoEditor(
     var busy by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var viewing by remember { mutableStateOf<PhotoPosition?>(null) }
+    var choosingDate by rememberSaveable { mutableStateOf(false) }
+    var proposedDate by rememberSaveable { mutableStateOf(date) }
     val scope = rememberCoroutineScope()
     fun leave() {
         vm.cleanPhotos()
         onBack()
     }
-    BackHandler { leave() }
     LaunchedEffect(id) { vm.cleanPhotos(references.filter { it.isNotEmpty() }) }
     val picker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -151,115 +159,197 @@ fun ProgressPhotoEditor(
                 }
             }
         }
-    Column(Modifier.fillMaxSize().imePadding()) {
-        PageHeading(
-            "Progress Photos",
-            { leave() },
-            actions = {
+    ModalBottomSheet(
+        onDismissRequest = { leave() },
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = OF.card,
+        dragHandle = {
+            Box(Modifier.fillMaxWidth().height(20.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(32.dp, 4.dp).background(OF.line, RoundedCornerShape(2.dp)))
+            }
+        },
+    ) {
+        Column(Modifier.fillMaxWidth().heightIn(max = 720.dp).imePadding()) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton({ leave() }) { Icon(Icons.Rounded.Close, "Close photos") }
+                TextButton(
+                    {
+                        proposedDate = date
+                        choosingDate = true
+                    },
+                    Modifier.weight(1f).semantics { contentDescription = "Change photo date" },
+                    enabled = !busy,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                LocalDate.parse(date)
+                                    .format(DateTimeFormatter.ofPattern("dd/MM/uuuu")),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Icon(Icons.Rounded.ArrowDropDown, null)
+                        }
+                        Text(
+                            "Progress Photos",
+                            color = OF.muted,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
                 if (record != null)
                     IconButton({ deleting = true }, enabled = !busy) {
                         Icon(Icons.Rounded.DeleteOutline, "Delete photo record")
                     }
-            },
-        )
-        Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-            BodyDateField(date) {
-                date = it
-                error = ""
+                else Spacer(Modifier.width(48.dp))
             }
-            Text(
-                "Add at least one view. Originals are copied privately; removing a slot takes effect when you save.",
-                color = OF.muted,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PhotoPosition.entries.forEachIndexed { index, position ->
-                    val reference = references[index]
-                    fun attach() {
-                        selected = index
-                        picker.launch(arrayOf("image/*"))
-                    }
-                    Column(
-                        Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text(position.label, style = MaterialTheme.typography.titleSmall)
-                        Spacer(Modifier.height(8.dp))
-                        Box(
-                            Modifier.fillMaxWidth()
-                                .aspectRatio(.75f)
-                                .background(OF.card, OF.shape)
-                                .clickable(enabled = !busy) {
-                                    if (reference.isEmpty()) attach() else viewing = position
-                                }
-                                .semantics {
-                                    contentDescription =
-                                        if (reference.isEmpty()) "Add ${position.label} photo"
-                                        else "View ${position.label} photo"
-                                },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (reference.isEmpty())
-                                Icon(Icons.Rounded.AddPhotoAlternate, null, Modifier.size(32.dp))
-                            else PhotoImage(vm.photoStore, reference, null, Modifier.fillMaxSize())
+            HorizontalDivider(color = OF.line)
+            Column(
+                Modifier.weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 18.dp)
+                    .padding(top = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PhotoPosition.entries.forEachIndexed { index, position ->
+                        val reference = references[index]
+                        fun attach() {
+                            selected = index
+                            picker.launch(arrayOf("image/*"))
                         }
-                        TextButton(
-                            { attach() },
-                            enabled = !busy,
-                            modifier =
-                                Modifier.semantics {
-                                    contentDescription =
-                                        "${if (reference.isEmpty()) "Add" else "Replace"} ${position.label} photo"
-                                },
+                        Column(
+                            Modifier.weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Text(if (reference.isEmpty()) "Add" else "Replace")
-                        }
-                        if (reference.isNotEmpty())
-                            IconButton(
-                                {
-                                    references =
-                                        references.mapIndexed { i, value ->
-                                            if (i == index) "" else value
-                                        }
-                                    error = ""
-                                },
-                                enabled = !busy,
+                            Text(position.label, style = MaterialTheme.typography.titleSmall)
+                            Spacer(Modifier.height(8.dp))
+                            Box(
+                                Modifier.fillMaxWidth()
+                                    .aspectRatio(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(OF.elevated)
+                                    .drawBehind {
+                                        if (reference.isEmpty())
+                                            drawRoundRect(
+                                                color = OF.muted,
+                                                cornerRadius = CornerRadius(10.dp.toPx()),
+                                                style =
+                                                    Stroke(
+                                                        width = 2.dp.toPx(),
+                                                        pathEffect =
+                                                            PathEffect.dashPathEffect(
+                                                                floatArrayOf(
+                                                                    6.dp.toPx(),
+                                                                    4.dp.toPx(),
+                                                                )
+                                                            ),
+                                                    ),
+                                            )
+                                    }
+                                    .clickable(enabled = !busy) {
+                                        if (reference.isEmpty()) attach() else viewing = position
+                                    }
+                                    .semantics {
+                                        contentDescription =
+                                            if (reference.isEmpty()) "Add ${position.label} photo"
+                                            else "View ${position.label} photo"
+                                    },
+                                contentAlignment = Alignment.Center,
                             ) {
-                                Icon(Icons.Rounded.Close, "Remove ${position.label} photo")
+                                if (reference.isEmpty())
+                                    Icon(
+                                        Icons.Rounded.PersonOutline,
+                                        null,
+                                        Modifier.size(40.dp),
+                                        tint = OF.muted,
+                                    )
+                                else
+                                    PhotoImage(
+                                        vm.photoStore,
+                                        reference,
+                                        null,
+                                        Modifier.fillMaxSize(),
+                                    )
                             }
+                            if (reference.isNotEmpty())
+                                Row {
+                                    IconButton({ attach() }, enabled = !busy) {
+                                        Icon(
+                                            Icons.Rounded.PhotoLibrary,
+                                            "Replace ${position.label} photo",
+                                        )
+                                    }
+                                    IconButton(
+                                        {
+                                            references =
+                                                references.mapIndexed { i, value ->
+                                                    if (i == index) "" else value
+                                                }
+                                            error = ""
+                                        },
+                                        enabled = !busy,
+                                    ) {
+                                        Icon(Icons.Rounded.Close, "Remove ${position.label} photo")
+                                    }
+                                }
+                        }
                     }
                 }
+                if (busy)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(Modifier.size(24.dp))
+                        Text("Copying photo…")
+                    }
+                Text(
+                    "Private originals · backups include image metadata",
+                    color = OF.muted,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
-            if (busy)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator(Modifier.size(24.dp))
-                    Text("Copying photo…")
-                }
-            Text(
-                "Choose an image up to 20 MiB / 100 megapixels. The back arrow or system Back discards unsaved changes. Backups include original image metadata; keep them private.",
-                color = OF.muted,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-        BodySaveFooter(error, enabled = !busy) {
-            runCatching {
-                    val photos =
-                        PhotoPosition.entries
-                            .mapIndexedNotNull { index, position ->
-                                references[index].takeIf { it.isNotEmpty() }?.let { position to it }
-                            }
-                            .toMap()
-                    vm.saveProgressPhotos(ProgressPhotoRecord(id, LocalDate.parse(date), photos))
-                    onSaved()
-                }
-                .onFailure { error = it.message ?: "Could not save photos" }
+            BodySaveFooter(error, enabled = !busy) {
+                runCatching {
+                        val photos =
+                            PhotoPosition.entries
+                                .mapIndexedNotNull { index, position ->
+                                    references[index]
+                                        .takeIf { it.isNotEmpty() }
+                                        ?.let { position to it }
+                                }
+                                .toMap()
+                        vm.saveProgressPhotos(
+                            ProgressPhotoRecord(id, LocalDate.parse(date), photos)
+                        )
+                        onSaved()
+                    }
+                    .onFailure { error = it.message ?: "Could not save photos" }
+            }
         }
     }
+    if (choosingDate)
+        AlertDialog(
+            onDismissRequest = { choosingDate = false },
+            title = { Text("Record date") },
+            text = { BodyDateField(proposedDate) { proposedDate = it } },
+            confirmButton = {
+                TextButton(
+                    {
+                        date = proposedDate
+                        choosingDate = false
+                        error = ""
+                    },
+                    enabled = runCatching { LocalDate.parse(proposedDate) }.isSuccess,
+                ) {
+                    Text("Apply date")
+                }
+            },
+            dismissButton = { TextButton({ choosingDate = false }) { Text("Cancel") } },
+        )
     if (deleting)
         ConfirmDialog(
             "Delete progress photos?",

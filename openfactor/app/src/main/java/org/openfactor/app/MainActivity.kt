@@ -63,6 +63,9 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
     var bodyDataTab by rememberSaveable { mutableIntStateOf(0) }
     var bodyChartMetric by rememberSaveable { mutableStateOf("weight") }
     var bodyChartRange by rememberSaveable { mutableStateOf(BodyChartRange.WEEK) }
+    var bodyEntryReturn by rememberSaveable { mutableStateOf("body-data") }
+    val contentRoute =
+        if (route == "measurement-entry" || route == "photo-entry") bodyEntryReturn else route
     val exercises = vm.exercises(data)
     val snackbar = remember { SnackbarHostState() }
     val routeState = rememberSaveableStateHolder()
@@ -150,7 +153,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                 "draft-picker" -> "workout-draft"
                 "gym" -> "gyms"
                 "gyms" -> gymsReturn
-                "weight-entry", "measurement-entry", "photo-entry" -> "body-data"
+                "measurement-entry", "photo-entry" -> bodyEntryReturn
+                "weight-entry" -> "body-data"
                 "body-charts" -> "body-data"
                 "program-picker" -> "program-editor"
                 "program-editor",
@@ -176,30 +180,22 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                     .nestedScroll(rootScroll)
                     .padding(
                         top = padding.calculateTopPadding(),
-                        bottom = if (route.isBlank()) 0.dp else padding.calculateBottomPadding(),
+                        bottom = if (contentRoute.isBlank()) 0.dp else padding.calculateBottomPadding(),
                     )
                     .background(OF.background)
             ) {
-                when (route) {
-                    "body-data", "measurement-entry" -> {
+                when (contentRoute) {
+                    "body-data" -> {
                         BodyDataScreen(
                             data, bodyDataTab, { bodyDataTab = it }, { route = "" },
                             { detailId = it; route = "weight-entry" },
-                            { detailId = it; route = "measurement-entry" },
-                            { detailId = it; route = "photo-entry" }, vm.photoStore,
+                            { detailId = it; bodyEntryReturn = "body-data"; route = "measurement-entry" },
+                            { detailId = it; bodyEntryReturn = "body-data"; route = "photo-entry" }, vm.photoStore,
                             {
                                 bodyChartMetric = if (bodyDataTab == 1) BodyMeasurement.NECK.key else "weight"
                                 route = "body-charts"
                             },
                         )
-                        if (route == "measurement-entry") key(detailId) {
-                            BodyMeasurementEditor(
-                                data.bodyMeasurements.find { it.id == detailId },
-                                { route = "body-data" },
-                                { vm.saveBodyMeasurements(it); bodyDataTab = 1; route = "body-data" },
-                                { vm.deleteBodyMeasurements(detailId); bodyDataTab = 1; route = "body-data" },
-                            )
-                        }
                     }
                     "body-charts" -> BodyChartScreen(
                         data, bodyChartMetric, bodyChartRange,
@@ -212,10 +208,6 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                             { vm.saveScaleWeight(it); bodyDataTab = 0; route = "body-data" },
                             { vm.deleteScaleWeight(detailId); bodyDataTab = 0; route = "body-data" },
                         )
-                    }
-                    "photo-entry" -> key(detailId) {
-                        ProgressPhotoEditor(data.progressPhotos.find { it.id == detailId }, vm,
-                            { route = "body-data" }, { bodyDataTab = 2; route = "body-data" })
                     }
                     "programs" ->
                         ProgramLibrary(
@@ -494,7 +486,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                         }
                 }
             }
-            if (route.isBlank())
+            if (contentRoute.isBlank())
                 NuvioWorkoutNavigation(
                     tab,
                     scrollEnergy,
@@ -505,6 +497,18 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                     tab = it
                 }
         }
+    }
+    if (route == "measurement-entry") key(detailId) {
+        BodyMeasurementEditor(
+            data.bodyMeasurements.find { it.id == detailId },
+            { route = bodyEntryReturn },
+            { vm.saveBodyMeasurements(it); bodyDataTab = 1; route = "body-data" },
+            { vm.deleteBodyMeasurements(detailId); bodyDataTab = 1; route = "body-data" },
+        )
+    }
+    if (route == "photo-entry") key(detailId) {
+        ProgressPhotoEditor(data.progressPhotos.find { it.id == detailId }, vm,
+            { route = bodyEntryReturn }, { bodyDataTab = 2; route = "body-data" })
     }
     if (programExit)
         AlertDialog(
@@ -563,6 +567,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                         shortcuts = false
                         detailId = ""
                         bodyDataTab = 1
+                        bodyEntryReturn = route
                         route = "measurement-entry"
                     },
                     colors = ListItemDefaults.colors(containerColor = OF.top),
@@ -574,6 +579,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                         shortcuts = false
                         detailId = ""
                         bodyDataTab = 2
+                        bodyEntryReturn = route
                         route = "photo-entry"
                     },
                     colors = ListItemDefaults.colors(containerColor = OF.top),
