@@ -186,7 +186,13 @@ fun HealthConnectPanel(
             confirmButton = { TextButton(onClick = {
                 permissionAction = null
                 requestedAction = action.name
-                permissions.launch(action.permissions)
+                try {
+                    permissions.launch(action.permissions)
+                } catch (_: android.content.ActivityNotFoundException) {
+                    requestedAction = null
+                    availability = healthConnectAvailability(context)
+                    message = "The Health Connect permission screen is unavailable. No transfer ran."
+                }
             }) { Text("Review permissions") } },
             dismissButton = { TextButton(onClick = { permissionAction = null }) { Text("Not now") } },
         )
