@@ -18,9 +18,21 @@ class PreferenceChoicesTest {
                 mapOf(WorkoutShortcut.HISTORY to ShortcutColor.TEAL, WorkoutShortcut.WEIGHT to ShortcutColor.RED), false),
         )
         val data = AppData(preferences = preferences, active = Workout(name = "Preserve me", notes = "Entry note"),
-            scaleWeights = listOf(ScaleWeightRecord(weightKg = 81.73)), exerciseDefaults = mapOf("press" to ExerciseDefaults(notes = "Pin note")))
+            scaleWeights = listOf(ScaleWeightRecord(weightKg = 81.73)), exerciseDefaults = mapOf("press" to ExerciseDefaults(note = "Pin note")))
         assertEquals(data, DataCodec.decode(DataCodec.encode(data)))
-        assertEquals(Preferences(), DataCodec.decode("""{"schemaVersion":1}""").preferences)
+        val legacy = DataCodec.decode("""{"schemaVersion":1}""").preferences
+        assertFalse(legacy.keepAlive)
+        assertTrue(legacy.showWorkoutTimer)
+        assertTrue(legacy.showBodyweightContribution)
+        assertFalse(legacy.distanceImperial)
+        assertFalse(legacy.heightInFeet)
+        assertFalse(legacy.clock24Hour)
+        assertEquals(AppTheme.DARK, legacy.theme)
+        assertEquals(listOf(WorkoutShortcut.WEIGHT, WorkoutShortcut.PHOTOS, WorkoutShortcut.MEASUREMENTS,
+            WorkoutShortcut.HISTORY, WorkoutShortcut.EMPTY_WORKOUT, WorkoutShortcut.NEW_PROGRAM,
+            WorkoutShortcut.NEW_WORKOUT), legacy.shortcuts.order)
+        assertTrue(legacy.shortcuts.showUpNext)
+        assertTrue(legacy.shortcuts.colors.isEmpty())
         val empty = data.copy(preferences = preferences.copy(shortcuts = ShortcutPreferences(order = emptyList())))
         assertEquals(empty, DataCodec.decode(DataCodec.encode(empty)))
         for (invalid in listOf(

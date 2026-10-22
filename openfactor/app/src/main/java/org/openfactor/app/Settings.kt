@@ -43,6 +43,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val data by vm.data.collectAsState()
     var dialog by rememberSaveable { mutableStateOf("") }
     var portabilityPage by rememberSaveable { mutableStateOf("") }
     var restoreBackup by remember { mutableStateOf<PreparedPhotoBackup?>(null) }
@@ -134,7 +135,7 @@ fun SettingsScreen(
             ) {
                 vm.restartOnboarding()
             }
-            val height = vm.data.value.onboarding.heightCm.toDoubleOrNull()
+            val height = data.onboarding.heightCm.toDoubleOrNull()
             SettingsRow(Icons.Rounded.AccountCircle, "Profile",
                 p.displayName + (height?.let { " · ${p.heightLabel(it)}" } ?: "")) {
                 dialog = "profile"
