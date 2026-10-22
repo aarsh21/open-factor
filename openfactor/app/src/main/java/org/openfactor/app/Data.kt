@@ -102,6 +102,7 @@ data class Preferences(
     val dismissedTutorials: Set<String> = emptySet(),
     val theme: AppTheme = AppTheme.DARK,
     val shortcuts: ShortcutPreferences = ShortcutPreferences(),
+    val dashboard: DashboardPreferences = DashboardPreferences(),
 )
 
 data class AppData(
@@ -366,7 +367,8 @@ object DataCodec {
                     .put("dataVisibility", DataVisibilityCodec.encode(d.preferences.dataVisibility))
                     .put("dismissedTutorials", JSONArray(d.preferences.dismissedTutorials.sorted()))
                     .put("theme", d.preferences.theme.name)
-                    .put("shortcuts", d.preferences.shortcuts.json()),
+                    .put("shortcuts", d.preferences.shortcuts.json())
+                    .put("dashboard", d.preferences.dashboard.json()),
             )
             .toString(2)
 
@@ -462,6 +464,7 @@ object DataCodec {
                     p.getJSONArray("dismissedTutorials").strings().toSet() else emptySet(),
                 theme = AppTheme.valueOf(p.optString("theme", AppTheme.DARK.name)),
                 shortcuts = ShortcutPreferences.decode(p.optJSONObject("shortcuts")),
+                dashboard = DashboardPreferences.decode(p.optJSONObject("dashboard")),
             ),
             j.optString("activeProgramId").takeIf { it.isNotBlank() && it != "null" },
             j.array("gyms").objects().map { GymCodec.decode(it) },

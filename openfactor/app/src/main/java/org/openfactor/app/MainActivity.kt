@@ -71,6 +71,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
     var detailId by rememberSaveable { mutableStateOf("") }
     var previousRoute by rememberSaveable { mutableStateOf("") }
     var exerciseInfo by rememberSaveable { mutableStateOf(false) }
+    var exerciseSettingsReturnRoute by rememberSaveable { mutableStateOf("") }
     var customReturnRoute by rememberSaveable { mutableStateOf("") }
     var duplicateId by rememberSaveable { mutableStateOf("") }
     var programDayId by rememberSaveable { mutableStateOf("") }
@@ -183,6 +184,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
         route =
             when (route) {
                 "exercise" -> previousRoute
+                "exercise-settings" -> exerciseSettingsReturnRoute
                 "custom" -> customReturnRoute
                 "picker" -> "session"
                 "draft-picker" -> "workout-draft"
@@ -322,11 +324,17 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                             ?.let { gym ->
                                 GymEditorScreen(gym, data, vm, { route = "gyms" }) { detailId = it }
                             }
-                    "levels" -> LevelsScreen(data, exercises, { route = "" }, ::openExercise)
+                    "levels" -> routeState.SaveableStateProvider("levels") {
+                        LevelsScreen(data, exercises, { route = "" }) {
+                            detailId = it
+                            exerciseSettingsReturnRoute = "levels"
+                            route = "exercise-settings"
+                        }
+                    }
                     "exercise-settings" -> exercises.firstOrNull { it.id == detailId }?.let { e ->
                         ExerciseSettingsScreen(
                             e, data.exerciseDefaults[e.id] ?: ExerciseDefaults(), data.preferences.restSeconds,
-                            { route = "" }, { vm.saveExerciseDefaults(e.id, it) }, { exerciseInfo = true },
+                            { route = exerciseSettingsReturnRoute }, { vm.saveExerciseDefaults(e.id, it) }, { exerciseInfo = true },
                             { duplicateId = e.id; customReturnRoute = route; route = "custom" },
                             { vm.archiveExercise(e.id, it) },
                         )
@@ -501,7 +509,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                     exercises,
                                     data.favorites,
                                     vm::favorite,
-                                    { detailId = it; route = "exercise-settings" },
+                                    { detailId = it; exerciseSettingsReturnRoute = ""; route = "exercise-settings" },
                                     onCustom = ::openCustom,
                                     gyms = data.gyms,
                                     equipmentCatalog = vm.equipmentCatalog,

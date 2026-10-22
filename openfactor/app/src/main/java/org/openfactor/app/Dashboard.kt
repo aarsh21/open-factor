@@ -14,6 +14,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,12 +45,65 @@ fun DashboardScreen(
     onLevels: () -> Unit,
     onBodyData: () -> Unit,
 ) {
-    var customize by remember { mutableStateOf(false) }
+    var customize by rememberSaveable { mutableStateOf(false) }
+    var detail by rememberSaveable { mutableStateOf<String?>(null) }
+    var detailParent by rememberSaveable { mutableStateOf<String?>(null) }
+    var chart by rememberSaveable { mutableStateOf<String?>(null) }
+    var range by rememberSaveable { mutableStateOf(BodyChartRange.MONTH) }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val detailState = rememberSaveableStateHolder()
+    val selection = data.preferences.dashboard
+    var focus by
+        rememberSaveable(selection.focuses) { mutableStateOf(selection.focuses.firstOrNull()) }
+    fun closeDetail() {
+        detail = detailParent
+        detailParent = null
+    }
+    androidx.activity.compose.BackHandler(customize || detail != null || chart != null) {
+        customize = false
+        if (detail != null) closeDetail()
+        chart = null
+    }
+    if (customize) {
+        DashboardCustomization(data, exercises, { customize = false }) { selection ->
+            vm.settings {
+                it.copy(
+                    dashboard = selection,
+                    showWeeklyWorkouts = true,
+                    showInsights = true,
+                    showHabits = true,
+                )
+            }
+            customize = false
+        }
+        return
+    }
+    chart?.let { key ->
+        BodyChartScreen(data, key, range, { chart = it }, { range = it }, { chart = null })
+        return
+    }
+    detail?.let { key ->
+        detailState.SaveableStateProvider(key) {
+            DashboardDetail(
+                data,
+                exercises,
+                key,
+                ::closeDetail,
+                {
+                    detailParent = detail
+                    detail = it
+                },
+            )
+        }
+        return
+    }
     val metrics = data.dashboardMetrics(exercises)
     val allWorkouts = metrics.allWorkouts
-    val scopedHistory = metrics.history
-    val workouts = metrics.weekly
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 108.dp)) {
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        state = listState,
+        contentPadding = PaddingValues(bottom = 108.dp),
+    ) {
         item {
             PageHeading(
                 "Dashboard",
@@ -71,7 +126,24 @@ fun DashboardScreen(
                     )
                 }
             }
-        if (data.preferences.showWeeklyWorkouts)
+        if (data.preferences.showWeeklyWorkouts && focus == "records")
+            item {
+                Column(Modifier.fillMaxWidth().background(OF.top).padding(18.dp)) {
+                    SectionTitle("Recent Records", "History", onHistory)
+                    Text(
+                        if (metrics.history.isEmpty()) "No Records Yet"
+                        else
+                            "Record detection is not available. Your saved workouts remain in History.",
+                        color = OF.muted,
+                    )
+                    if ("weekly" in selection.focuses)
+                        TextButton({ focus = "weekly" }) {
+                            Text("Weekly Workouts")
+                            Icon(Icons.Rounded.ChevronRight, null)
+                        }
+                }
+            }
+        if (data.preferences.showWeeklyWorkouts && focus == "weekly")
             item {
                 Column(
                     Modifier.fillMaxWidth()
@@ -136,86 +208,46 @@ fun DashboardScreen(
                                 colors =
                                     ButtonDefaults.textButtonColors(
                                         containerColor =
-                                            if (allWorkouts == all) Color.White
+                                            if (allWorkouts == all)
+                                                MaterialTheme.colorScheme.primary
                                             else Color.Transparent,
                                         contentColor =
-                                            if (allWorkouts == all) Color.Black else Color.White,
+                                            if (allWorkouts == all)
+                                                MaterialTheme.colorScheme.onPrimary
+                                            else MaterialTheme.colorScheme.onSurface,
                                     ),
                             ) {
                                 Text(label)
                             }
                         }
                     }
-                }
-            }
-        if (data.preferences.showInsights)
-            item {
-                Column(Modifier.padding(horizontal = 18.dp)) {
-                    SectionTitle("Insights & Analytics", "History", onHistory)
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        InsightCard(
-                            "Workouts",
-                            "Last 7 Completed",
-                            scopedHistory.take(7).sumOf { it.completedWorkingSets() }.toString(),
-                            "sets",
-                            Modifier.weight(1f),
-                            onHistory,
-                        )
-                        InsightCard(
-                            "Volume",
-                            "This Week",
-                            workouts.sumOf { it.volumeKg() }.displayWeight(data.preferences.pounds),
-                            if (data.preferences.pounds) "lb" else "kg",
-                            Modifier.weight(1f),
-                            onHistory,
-                        )
-                    }
-                    TextButton(onLevels) {
-                        Icon(Icons.Rounded.AccessibilityNew, null)
-                        Text(" Muscle Levels")
-                    }
-                }
-            }
-        if (data.preferences.showHabits)
-            item {
-                Column(Modifier.padding(horizontal = 18.dp)) {
-                    SectionTitle("Habits")
-                    Surface(shape = OF.shape, color = OF.card, modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            Modifier.padding(18.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                    if ("records" in selection.focuses)
+                        TextButton(
+                            { focus = "records" },
+                            Modifier.align(Alignment.CenterHorizontally),
                         ) {
-                            Icon(Icons.Rounded.CalendarMonth, null, Modifier.size(26.dp))
-                            Spacer(Modifier.width(14.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text("Workouts", style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    "${metrics.completedWorkouts} completed this week",
-                                    color = OF.muted,
-                                )
-                            }
-                            IconButton(onStart) { Icon(Icons.Rounded.Add, "Start workout") }
+                            Text("Recent Records")
+                            Icon(Icons.Rounded.ChevronRight, null)
                         }
-                    }
                 }
             }
+        items(selection.sections, key = { it.name }) { section ->
+            DashboardTiles(
+                data,
+                exercises,
+                section,
+                { detail = it },
+                { chart = it },
+                onHistory,
+                onBodyData,
+                onStart,
+            )
+        }
         item {
             Column(Modifier.padding(horizontal = 18.dp)) {
-                SectionTitle("Body Data", "History", onBodyData)
-                val latest = data.scaleWeights.maxByOrNull { it.date }
-                Surface(shape = OF.shape, color = OF.card) {
-                    ListItem(
-                        headlineContent = { Text("Scale Weight") },
-                        supportingContent = {
-                            Text(latest?.let {
-                                "${it.weightKg.bodyWeightNumber(data.preferences.pounds)} ${if (data.preferences.pounds) "lb" else "kg"} · ${it.date}"
-                            } ?: "No weigh-ins yet")
-                        },
-                        leadingContent = { Icon(Icons.Rounded.MonitorWeight, null) },
-                        trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
-                        modifier = Modifier.clickable(onClick = onBodyData),
-                        colors = ListItemDefaults.colors(containerColor = OF.card),
-                    )
+                TextButton(onLevels) {
+                    Icon(Icons.Rounded.AccessibilityNew, null)
+                    Text(" Muscle Levels")
                 }
             }
         }
@@ -225,38 +257,6 @@ fun DashboardScreen(
             }
         }
     }
-    if (customize)
-        AlertDialog(
-            onDismissRequest = { customize = false },
-            title = { Text("Customize Dashboard") },
-            text = {
-                Column {
-                    listOf(
-                            "Weekly Workouts" to data.preferences.showWeeklyWorkouts,
-                            "Insights & Analytics" to data.preferences.showInsights,
-                            "Habits" to data.preferences.showHabits,
-                        )
-                        .forEachIndexed { i, (label, checked) ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(label, Modifier.weight(1f))
-                                Switch(
-                                    checked,
-                                    { value ->
-                                        vm.settings {
-                                            when (i) {
-                                                0 -> it.copy(showWeeklyWorkouts = value)
-                                                1 -> it.copy(showInsights = value)
-                                                else -> it.copy(showHabits = value)
-                                            }
-                                        }
-                                    },
-                                )
-                            }
-                        }
-                }
-            },
-            confirmButton = { TextButton({ customize = false }) { Text("Done") } },
-        )
 }
 
 @Composable
@@ -313,7 +313,7 @@ private fun WeeklyRing(
 }
 
 @Composable
-private fun InsightCard(
+internal fun InsightCard(
     title: String,
     subtitle: String,
     value: String,
@@ -322,14 +322,14 @@ private fun InsightCard(
     onClick: () -> Unit,
 ) {
     Surface(
-        modifier.height(166.dp).clickable(onClick = onClick),
+        modifier.heightIn(min = 166.dp).clickable(onClick = onClick),
         shape = OF.shape,
         color = OF.card,
     ) {
         Column(Modifier.padding(16.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(subtitle, color = OF.muted, fontSize = 12.sp)
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(32.dp))
             HorizontalDivider(color = OF.line)
             Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(value, fontSize = 24.sp, fontWeight = FontWeight.Medium)

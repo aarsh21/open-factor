@@ -158,4 +158,60 @@ class TrainingMetricsTest {
         assertEquals(2, metrics.completedWorkouts)
         assertEquals(0, AppData().dashboardMetrics(catalog, today).totals.sets)
     }
+
+    @Test
+    fun levelsWeightsSecondarySetsWithoutDoubleCountingAndKeepsBothDateBoundaries() {
+        val exercises =
+            listOf(
+                Exercise("primary", "Primary", "Chest", "Barbell", secondary = listOf("Chest")),
+                Exercise(
+                    "secondary",
+                    "Secondary",
+                    "Triceps",
+                    "Dumbbell",
+                    secondary = listOf("Chest"),
+                ),
+            )
+        fun saved(id: String, offset: Long, exercise: String, count: Int) =
+            Workout(
+                id = id,
+                name = "Training",
+                startedAt =
+                    today
+                        .plusDays(offset)
+                        .atStartOfDay(ZoneId.systemDefault())
+                        .toInstant()
+                        .toEpochMilli(),
+                exercises =
+                    listOf(
+                        SessionExercise(
+                            exerciseId = exercise,
+                            sets =
+                                List(count) { LoggedSet(completed = true) } +
+                                    listOf(
+                                        LoggedSet(completed = true, warmup = true),
+                                        LoggedSet(completed = false),
+                                    ),
+                        )
+                    ),
+            )
+        val current = saved("current", 0, "primary", 4)
+        val history =
+            listOf(
+                current,
+                current,
+                saved("first", -29, "secondary", 6),
+                saved("old", -30, "primary", 20),
+                saved("future", 1, "secondary", 30),
+            )
+        val contributions = muscleContributions(history, exercises, 30, "Chest", today)
+        assertEquals(listOf("primary", "secondary"), contributions.map { it.exercise.id })
+        assertEquals(listOf(4, 6), contributions.map { it.sets })
+        assertEquals(listOf(4.0, 3.0), contributions.map { it.weightedSets })
+        assertEquals(
+            listOf(4.0),
+            muscleContributions(history, exercises, 7, "Chest", today).map { it.weightedSets },
+        )
+        assertTrue(muscleContributions(history, exercises, 90, "Lats", today).isEmpty())
+    }
 }
