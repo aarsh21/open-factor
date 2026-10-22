@@ -36,6 +36,14 @@ fun AppData.bodyChartSeries(): List<BodyChartSeries> =
                 record.bodyFatPercent?.let { BodyChartPoint(record.id, record.date, it) }
             },
         ),
+        BodyChartSeries(
+            "visualBodyFat",
+            "Visual Body Fat",
+            "%",
+            bodyMeasurements.mapNotNull { record ->
+                record.visualBodyFatPercent?.let { BodyChartPoint(record.id, record.date, it) }
+            },
+        ),
     ) +
         BodyMeasurement.entries.map { field ->
             BodyChartSeries(

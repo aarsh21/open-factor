@@ -51,13 +51,22 @@ enum class BodyMeasurement(val key: String, val label: String, val group: String
 data class BodyMeasurementRecord(
     val id: String = newId(),
     val date: LocalDate = LocalDate.now(),
-    val centimeters: Map<BodyMeasurement, Double>,
+    val centimeters: Map<BodyMeasurement, Double> = emptyMap(),
+    val visualBodyFatPercent: Double? = null,
 ) {
     fun validate() {
         require(id.isNotBlank()) { "Missing measurement record ID" }
-        require(centimeters.isNotEmpty()) { "Enter at least one measurement" }
+        require(centimeters.isNotEmpty() || visualBodyFatPercent != null) {
+            "Enter at least one measurement"
+        }
         require(centimeters.values.all { it.isFinite() && it > 0 && it <= 1000 }) {
             "Measurements must be greater than 0 and at most 1000 cm"
+        }
+        require(
+            visualBodyFatPercent == null ||
+                visualBodyFatPercent.isFinite() && visualBodyFatPercent in 0.0..100.0
+        ) {
+            "Visual body fat must be between 0 and 100%"
         }
     }
 }
@@ -109,6 +118,7 @@ object BodyDataCodec {
                     .put("id", it.id)
                     .put("date", it.date.toString())
                     .put("centimeters", values)
+                    .put("visualBodyFatPercent", it.visualBodyFatPercent)
             }
         )
 
@@ -151,6 +161,8 @@ object BodyDataCodec {
                         value.getString("id"),
                         LocalDate.parse(value.getString("date")),
                         fields,
+                        if (value.isNull("visualBodyFatPercent")) null
+                        else value.getDouble("visualBodyFatPercent"),
                     )
                     .also { it.validate() }
             }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -14,9 +15,16 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun BodyDataScreen(
@@ -33,7 +41,7 @@ fun BodyDataScreen(
     val measurements = tab == 1
     Column(Modifier.fillMaxSize()) {
         PageHeading("Body Data", onBack)
-        TabRow(tab) {
+        ScrollableTabRow(tab, edgePadding = 0.dp) {
             listOf("Scale Weight", "Measurements", "Photos").forEachIndexed { index, title ->
                 Tab(tab == index, { onTab(index) }, text = { Text(title) })
             }
@@ -73,7 +81,7 @@ fun BodyDataScreen(
                         EmptyContent(
                             Icons.Rounded.Straighten,
                             "No measurements yet",
-                            "Log any of the full-body measurements in centimeters. Tap a saved record to edit or delete it.",
+                            "Log visual body fat or full-body measurements in centimeters. Tap a saved record to edit or delete it.",
                         )
                     }
                 items(data.bodyMeasurements.sortedByDescending { it.date }, key = { it.id }) {
@@ -83,6 +91,9 @@ fun BodyDataScreen(
                             headlineContent = { Text(record.date.toString()) },
                             supportingContent = {
                                 Column {
+                                    record.visualBodyFatPercent?.let {
+                                        Text("Visual Body Fat: ${it.bodyNumber()}%")
+                                    }
                                     BodyMeasurement.entries
                                         .filter { it in record.centimeters }
                                         .take(3)
@@ -268,6 +279,7 @@ fun ScaleWeightEditor(
         )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BodyMeasurementEditor(
     record: BodyMeasurementRecord?,
@@ -282,88 +294,176 @@ fun BodyMeasurementEditor(
             BodyMeasurement.entries.map { record?.centimeters?.get(it)?.bodyNumber(6) ?: "" }
         )
     }
+    var visualFat by rememberSaveable {
+        mutableStateOf(record?.visualBodyFatPercent?.bodyNumber(6) ?: "")
+    }
     var error by rememberSaveable { mutableStateOf("") }
     var deleting by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().imePadding()) {
-        PageHeading(
-            "Full Body",
-            onBack,
-            actions = {
+    var reference by rememberSaveable { mutableStateOf(false) }
+    var choosingDate by rememberSaveable { mutableStateOf(false) }
+    var proposedDate by rememberSaveable { mutableStateOf(date) }
+    val fatValid = visualFat.isBlank() || visualFat.bodyDecimal()?.let { it in 0.0..100.0 } == true
+    ModalBottomSheet(
+        onDismissRequest = onBack,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = OF.card,
+    ) {
+        Column(Modifier.fillMaxWidth().fillMaxHeight(.95f).imePadding()) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onBack) { Icon(Icons.Rounded.Close, "Close measurements") }
+                TextButton(
+                    {
+                        proposedDate = date
+                        choosingDate = true
+                    },
+                    Modifier.weight(1f).semantics { contentDescription = "Change measurement date" },
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                LocalDate.parse(date)
+                                    .format(DateTimeFormatter.ofPattern("dd/MM/uuuu")),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Icon(Icons.Rounded.ArrowDropDown, null)
+                        }
+                        Text(
+                            "Full Body",
+                            color = OF.muted,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
                 if (record != null)
                     IconButton({ deleting = true }) {
                         Icon(Icons.Rounded.DeleteOutline, "Delete measurements")
                     }
-            },
-        )
-        LazyColumn(
-            Modifier.weight(1f),
-            contentPadding = PaddingValues(18.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item {
-                BodyDateField(
-                    date,
-                    {
-                        date = it
-                        error = ""
-                    },
-                )
+                else Spacer(Modifier.width(48.dp))
             }
-            item {
-                Text(
-                    "All fields are optional; enter at least one measurement. Values are stored in centimeters.",
-                    color = OF.muted,
-                )
-            }
-            BodyMeasurement.entries.forEachIndexed { index, field ->
-                if (index == 0 || BodyMeasurement.entries[index - 1].group != field.group)
-                    item { SectionTitle(field.group) }
-                item(key = field.key) {
-                    val text = values[index]
-                    val valid =
-                        text.isBlank() || text.bodyDecimal()?.let { it > 0 && it <= 1000 } == true
-                    BodyNumberField(
-                        text,
-                        { next ->
-                            values =
-                                values.mapIndexed { i, value -> if (i == index) next else value }
+            HorizontalDivider(color = OF.line)
+            LazyColumn(
+                Modifier.weight(1f),
+                contentPadding = PaddingValues(18.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                item {
+                    SectionTitle("Body Fat")
+                    FullBodyNumberField(
+                        visualFat,
+                        {
+                            visualFat = it
                             error = ""
                         },
-                        field.label,
-                        "cm",
-                        !valid,
-                        "Enter more than 0 and at most 1000 cm, or leave blank.",
+                        "Visual Body Fat",
+                        "%",
+                        !fatValid,
+                        "Enter 0–100%, or leave blank.",
+                        trailing = {
+                            FilledTonalButton(
+                                { reference = true },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.heightIn(min = 56.dp),
+                            ) {
+                                Icon(Icons.Rounded.GridView, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Reference")
+                            }
+                        },
+                    )
+                }
+                BodyMeasurement.entries.forEachIndexed { index, field ->
+                    if (index == 0 || BodyMeasurement.entries[index - 1].group != field.group)
+                        item { SectionTitle(field.group) }
+                    item(key = field.key) {
+                        val text = values[index]
+                        val valid =
+                            text.isBlank() ||
+                                text.bodyDecimal()?.let { it > 0 && it <= 1000 } == true
+                        FullBodyNumberField(
+                            text,
+                            { next ->
+                                values =
+                                    values.mapIndexed { i, value ->
+                                        if (i == index) next else value
+                                    }
+                                error = ""
+                            },
+                            field.label,
+                            "cm",
+                            !valid,
+                            "Enter more than 0 and at most 1000 cm, or leave blank.",
+                        )
+                    }
+                }
+                item {
+                    Text(
+                        "Enter at least one value. Circumferences are stored in cm. Visual body fat is your manually entered percentage; no estimate is calculated.",
+                        color = OF.muted,
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }
-        }
-        BodySaveFooter(error) {
-            runCatching {
-                    val parsed =
-                        BodyMeasurement.entries
-                            .mapIndexedNotNull { index, field ->
-                                val text = values[index]
-                                if (text.isBlank()) null
-                                else {
-                                    val original = record?.centimeters?.get(field)
-                                    val number =
-                                        if (original != null && text == original.bodyNumber(6))
-                                            original
-                                        else text.bodyDecimal()
-                                    require(number != null && number > 0 && number <= 1000) {
-                                        "${field.label}: enter more than 0 and at most 1000 cm."
+            BodySaveFooter(error) {
+                runCatching {
+                        require(fatValid) { "Visual body fat must be 0–100%, or blank." }
+                        val parsed =
+                            BodyMeasurement.entries
+                                .mapIndexedNotNull { index, field ->
+                                    val text = values[index]
+                                    if (text.isBlank()) null
+                                    else {
+                                        val original = record?.centimeters?.get(field)
+                                        val number =
+                                            if (original != null && text == original.bodyNumber(6))
+                                                original
+                                            else text.bodyDecimal()
+                                        require(number != null && number > 0 && number <= 1000) {
+                                            "${field.label}: enter more than 0 and at most 1000 cm."
+                                        }
+                                        field to number
                                     }
-                                    field to number
                                 }
-                            }
-                            .toMap()
-                    val entry = BodyMeasurementRecord(id, LocalDate.parse(date), parsed)
-                    entry.validate()
-                    onSave(entry)
-                }
-                .onFailure { error = it.message ?: "Could not save measurements" }
+                                .toMap()
+                        val percent =
+                            if (visualFat.isBlank()) null
+                            else if (
+                                record?.visualBodyFatPercent != null &&
+                                    visualFat == record.visualBodyFatPercent.bodyNumber(6)
+                            )
+                                record.visualBodyFatPercent
+                            else visualFat.bodyDecimal()
+                        val entry =
+                            BodyMeasurementRecord(id, LocalDate.parse(date), parsed, percent)
+                        entry.validate()
+                        onSave(entry)
+                    }
+                    .onFailure { error = it.message ?: "Could not save measurements" }
+            }
         }
     }
+    if (reference) BodyFatReferenceSheet { reference = false }
+    if (choosingDate)
+        AlertDialog(
+            onDismissRequest = { choosingDate = false },
+            title = { Text("Record date") },
+            text = { BodyDateField(proposedDate) { proposedDate = it } },
+            confirmButton = {
+                TextButton(
+                    {
+                        date = proposedDate
+                        choosingDate = false
+                        error = ""
+                    },
+                    enabled = runCatching { LocalDate.parse(proposedDate) }.isSuccess,
+                ) {
+                    Text("Apply date")
+                }
+            },
+            dismissButton = { TextButton({ choosingDate = false }) { Text("Cancel") } },
+        )
     if (deleting)
         ConfirmDialog(
             "Delete measurements?",
@@ -377,6 +477,56 @@ fun BodyMeasurementEditor(
                 deleting = false
             },
         )
+}
+
+@Composable
+private fun FullBodyNumberField(
+    value: String,
+    onChange: (String) -> Unit,
+    label: String,
+    unit: String,
+    invalid: Boolean,
+    message: String,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    val focus = remember { FocusRequester() }
+    Column(
+        Modifier.fillMaxWidth().clickable { focus.requestFocus() },
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            TextField(
+                value,
+                onChange,
+                Modifier.weight(1f).focusRequester(focus).semantics {
+                    contentDescription = "$label ($unit)"
+                },
+                suffix = { Text(unit) },
+                singleLine = true,
+                isError = invalid,
+                shape = RoundedCornerShape(8.dp),
+                colors =
+                    TextFieldDefaults.colors(
+                        focusedContainerColor = OF.elevated,
+                        unfocusedContainerColor = OF.elevated,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                    ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            )
+            trailing?.invoke()
+        }
+        if (invalid)
+            Text(
+                message,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+    }
 }
 
 @Composable

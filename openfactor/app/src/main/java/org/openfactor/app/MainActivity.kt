@@ -176,16 +176,26 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                     .background(OF.background)
             ) {
                 when (route) {
-                    "body-data" -> BodyDataScreen(
-                        data, bodyDataTab, { bodyDataTab = it }, { route = "" },
-                        { detailId = it; route = "weight-entry" },
-                        { detailId = it; route = "measurement-entry" },
-                        { detailId = it; route = "photo-entry" }, vm.photoStore,
-                        {
-                            bodyChartMetric = if (bodyDataTab == 1) BodyMeasurement.NECK.key else "weight"
-                            route = "body-charts"
-                        },
-                    )
+                    "body-data", "measurement-entry" -> {
+                        BodyDataScreen(
+                            data, bodyDataTab, { bodyDataTab = it }, { route = "" },
+                            { detailId = it; route = "weight-entry" },
+                            { detailId = it; route = "measurement-entry" },
+                            { detailId = it; route = "photo-entry" }, vm.photoStore,
+                            {
+                                bodyChartMetric = if (bodyDataTab == 1) BodyMeasurement.NECK.key else "weight"
+                                route = "body-charts"
+                            },
+                        )
+                        if (route == "measurement-entry") key(detailId) {
+                            BodyMeasurementEditor(
+                                data.bodyMeasurements.find { it.id == detailId },
+                                { route = "body-data" },
+                                { vm.saveBodyMeasurements(it); bodyDataTab = 1; route = "body-data" },
+                                { vm.deleteBodyMeasurements(detailId); bodyDataTab = 1; route = "body-data" },
+                            )
+                        }
+                    }
                     "body-charts" -> BodyChartScreen(
                         data, bodyChartMetric, bodyChartRange,
                         { bodyChartMetric = it }, { bodyChartRange = it }, { route = "body-data" },
@@ -196,14 +206,6 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                             { route = "body-data" },
                             { vm.saveScaleWeight(it); bodyDataTab = 0; route = "body-data" },
                             { vm.deleteScaleWeight(detailId); bodyDataTab = 0; route = "body-data" },
-                        )
-                    }
-                    "measurement-entry" -> key(detailId) {
-                        BodyMeasurementEditor(
-                            data.bodyMeasurements.find { it.id == detailId },
-                            { route = "body-data" },
-                            { vm.saveBodyMeasurements(it); bodyDataTab = 1; route = "body-data" },
-                            { vm.deleteBodyMeasurements(detailId); bodyDataTab = 1; route = "body-data" },
                         )
                     }
                     "photo-entry" -> key(detailId) {

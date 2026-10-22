@@ -33,6 +33,7 @@ class BodyDataTest {
                                 BodyMeasurement.entries
                                     .mapIndexed { index, field -> field to (20.25 + index) }
                                     .toMap(),
+                            visualBodyFatPercent = 24.75,
                         )
                     ),
             )
@@ -91,6 +92,71 @@ class BodyDataTest {
     }
 
     @Test
+    fun backupKeepsVisualBodyFatSeparateFromScaleBodyFat() {
+        val data =
+            AppData(
+                scaleWeights =
+                    listOf(ScaleWeightRecord(date = date, weightKg = 71.25, bodyFatPercent = 18.7)),
+                bodyMeasurements =
+                    listOf(
+                        BodyMeasurementRecord(
+                            date = date,
+                            centimeters = mapOf(BodyMeasurement.WAIST to 84.5),
+                        )
+                    ),
+            )
+        val backup = JSONObject(DataCodec.encode(data))
+        backup.getJSONArray("bodyMeasurements").getJSONObject(0).put("visualBodyFatPercent", 24.75)
+        val restored = JSONObject(DataCodec.encode(DataCodec.decode(backup.toString())))
+        assertEquals(
+            24.75,
+            restored
+                .getJSONArray("bodyMeasurements")
+                .getJSONObject(0)
+                .getDouble("visualBodyFatPercent"),
+            0.0,
+        )
+        assertEquals(
+            18.7,
+            restored.getJSONArray("scaleWeights").getJSONObject(0).getDouble("bodyFatPercent"),
+            0.0,
+        )
+    }
+
+    @Test
+    fun visualBodyFatCanBeTheOnlyFullBodyValueAndClearingItDoesNotEraseCircumferences() {
+        val base =
+            AppData(
+                scaleWeights =
+                    listOf(ScaleWeightRecord(date = date, weightKg = 81.2, bodyFatPercent = 17.3))
+            )
+        for (percent in listOf(0.0, 24.75, 100.0)) {
+            val record =
+                BodyMeasurementRecord(id = "visual", date = date, visualBodyFatPercent = percent)
+            val saved = base.withBodyMeasurements(record)
+            assertEquals(saved, DataCodec.decode(DataCodec.encode(saved)))
+            assertEquals(
+                percent,
+                saved.bodyChartSeries().first { it.key == "visualBodyFat" }.points.single().value,
+                0.0,
+            )
+            assertEquals(
+                listOf(17.3),
+                saved.bodyChartSeries().first { it.key == "bodyFat" }.points.map { it.value },
+            )
+            val measured = record.copy(centimeters = mapOf(BodyMeasurement.WAIST to 85.25))
+            val cleared = measured.copy(visualBodyFatPercent = null)
+            assertEquals(
+                listOf(cleared),
+                saved.withBodyMeasurements(measured).withBodyMeasurements(cleared).bodyMeasurements,
+            )
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            base.withBodyMeasurements(BodyMeasurementRecord())
+        }
+    }
+
+    @Test
     fun invalidBodyDataRejectsTheWholeBackupRatherThanSilentlyDroppingRecords() {
         val good =
             AppData()
@@ -114,6 +180,13 @@ class BodyDataTest {
             it.getJSONArray("scaleWeights").put(it.getJSONArray("scaleWeights").getJSONObject(0))
         }
         rejected { it.put("bodyMeasurements", "not an array") }
+        listOf(-0.01, 100.01, "NaN").forEach { percent ->
+            rejected {
+                it.getJSONArray("bodyMeasurements")
+                    .getJSONObject(0)
+                    .put("visualBodyFatPercent", percent)
+            }
+        }
         rejected {
             it.getJSONArray("bodyMeasurements").getJSONObject(0).put("centimeters", JSONObject())
         }

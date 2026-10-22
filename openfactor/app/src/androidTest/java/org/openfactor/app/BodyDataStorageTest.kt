@@ -25,7 +25,17 @@ class BodyDataStorageTest {
                             SessionExercise(
                                 exerciseId = "test",
                                 sets =
-                                    listOf(LoggedSet(weightKg = 42.5, reps = 9, completed = true)),
+                                    listOf(
+                                        LoggedSet(
+                                            weightKg = 42.5,
+                                            reps = 9,
+                                            completed = true,
+                                            assistanceKg = 12.25,
+                                            durationSeconds = 85.5,
+                                            distanceMeters = 321.75,
+                                        ),
+                                        LoggedSet(warmup = true),
+                                    ),
                             )
                         ),
                 )
@@ -37,6 +47,11 @@ class BodyDataStorageTest {
                     programs = listOf(program),
                     activeProgramId = program.id,
                     programDraft = program.copy(id = "draft"),
+                    workoutDraft =
+                        WorkoutDraft(
+                            name = "Synthetic preserved composition",
+                            exercises = workout.exercises,
+                        ),
                     gyms = listOf(GymProfile(name = "Synthetic preserved gym")),
                 )
             store.save(training)
@@ -56,6 +71,7 @@ class BodyDataStorageTest {
                             BodyMeasurement.RIGHT_BICEP to 36.25,
                             BodyMeasurement.WAIST to 87.5,
                         ),
+                    visualBodyFatPercent = 26.125,
                 )
             vm.saveScaleWeight(weight)
             vm.saveBodyMeasurements(measures)
@@ -70,13 +86,19 @@ class BodyDataStorageTest {
             reopened.restore(backup)
             assertEquals(saved, reopened.data.value)
             assertEquals(saved, WorkoutStore(context).load())
-            val invalid =
-                JSONObject(backup)
-                    .apply { getJSONArray("scaleWeights").getJSONObject(0).put("weightKg", -1) }
-                    .toString()
-            assertThrows(IllegalArgumentException::class.java) { reopened.restore(invalid) }
-            assertEquals(saved, reopened.data.value)
-            assertEquals(saved, WorkoutStore(context).load())
+            for ((table, field) in
+                listOf(
+                    "scaleWeights" to "weightKg",
+                    "bodyMeasurements" to "visualBodyFatPercent",
+                )) {
+                val invalid =
+                    JSONObject(backup)
+                        .apply { getJSONArray(table).getJSONObject(0).put(field, -1) }
+                        .toString()
+                assertThrows(IllegalArgumentException::class.java) { reopened.restore(invalid) }
+                assertEquals(saved, reopened.data.value)
+                assertEquals(saved, WorkoutStore(context).load())
+            }
         } finally {
             store.save(before)
         }

@@ -2,8 +2,9 @@
 
 Body Data → Scale Weight or Measurements → View Charts opens charts of saved
 readings. The metric selector includes scale weight, manually entered scale body
-fat, and all 18 circumference fields. Weight follows the kg/lb setting;
-circumferences remain in cm. Changing the chart does not change saved data.
+fat, separate manual Visual Body Fat, and all 18 circumference fields. Weight
+follows the kg/lb setting. Circumferences remain in cm. Changing the chart does
+not change saved data.
 
 Each dot represents a saved record. Same-date records remain separate. Missing
 fields are omitted, not converted to zero. A recorded 0% body-fat value remains
@@ -47,8 +48,8 @@ by the existing complete JSON backup; there is no new persisted chart model.
 
 Weight Trend smoothing, source aggregation, average/difference policy, daily
 selector behavior, chart gestures, and tutorial sequencing remain unrecovered.
-The separate observed Full Body Visual Body Fat input/reference, its illustrated
-reference, and source bottom-sheet form geometry are not implemented here.
+The [Full Body record policy](BODY-MEASUREMENTS.md) distinguishes the observed
+input and reference sheet from local storage and manual-fat chart behavior.
 The existing progress-photo workflow is unchanged. Private source frames and
 account data are not bundled or committed.
 

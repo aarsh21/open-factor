@@ -19,6 +19,9 @@ android {
     kotlinOptions { jvmTarget = "17" }
     buildTypes { release { isMinifyEnabled = false } }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    providers.gradleProperty("openfactorBodyReferenceDir").orNull?.let {
+        sourceSets.getByName("main").assets.srcDir(it)
+    }
 }
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.04.01"))
