@@ -621,11 +621,12 @@ fun ExerciseDetail(
                         Text("Alternative Names", color = OF.muted)
                         Text(e.aliases.joinToString(", "), Modifier.padding(bottom = 12.dp))
                     }
+                    val type = e.classifiedType
                     e.properties
-                        .filterKeys { it !in listOf("Range of Motion", "Stability") }
+                        .filterKeys { it !in listOf("Range of Motion", "Stability") && (it != "Region" || type == null) }
                         .forEach { (label, value) ->
                             Text(label, color = OF.muted)
-                            Text(value, Modifier.padding(bottom = 12.dp))
+                            Text(if (label == "Type") type?.label ?: value else value, Modifier.padding(bottom = 12.dp))
                         }
                     Text("Body Weight Contribution", color = OF.muted)
                     Text("${(e.bodyweight*100).toInt()}%")

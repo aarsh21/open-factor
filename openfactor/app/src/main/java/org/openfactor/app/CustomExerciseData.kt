@@ -84,6 +84,11 @@ data class CustomExerciseDraft(
     }
 }
 
+val Exercise.classifiedType: CustomExerciseType?
+    get() = CustomExerciseType.entries.find {
+        it.catalogType == properties["Type"] && (it == CustomExerciseType.CORE || it.region == properties["Region"])
+    }
+
 fun Exercise.duplicateDraft(
     resistance: List<Set<String>> = resistanceEquipment,
     support: List<Set<String>> = supportEquipment,
@@ -92,9 +97,7 @@ fun Exercise.duplicateDraft(
     val metrics = loggingMetrics()
     return CustomExerciseDraft(
         name = "$title (Copy)", metric1 = metrics.getOrNull(0), metric2 = metrics.getOrNull(1),
-        type = CustomExerciseType.entries.find {
-            it.catalogType == properties["Type"] && (it == CustomExerciseType.CORE || it.region == properties["Region"])
-        },
+        type = classifiedType,
         laterality = properties["Laterality"] ?: "Bilateral",
         primary = muscles, secondary = secondary,
         resistance = resistance, support = support,

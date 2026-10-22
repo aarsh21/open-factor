@@ -1,0 +1,17 @@
+# Combined exercise type in Info, 22 October 2026
+
+Info now displays the existing six-part classification, such as **Compound Lower**, instead of exposing raw `Multi-joint (compound)` and a separate Region. This changes presentation only; source facts, custom records, filters, defaults and training/body/photo data remain unchanged.
+
+## Evidence and boundary
+
+Retained `S/source-exercise-metadata.xml` shows **45° Leg Press → Details → Type → Compound Lower**; `S` is defined in [the baseline audit](whole-app-parity-2026-10-22.md). Its factual record is `1a25c6f170d88079a926dde776766181`, with raw Type `Multi-joint (compound)` and Region `Lower body`. The existing rich wizard's six labels supply the same classification vocabulary. [The Region projection](catalog-region-01.md) recovered the missing input without guessing from muscle names.
+
+The shared classification lookup in [CustomExerciseData.kt](../../../openfactor/app/src/main/java/org/openfactor/app/CustomExerciseData.kt) was extracted from existing duplicate-prefill logic and verified unchanged before applying it to [Info Details](../../../openfactor/app/src/main/java/org/openfactor/app/Exercises.kt). Recognized classifications show their combined label without a redundant Region row. Seventeen unresolved records retain both raw fields: nine lack Region, and eight have joint-type/Core-region combinations outside the six wizard choices. They are not assigned an invented upper/lower category. Duplicate creation still requires an explicit choice for those cases; complete catalog-copy classification remains unaccepted.
+
+The 45° Leg Press UI check failed before the presentation fix because `Compound Lower` was absent (`.amp/in/artifacts/parity-implementation-09/before.log`). Public/private assembly and lint, 51 JVM tests and six public native tests passed. Classification-only refactor verification is `classification-refactor.log` in that artifact directory.
+
+The uninterrupted five-case public UI check passed (`ui/result.json`, `after.log`), covering Compound Lower/Upper/Full Body, Isolation Lower and a missing-Region fallback, with unchanged saved state. All five renders were inspected. The saved-copy recheck executed the added existing-smoke assertions and passed at default and 1.3× text (`custom-detail/result.json`, `22-combined-type.png`, `23-combined-type-large-font.png`). Type values are readable; the source target-muscle row is intentionally horizontally scrollable and content may crop at vertical scroll boundaries. The shared heading's two-line default clips the saved Copy suffix, especially at large text; that separate header defect is next, not counted as accepted layout here.
+
+An early multi-case harness issued Back twice during sheet dismissal and remained on settings; this was corrected by waiting for Close Info and the settings Back destination rather than assuming two immediate Back events complete two transitions. That partial run is retained in `after-query-assumption/` and is not a complete UI pass. This unit ran focused UI acceptance, not a new full custom-wizard or parent media regression.
+
+This accepts the narrow observed type presentation, not complete exercise lifecycle/filter parity. Modified/Archived membership and actions, equipment/left-right rest policies, source duplicate/Create outcomes and the wider parity backlog remain unaccepted. No parent media/smoke/ledger or body files were changed. Work is local and unpushed.
