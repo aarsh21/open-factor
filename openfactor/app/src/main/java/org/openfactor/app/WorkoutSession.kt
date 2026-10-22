@@ -272,6 +272,17 @@ fun WorkoutSession(
                             TextButton({ warmup = true }) { Text("Warm Up") }
                             TextButton({ targets = true }) { Text("Targets") }
                         }
+                        val pinnedNote = data.exerciseDefaults[e.id]?.note.orEmpty()
+                        if (pinnedNote.isNotBlank()) Row(
+                            Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Icon(Icons.Rounded.PushPin, null, Modifier.size(20.dp), tint = OF.muted)
+                            Column(Modifier.weight(1f)) {
+                                Text("Pinned exercise note", style = MaterialTheme.typography.bodySmall, color = OF.muted)
+                                Text(pinnedNote, style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
                         if (se.notes.isNotBlank()) Text(
                             se.notes,
                             Modifier.fillMaxWidth().clickable(onClickLabel = "Edit exercise notes") { exerciseNotes = true }

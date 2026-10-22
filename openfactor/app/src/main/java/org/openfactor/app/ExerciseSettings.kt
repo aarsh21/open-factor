@@ -84,7 +84,7 @@ fun ExerciseSettingsScreen(
                 )
             }
             Text(
-                "Changes apply when you add this exercise to a new workout or draft. Program rest targets take priority. Existing entries keep their notes and timers.",
+                "Rest timer changes apply to new entries. Program rest targets take priority. Existing entries keep their workout notes and timers. Exercise notes stay pinned to the exercise, separate from workout history.",
                 Modifier.padding(vertical = 16.dp), color = OF.muted,
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -101,7 +101,7 @@ fun ExerciseSettingsScreen(
             title = { Text(if (rest) "Rest Timer" else "Exercise Note") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(if (rest) "Override the workout rest timer for new entries." else "This note is copied into new workout entries for this exercise.")
+                    Text(if (rest) "Override the workout rest timer for new entries." else "This note stays pinned to the exercise and is not copied into workout history.")
                     OutlinedTextField(
                         text, { text = it }, Modifier.fillMaxWidth(),
                         label = { Text(if (rest) "Rest seconds" else "Note") },

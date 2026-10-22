@@ -104,7 +104,7 @@ class ProgramDataTest {
         assertNull(set.rir)
         assertFalse(set.completed)
         assertEquals(45, e.restSeconds)
-        assertEquals("Default note", e.notes)
+        assertEquals("", e.notes)
         val entered = w.copy(exercises = listOf(e.copy(sets = listOf(set.copy(weightKg = 37.5, reps = 9)))))
         val complete = entered.toggleSetCompletion(e.id, set.id, Preferences(restSeconds = 120), 2000)
         assertEquals(47000L, complete.restUntil)

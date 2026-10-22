@@ -16,7 +16,7 @@ fun newSessionExercise(
     sets: List<LoggedSet> = listOf(LoggedSet()),
     restSeconds: Int? = null,
 ): SessionExercise = SessionExercise(
-    exerciseId = exerciseId, sets = sets, notes = defaults?.note.orEmpty(),
+    exerciseId = exerciseId, sets = sets,
     restSeconds = restSeconds ?: defaults?.restSeconds,
 )
 

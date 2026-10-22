@@ -57,8 +57,8 @@ def tap(label, attr='text', first=False):
     adb('shell', 'input', 'tap', str((left + right) // 2), str((top + bottom) // 2))
 
 
-def field(label, value):
-    tap(label)
+def field(label, value, attr='text'):
+    tap(label, attr)
     focused = [n for n in nodes() if n.get('class') == 'android.widget.EditText' and n.get('focused') == 'true']
     assert len(focused) == 1, label
     old = focused[0].get('text', '')
@@ -288,39 +288,104 @@ tap('Needle 000', first=True)
 assert matching('Instructions') and matching('Add Exercise')
 tap('Add Exercise')
 entry = state()['workoutDraft']['exercises'][0]
-assert entry['notes'] == 'Brace then pause' and entry['restSeconds'] == 75
+assert entry['notes'] == '' and entry['restSeconds'] == 75
 assert entry['sets'][0]['reps'] is None
 tap('Start Workout')
 assert state()['active']['exercises'][0] == entry
-assert matching('Brace then pause'), 'The copied exercise note is hidden from the logger'
+assert matching('Pinned exercise note') and matching('Brace then pause')
 assert state()['history'] == before['history']
 assert state()['scaleWeights'] == before['scaleWeights'] and state()['progressPhotos'] == before['progressPhotos']
 capture('17-defaults-in-logger')
 
-# Clearing each override restores defaults without rewriting the now-active entry.
+# A workout-entry note is independent of the pin and survives process recreation.
+tap('Exercise options for Needle 000', 'content-desc')
+tap('Exercise notes')
+field('Exercise notes', 'Workout entry observation')
+tap('Save')
+assert state()['active']['exercises'][0]['notes'] == 'Workout entry observation'
+assert state()['exerciseDefaults']['synthetic-000']['note'] == 'Brace then pause'
+assert matching('Brace then pause') and matching('Workout entry observation')
+capture('19-pin-and-workout-note')
+adb('shell', 'settings', 'put', 'system', 'font_scale', '1.3')
+time.sleep(2)
+capture('20-pin-and-workout-note-large-text')
+adb('shell', 'settings', 'put', 'system', 'font_scale', '1.0')
 active = state()['active']
+adb('shell', 'input', 'keyevent', '3')
+time.sleep(1)
+old_pid = adb('shell', 'pidof', 'org.openfactor.app').strip()
+adb('shell', 'am', 'kill', 'org.openfactor.app')
+time.sleep(1)
+assert not adb('shell', 'pidof org.openfactor.app || true').strip()
+adb('shell', 'am', 'start', '-n', 'org.openfactor.app/.MainActivity')
+assert matching('Brace then pause') and matching('Workout entry observation')
+assert adb('shell', 'pidof', 'org.openfactor.app').strip() != old_pid
+assert state()['active'] == active
+
+# Editing a pin updates its separate live display, never the workout entry.
 adb('shell', 'input', 'keyevent', '4')
 select_scope('Performed', 'All')
 field('Needle', 'Needle 000')
+tap('Needle 000', first=True)
+tap('Exercise Note')
+assert matching('This note stays pinned to the exercise and is not copied into workout history.')
+field('Brace then pause', 'Updated pinned reminder')
+capture('21-pin-editor-contract')
+tap('Save')
+assert state()['active'] == active and state()['history'] == before['history']
+tap('Back', 'content-desc')
+tap('Dashboard')
+tap('Resume Empty')
+assert matching('Updated pinned reminder') and matching('Workout entry observation')
+assert not matching('Brace then pause')
+capture('22-updated-pin-existing-workout')
+
+# Clearing overrides removes the pin but preserves the entry note and rest timer.
+active = state()['active']
+adb('shell', 'input', 'keyevent', '4')
+tap('Exercises')
 tap('Needle 000', first=True)
 tap('Rest Timer')
 field('75', '')
 tap('Save')
 assert matching('Default · 120s')
 tap('Exercise Note')
-field('Brace then pause', '')
+field('Updated pinned reminder', '')
 tap('Save')
 tap('Do Not Recommend')
 assert 'synthetic-000' not in state()['exerciseDefaults']
 assert state()['active'] == active and state()['history'] == before['history']
 capture('18-cleared-defaults-existing-entry-unchanged')
+tap('Back', 'content-desc')
+tap('Dashboard')
+tap('Resume Empty')
+assert not matching('Pinned exercise note') and not matching('Updated pinned reminder')
+assert matching('Workout entry observation')
+capture('23-cleared-pin-retains-workout-note')
+field('Needle 000 set 1 reps (Reps)', '9', 'content-desc')
+tap('Complete set 1 for Needle 000', 'content-desc')
+tap('Workout options', 'content-desc')
+tap('Finish Workout')
+tap('Finish')
+assert matching('Workout entry observation')
+assert not matching('Brace then pause') and not matching('Updated pinned reminder')
+finished = state()['history'][0]
+assert finished['exercises'][0]['notes'] == 'Workout entry observation'
+assert state()['history'][1:] == before['history']
+assert state()['scaleWeights'] == before['scaleWeights'] and state()['progressPhotos'] == before['progressPhotos']
+capture('24-history-has-only-workout-note')
+adb('shell', 'am', 'force-stop', 'org.openfactor.app')
+adb('shell', 'am', 'start', '-n', 'org.openfactor.app/.MainActivity')
+assert state()['history'][0] == finished
 (args.output / 'apk-sha256.txt').write_text(adb('shell', 'sha256sum', adb('shell', 'pm', 'path', 'org.openfactor.app').strip().removeprefix('package:')))
 (args.output / 'result.json').write_text(json.dumps(dict(status='passed', serial=args.serial,
     query_resets_scroll=True, detail_return_preserves_scroll=True, resistance_entity_alternatives=True,
     sheet_search_cancel=True, combined_filter_empty_and_clear=True, recreation=True,
     read_only_filters_do_not_mutate_data=True, defaults_save_cancel_validation=True,
     unsaved_note_recreation=True, performed_and_deprioritized_scopes=True,
-    info_sheet_and_contextual_add=True, defaults_in_new_entry_and_logger=True,
+    info_sheet_and_contextual_add=True, rest_default_in_new_entry=True,
+    pinned_note_separate_from_workout_notes=True, live_pin_update_and_removal=True,
+    only_workout_notes_enter_history=True,
     clear_defaults_preserves_existing_entry=True,
     body_history_unchanged=True, offline=True), indent=2) + '\n')
 print((args.output / 'result.json').read_text())

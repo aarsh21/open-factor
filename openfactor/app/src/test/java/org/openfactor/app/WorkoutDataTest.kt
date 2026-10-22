@@ -18,7 +18,7 @@ class WorkoutDataTest {
         )
         assertEquals(data, DataCodec.decode(DataCodec.encode(data)))
         val fresh = newSessionExercise("chin", defaults)
-        assertEquals("Global note", fresh.notes)
+        assertEquals("", fresh.notes)
         assertEquals(75, fresh.restSeconds)
         assertNull(fresh.sets.single().reps)
         assertNull(fresh.sets.single().weightKg)

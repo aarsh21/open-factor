@@ -48,7 +48,7 @@ class TrainingFlowTest {
     }
 
     @Test
-    fun exerciseDefaultsAffectOnlyNewEntriesAndSurviveStorageAndBackup() {
+    fun exercisePinsStaySeparateFromWorkoutNotesAndDefaultsSurviveStorageAndBackup() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val vm = WorkoutViewModel(context.applicationContext as android.app.Application)
         val backup = vm.export()
@@ -61,7 +61,7 @@ class TrainingFlowTest {
             vm.prepareWorkout()
             vm.addDraftExercise(id)
             val draftEntry = vm.data.value.workoutDraft!!.exercises.single()
-            assertEquals("First default", draftEntry.notes)
+            assertEquals("", draftEntry.notes)
             assertEquals(75, draftEntry.restSeconds)
             vm.saveExerciseDefaults(id, ExerciseDefaults("Next default", 90, false))
             assertEquals(draftEntry, vm.data.value.workoutDraft!!.exercises.single())
@@ -69,13 +69,22 @@ class TrainingFlowTest {
             assertEquals(draftEntry, vm.data.value.active!!.exercises.single())
             vm.addExercise(id)
             assertEquals(draftEntry, vm.data.value.active!!.exercises.first())
-            assertEquals("Next default", vm.data.value.active!!.exercises.last().notes)
+            assertEquals("", vm.data.value.active!!.exercises.last().notes)
             assertEquals(90, vm.data.value.active!!.exercises.last().restSeconds)
+            val logged = vm.data.value.active!!.exercises.last()
+            vm.exerciseNotes(logged.id, "Workout entry only")
+            assertEquals("Next default", vm.data.value.exerciseDefaults[id]!!.note)
+            vm.editSet(logged.id, logged.sets.single().id) { it.copy(weightKg = 37.5, reps = 9, completed = true) }
             assertEquals(vm.data.value, WorkoutViewModel(context.applicationContext as android.app.Application).data.value)
             assertEquals(vm.data.value, DataCodec.decode(vm.export()))
-            vm.discard()
+            vm.finish()
+            val finished = vm.data.value.history.first()
+            assertEquals(listOf("", "Workout entry only"), finished.exercises.map { it.notes })
+            assertEquals(before.history, vm.data.value.history.drop(1))
+            vm.saveExerciseDefaults(id, ExerciseDefaults("Changed pinned note", 90, false))
+            assertEquals(finished, vm.data.value.history.first())
             vm.start("Fresh", listOf(id))
-            assertEquals("Next default", vm.data.value.active!!.exercises.single().notes)
+            assertEquals("", vm.data.value.active!!.exercises.single().notes)
             assertEquals(90, vm.data.value.active!!.exercises.single().restSeconds)
             vm.discard()
             val day = ProgramDay(exercises = listOf(PlannedExercise(exerciseId = id)))
@@ -83,10 +92,10 @@ class TrainingFlowTest {
             vm.beginProgram(program)
             vm.saveProgram(false)
             assertTrue(vm.startProgramDay(program.id, day.id, 0))
-            assertEquals("Next default", vm.data.value.active!!.exercises.single().notes)
+            assertEquals("", vm.data.value.active!!.exercises.single().notes)
             assertEquals(90, vm.data.value.active!!.exercises.single().restSeconds)
             assertNull(vm.data.value.active!!.exercises.single().sets.first().weightKg)
-            assertEquals(before.history, vm.data.value.history)
+            assertEquals(listOf(finished) + before.history, vm.data.value.history)
             assertEquals(before.scaleWeights, vm.data.value.scaleWeights)
             assertEquals(before.bodyMeasurements, vm.data.value.bodyMeasurements)
             assertEquals(before.progressPhotos, vm.data.value.progressPhotos)
