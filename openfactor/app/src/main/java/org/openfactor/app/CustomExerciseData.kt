@@ -86,7 +86,51 @@ data class CustomExerciseDraft(
 
 val Exercise.classifiedType: CustomExerciseType?
     get() = CustomExerciseType.entries.find {
-        it.catalogType == properties["Type"] && (it == CustomExerciseType.CORE || it.region == properties["Region"])
+        it.catalogType == properties["Type"] && (it == CustomExerciseType.CORE || it.region == effectiveRegion)
+    }
+
+/** Null means unavailable facts; an empty list is an explicitly empty source pattern list. */
+val Exercise.movementPatterns: List<String>?
+    get() = properties["Movement Patterns"]?.split(", ")?.filter { it.isNotBlank() && it != "None" }
+
+/** Source Exercise effective-region predicate, before the five-category Info projection. */
+val Exercise.effectiveRegion: String?
+    get() {
+        val region = properties["Region"]
+        if (region != "Core") return region
+        val patterns = movementPatterns ?: return null
+        if (patterns.any { it == "Ab Accessory" || it == "Oblique Acessory" }) return "Core"
+        return patterns.map { pattern ->
+            when (pattern) {
+                "Chest Accessory", "Lateral Delt Accessory", "Front Delt Accessory", "Rear Delt Accessory",
+                "Biceps Accessory", "Triceps Accessory", "Upper Trap Accessory", "Upper Back Accessory",
+                "Lat Accessory", "Forearm Accessory", "Anterior Forearm Accessory", "Posterior Forearm Accessory",
+                "Neck Accessory", "Neck Flexor Accessory", "Neck Extensor Accessory", "Serratus Accessory" -> "Upper body"
+                "Quad Accessory", "Lunge/Split Squat/Step Up/Single Leg Squat", "Hamstring Accessory",
+                "Hip Abductor Accessory", "Hip Adductor Accessory", "Glute Max Accessory", "Calf Accessory",
+                "Lower Back Accessory", "Tibialis Anterior Accessory" -> "Lower body"
+                else -> null
+            }
+        }.distinct().singleOrNull() ?: "Core"
+    }
+
+/** Info uses five native categories; the custom wizard's six choices remain separate. */
+val Exercise.infoTypeLabel: String?
+    get() = when (properties["Type"]) {
+        "Core" -> "Core"
+        "Multi-joint (compound)" -> when (effectiveRegion) {
+            "Upper body" -> "Compound Upper"
+            "Lower body", "Full body" -> "Compound Lower"
+            "Core" -> "Core"
+            else -> null
+        }
+        "Single joint (isolation)" -> when (effectiveRegion) {
+            "Upper body" -> "Upper Isolation"
+            "Lower body", "Full body" -> "Lower Isolation"
+            "Core" -> "Core"
+            else -> null
+        }
+        else -> null
     }
 
 fun Exercise.duplicateDraft(

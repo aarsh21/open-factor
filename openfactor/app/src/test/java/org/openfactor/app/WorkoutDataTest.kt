@@ -37,6 +37,11 @@ class WorkoutDataTest {
         assertEquals(75, fresh.restSeconds)
         assertNull(fresh.sets.single().reps)
         assertNull(fresh.sets.single().weightKg)
+        assertTrue(defaults.hasOverrides)
+        assertTrue(ExerciseDefaults(restSeconds = 0).hasOverrides)
+        val reset = defaults.withoutOverrides()
+        assertEquals(ExerciseDefaults("Global note", doNotRecommend = true), reset)
+        assertFalse(reset.hasOverrides)
         assertTrue(DataCodec.decode("""{"schemaVersion":1}""").exerciseDefaults.isEmpty())
         for (invalid in listOf("-1", "1801", "1.5", "\"30\"")) assertThrows(IllegalArgumentException::class.java) {
             DataCodec.decode("""{"schemaVersion":1,"exerciseDefaults":{"chin":{"restSeconds":$invalid}}}""")
@@ -70,6 +75,7 @@ class WorkoutDataTest {
         assertTrue(equipmentRequirementsMet(custom.resistanceEquipment, custom.supportEquipment, setOf("bar", "plates", "bench", "rack")))
         val legacy = DataCodec.decode("""{"schemaVersion":1,"customExercises":[{"id":"old","name":"Old","muscle":"Other","equipment":"Bodyweight"}]}""")
         assertTrue(legacy.customExercises.single().custom)
+        assertFalse(legacy.customExercises.single().archived)
         assertEquals(listOf(SetMetric.WEIGHT, SetMetric.REPS), legacy.customExercises.single().loggingMetrics())
         val catalogExercise = DataCodec.catalog("""[{"id":"air-bike","name":"Air Biking","muscle":"Other","muscles":[]}]""").single()
         assertEquals(listOf("Other"), catalogExercise.muscles)
@@ -86,7 +92,7 @@ class WorkoutDataTest {
             resistance = listOf(setOf("machine"), setOf("bar", "plates")), support = listOf(setOf("bench", "rack")),
             bodyPercent = "7.6", rom = 2, stability = 4,
             primaryJoint = "Knee Flexion", alternateNames = "Supported Hold", instructions = "Keep still",
-        ).toExercise(emptyList(), "original").copy(aliases = aliases, frames = listOf("original.png"), clips = listOf("original.mp4"))
+        ).toExercise(emptyList(), "original").copy(aliases = aliases, frames = listOf("original.png"), clips = listOf("original.mp4"), archived = true)
         val draft = original.duplicateDraft()
         assertEquals("7.6", draft.bodyPercent)
         assertEquals(CustomExerciseType.ISOLATION_LOWER, draft.type)
@@ -96,6 +102,9 @@ class WorkoutDataTest {
         assertEquals(.076, original.bodyweight, 0.0)
         assertEquals(aliases, original.aliases)
         assertNotEquals(original.id, duplicate.id)
+        assertTrue(original.archived)
+        assertFalse(duplicate.archived)
+        assertEquals(original, DataCodec.decode(DataCodec.encode(AppData(customExercises = listOf(original)))).customExercises.single())
         assertEquals("Edited Hold", duplicate.name)
         assertEquals(.81, duplicate.bodyweight, 0.0)
         assertEquals(listOf(setOf("machine"), setOf("bar", "plates")), duplicate.resistanceEquipment)
@@ -112,6 +121,34 @@ class WorkoutDataTest {
         assertEquals(aliases + "Additional hold", extended.aliases)
         assertNotEquals(duplicate.id, extended.id)
         assertEquals(listOf(duplicate, extended), DataCodec.decode(DataCodec.encode(AppData(customExercises = listOf(duplicate, extended)))).customExercises)
+    }
+
+    @Test
+    fun infoClassificationUsesRawPatternsWithoutInferringFromNameOrMuscles() {
+        val source = Exercise("classification", "Chest press", "Chest", "Other",
+            properties = mapOf("Type" to "Multi-joint (compound)", "Region" to "Core", "Movement Patterns" to "Lower Back Accessory"))
+        assertEquals("Lower body", source.effectiveRegion)
+        assertEquals("Compound Lower", source.infoTypeLabel)
+        assertEquals(CustomExerciseType.COMPOUND_LOWER, source.duplicateDraft().type)
+        fun patterns(value: String) = source.copy(properties = source.properties + ("Movement Patterns" to value))
+        assertEquals("Compound Upper", patterns("Triceps Accessory, Chest Accessory").infoTypeLabel)
+        assertEquals("Core", patterns("Lower Back Accessory, Horizontal Pull").infoTypeLabel)
+        assertEquals("Core", patterns("Lower Back Accessory, Chest Accessory").infoTypeLabel)
+        assertEquals("Core", patterns("Lower Back Accessory, Ab Accessory").infoTypeLabel)
+        assertEquals("Core", patterns("Lower Back Accessory, Oblique Acessory").infoTypeLabel)
+        assertEquals("Core", patterns("None").infoTypeLabel)
+        assertEquals(emptyList<String>(), patterns("None").movementPatterns)
+        assertEquals(listOf("Horizontal Pull", "Vertical Pull"), patterns("Horizontal Pull, Vertical Pull").movementPatterns)
+        val absent = source.copy(properties = source.properties - "Movement Patterns")
+        assertNull(absent.movementPatterns)
+        assertNull(absent.infoTypeLabel)
+        assertNull(absent.duplicateDraft().type)
+        assertNull(source.copy(properties = source.properties - "Region").infoTypeLabel)
+        val fullBody = source.copy(properties = source.properties + ("Region" to "Full body"))
+        assertEquals("Compound Lower", fullBody.infoTypeLabel)
+        assertEquals(CustomExerciseType.COMPOUND_FULL, fullBody.duplicateDraft().type)
+        assertEquals("Lower Isolation", source.copy(properties = source.properties + ("Type" to "Single joint (isolation)")).infoTypeLabel)
+        assertEquals("Upper Isolation", patterns("Chest Accessory").copy(properties = patterns("Chest Accessory").properties + ("Type" to "Single joint (isolation)")).infoTypeLabel)
     }
 
     @Test

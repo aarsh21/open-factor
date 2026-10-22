@@ -290,6 +290,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                             e, data.exerciseDefaults[e.id] ?: ExerciseDefaults(), data.preferences.restSeconds,
                             { route = "" }, { vm.saveExerciseDefaults(e.id, it) }, { exerciseInfo = true },
                             { duplicateId = e.id; customReturnRoute = route; route = "custom" },
+                            { vm.archiveExercise(e.id, it) },
                         )
                         if (exerciseInfo) ModalBottomSheet(
                             onDismissRequest = { exerciseInfo = false },
@@ -468,6 +469,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                     equipmentCatalog = vm.equipmentCatalog,
                                     performedIds = data.history.flatMap { w -> w.exercises.filter { entry -> entry.sets.any { it.completed } }.map { it.exerciseId } }.toSet(),
                                     deprioritizedIds = data.exerciseDefaults.filterValues { it.doNotRecommend }.keys,
+                                    modifiedIds = data.exerciseDefaults.filterValues { it.hasOverrides }.keys,
                                 )
                             }
                             3 ->

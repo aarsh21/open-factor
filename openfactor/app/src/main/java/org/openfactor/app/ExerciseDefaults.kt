@@ -8,6 +8,11 @@ data class ExerciseDefaults(
     val doNotRecommend: Boolean = false,
 ) {
     init { require(restSeconds == null || restSeconds in 0..1800) }
+
+    // Source Modified checks overrides, not the presence of an exercise config or pin.
+    val hasOverrides: Boolean get() = restSeconds != null
+
+    fun withoutOverrides(): ExerciseDefaults = copy(restSeconds = null)
 }
 
 fun newSessionExercise(

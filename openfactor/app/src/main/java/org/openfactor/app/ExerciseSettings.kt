@@ -25,6 +25,7 @@ fun ExerciseSettingsScreen(
     onSave: (ExerciseDefaults) -> Unit,
     onInfo: () -> Unit,
     onDuplicate: () -> Unit,
+    onArchive: (Boolean) -> Unit,
 ) {
     var editor by rememberSaveable(exercise.id) { mutableStateOf("") }
     Column(Modifier.fillMaxSize()) {
@@ -33,61 +34,83 @@ fun ExerciseSettingsScreen(
             SectionTitle("General")
             Surface(shape = OF.shape, color = OF.card) {
                 Column {
+                    if (!exercise.archived) {
+                        ListItem(
+                            headlineContent = { Text("Info") },
+                            supportingContent = { Text("Instructions, details and history") },
+                            leadingContent = { Icon(Icons.Rounded.Info, null) },
+                            trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
+                            modifier = Modifier.clickable(onClick = onInfo),
+                            colors = ListItemDefaults.colors(containerColor = OF.card),
+                        )
+                        HorizontalDivider(color = OF.line)
+                        ListItem(
+                            headlineContent = { Text("Exercise Note") },
+                            supportingContent = { Text(defaults.note.ifBlank { "Display a note every time you work out with this exercise." }) },
+                            leadingContent = { Icon(Icons.Rounded.EditNote, null) },
+                            trailingContent = { Text(if (defaults.note.isBlank()) "Add" else "Edit", color = MaterialTheme.colorScheme.primary) },
+                            modifier = Modifier.clickable { editor = "note" },
+                            colors = ListItemDefaults.colors(containerColor = OF.card),
+                        )
+                        HorizontalDivider(color = OF.line)
+                        ListItem(
+                            headlineContent = { Text("Do Not Recommend") },
+                            supportingContent = { Text("Keep this exercise in Deprioritized. Automatic program generation is not available yet.") },
+                            leadingContent = { Icon(Icons.Rounded.Block, null) },
+                            trailingContent = { Switch(defaults.doNotRecommend, null) },
+                            modifier = Modifier.toggleable(defaults.doNotRecommend, role = Role.Switch) {
+                                onSave(defaults.copy(doNotRecommend = it))
+                            },
+                            colors = ListItemDefaults.colors(containerColor = OF.card),
+                        )
+                        HorizontalDivider(color = OF.line)
+                        ListItem(
+                            headlineContent = { Text("Edit Duplicate") },
+                            supportingContent = { Text("To edit all available exercise properties, create a duplicate.") },
+                            leadingContent = { Icon(Icons.Rounded.ContentCopy, null) },
+                            trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
+                            modifier = Modifier.clickable(onClick = onDuplicate),
+                            colors = ListItemDefaults.colors(containerColor = OF.card),
+                        )
+                    }
+                    if (exercise.custom) {
+                        if (!exercise.archived) HorizontalDivider(color = OF.line)
+                        ListItem(
+                            headlineContent = { Text(if (exercise.archived) "Unarchive Exercise" else "Archive Exercise") },
+                            supportingContent = {
+                                Text(if (exercise.archived) "Make this exercise available in your custom library and search again."
+                                    else "Hide this exercise from your custom library and search without changing your history.")
+                            },
+                            leadingContent = { Icon(if (exercise.archived) Icons.Rounded.Unarchive else Icons.Rounded.Archive, null) },
+                            modifier = Modifier.clickable { onArchive(!exercise.archived) },
+                            colors = ListItemDefaults.colors(containerColor = OF.card),
+                        )
+                    }
+                }
+            }
+            if (!exercise.archived) {
+                SectionTitle("Overrides")
+                Surface(shape = OF.shape, color = OF.card) {
                     ListItem(
-                        headlineContent = { Text("Info") },
-                        supportingContent = { Text("Instructions, details and history") },
-                        leadingContent = { Icon(Icons.Rounded.Info, null) },
-                        trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
-                        modifier = Modifier.clickable(onClick = onInfo),
-                        colors = ListItemDefaults.colors(containerColor = OF.card),
-                    )
-                    HorizontalDivider(color = OF.line)
-                    ListItem(
-                        headlineContent = { Text("Exercise Note") },
-                        supportingContent = { Text(defaults.note.ifBlank { "Display a note every time you work out with this exercise." }) },
-                        leadingContent = { Icon(Icons.Rounded.EditNote, null) },
-                        trailingContent = { Text(if (defaults.note.isBlank()) "Add" else "Edit", color = MaterialTheme.colorScheme.primary) },
-                        modifier = Modifier.clickable { editor = "note" },
-                        colors = ListItemDefaults.colors(containerColor = OF.card),
-                    )
-                    HorizontalDivider(color = OF.line)
-                    ListItem(
-                        headlineContent = { Text("Do Not Recommend") },
-                        supportingContent = { Text("Keep this exercise in Deprioritized. Automatic program generation is not available yet.") },
-                        leadingContent = { Icon(Icons.Rounded.Block, null) },
-                        trailingContent = { Switch(defaults.doNotRecommend, null) },
-                        modifier = Modifier.toggleable(defaults.doNotRecommend, role = Role.Switch) {
-                            onSave(defaults.copy(doNotRecommend = it))
-                        },
-                        colors = ListItemDefaults.colors(containerColor = OF.card),
-                    )
-                    HorizontalDivider(color = OF.line)
-                    ListItem(
-                        headlineContent = { Text("Edit Duplicate") },
-                        supportingContent = { Text("To edit all available exercise properties, create a duplicate.") },
-                        leadingContent = { Icon(Icons.Rounded.ContentCopy, null) },
-                        trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
-                        modifier = Modifier.clickable(onClick = onDuplicate),
+                        headlineContent = { Text("Rest Timer") },
+                        supportingContent = { Text(defaults.restSeconds?.let { "${it}s" } ?: "Default · ${workoutRestSeconds}s") },
+                        leadingContent = { Icon(Icons.Rounded.Timer, null) },
+                        trailingContent = { Text("Edit", color = MaterialTheme.colorScheme.primary) },
+                        modifier = Modifier.clickable { editor = "rest" },
                         colors = ListItemDefaults.colors(containerColor = OF.card),
                     )
                 }
-            }
-            SectionTitle("Overrides")
-            Surface(shape = OF.shape, color = OF.card) {
-                ListItem(
-                    headlineContent = { Text("Rest Timer") },
-                    supportingContent = { Text(defaults.restSeconds?.let { "${it}s" } ?: "Default · ${workoutRestSeconds}s") },
-                    leadingContent = { Icon(Icons.Rounded.Timer, null) },
-                    trailingContent = { Text("Edit", color = MaterialTheme.colorScheme.primary) },
-                    modifier = Modifier.clickable { editor = "rest" },
-                    colors = ListItemDefaults.colors(containerColor = OF.card),
+                TextButton(
+                    { onSave(defaults.withoutOverrides()) },
+                    enabled = defaults.hasOverrides,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                ) { Text("Remove all exercise level overrides") }
+                Text(
+                    "Rest timer changes apply to new entries. Program rest targets take priority. Existing entries keep their workout notes and timers. Exercise notes stay pinned to the exercise, separate from workout history.",
+                    Modifier.padding(vertical = 16.dp), color = OF.muted,
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
-            Text(
-                "Rest timer changes apply to new entries. Program rest targets take priority. Existing entries keep their workout notes and timers. Exercise notes stay pinned to the exercise, separate from workout history.",
-                Modifier.padding(vertical = 16.dp), color = OF.muted,
-                style = MaterialTheme.typography.bodyMedium,
-            )
         }
     }
     if (editor.isNotEmpty()) {

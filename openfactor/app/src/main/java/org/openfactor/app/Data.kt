@@ -36,6 +36,7 @@ data class Exercise(
     val browseCategories: List<String> = emptyList(),
     val resistanceEquipment: List<Set<String>> = emptyList(),
     val supportEquipment: List<Set<String>> = emptyList(),
+    val archived: Boolean = false,
 )
 
 data class LoggedSet(
@@ -291,6 +292,7 @@ object DataCodec {
             .put("equipment", equipment)
             .put("instructions", instructions)
             .put("custom", custom)
+            .put("archived", archived)
             .put("secondary", JSONArray(secondary))
             .put("frames", JSONArray(frames))
             .put("video", video)
@@ -499,6 +501,7 @@ object DataCodec {
             array("browseCategories").strings(),
             requirements("resistanceEquipment"),
             requirements("supportEquipment"),
+            optBoolean("archived"),
         ).also { if (custom) it.loggingMetrics() }
     }
 
@@ -541,11 +544,13 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     val catalog: List<Exercise> =
         if (imported.isEmpty()) bundled
         else {
-            val regions = bundled.associate { it.id to it.properties["Region"] }
+            val facts = bundled.associate { it.id to it.properties }
             imported.map { exercise ->
-                val region = regions[exercise.id]
-                if (region == null || "Region" in exercise.properties) exercise
-                else exercise.copy(properties = exercise.properties + ("Region" to region))
+                val missing = facts[exercise.id].orEmpty().filterKeys {
+                    it in listOf("Region", "Movement Patterns") && it !in exercise.properties
+                }
+                if (missing.isEmpty()) exercise
+                else exercise.copy(properties = exercise.properties + missing)
             }
         }
 
@@ -897,6 +902,10 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun saveExerciseDefaults(id: String, value: ExerciseDefaults) = update { d ->
         d.copy(exerciseDefaults = if (value == ExerciseDefaults()) d.exerciseDefaults - id else d.exerciseDefaults + (id to value))
+    }
+
+    fun archiveExercise(id: String, archived: Boolean) = update { d ->
+        d.copy(customExercises = d.customExercises.map { if (it.id == id) it.copy(archived = archived) else it })
     }
 
     fun addCustom(draft: CustomExerciseDraft): String {

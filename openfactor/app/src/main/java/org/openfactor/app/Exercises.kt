@@ -13,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -37,6 +36,7 @@ fun ExerciseLibrary(
     equipmentCatalog: EquipmentCatalog? = null,
     performedIds: Set<String> = emptySet(),
     deprioritizedIds: Set<String> = emptySet(),
+    modifiedIds: Set<String> = emptySet(),
 ) {
     var gymId by rememberSaveable { mutableStateOf("") }
     var gymMenu by remember { mutableStateOf(false) }
@@ -76,14 +76,18 @@ fun ExerciseLibrary(
             gym,
             type,
             laterality,
+            picking,
             scope,
             performedIds,
             deprioritizedIds,
+            modifiedIds,
         ) {
             exercises
                 .filter { e ->
+                    (if (scope == "Archived" && !picking) e.archived else !e.archived) &&
                     (scope == "All" || (scope == "Performed" && e.id in performedIds) ||
-                        (scope == "Deprioritized" && e.id in deprioritizedIds)) &&
+                        (scope == "Deprioritized" && e.id in deprioritizedIds) ||
+                        (scope == "Modified" && e.id in modifiedIds) || scope == "Archived") &&
                     (equipmentCatalog?.available(e, gym) != false) &&
                         (type == "All types" || e.properties["Type"] == type) &&
                         (laterality == "All lateralities" ||
@@ -173,7 +177,7 @@ fun ExerciseLibrary(
                     .padding(horizontal = 18.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (!picking) FilterChooser("Scope", listOf("All", "Performed", "Deprioritized"), scope) { scope = it }
+                if (!picking) FilterChooser("Scope", listOf("All", "Performed", "Deprioritized", "Modified", "Archived"), scope) { scope = it }
                 Box {
                     FilterChip(
                         true,
@@ -277,7 +281,7 @@ fun ExerciseLibrary(
                         Box(
                             Modifier.border(
                                 if (muscle == m) 2.dp else 1.dp,
-                                if (muscle == m) Color.White else OF.line,
+                                if (muscle == m) MaterialTheme.colorScheme.onSurface else OF.line,
                                 RoundedCornerShape(10.dp),
                             )
                         ) {
@@ -288,7 +292,7 @@ fun ExerciseLibrary(
                             Modifier.padding(top = 4.dp),
                             fontSize = 12.sp,
                             maxLines = 1,
-                            color = if (muscle == m) Color.White else OF.muted,
+                            color = if (muscle == m) MaterialTheme.colorScheme.onSurface else OF.muted,
                         )
                     }
                 }
@@ -622,12 +626,12 @@ fun ExerciseDetail(
                         Text("Alternative Names", color = OF.muted)
                         Text(e.aliases.joinToString(", "), Modifier.padding(bottom = 12.dp))
                     }
-                    val type = e.classifiedType
+                    val type = e.infoTypeLabel
                     e.properties
-                        .filterKeys { it !in listOf("Range of Motion", "Stability") && (it != "Region" || type == null) }
+                        .filterKeys { it !in listOf("Range of Motion", "Stability", "Movement Patterns") && (it != "Region" || type == null) }
                         .forEach { (label, value) ->
                             Text(label, color = OF.muted)
-                            Text(if (label == "Type") type?.label ?: value else value, Modifier.padding(bottom = 12.dp))
+                            Text(if (label == "Type") type ?: value else value, Modifier.padding(bottom = 12.dp))
                         }
                     Text("Body Weight Contribution", color = OF.muted)
                     Text("${(e.bodyweight*100).toInt()}%")
@@ -653,7 +657,7 @@ fun ExerciseDetail(
                                 .filter { it.completed }
                                 .forEach { s ->
                                     Text(
-                                        s.describe(e.loggingMetrics(), data.preferences.pounds),
+                                        s.describe(e.loggingMetrics(), data.preferences.pounds, data.preferences.distanceImperial),
                                         Modifier.padding(top = 8.dp),
                                     )
                                 }

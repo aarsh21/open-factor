@@ -107,6 +107,45 @@ class TrainingFlowTest {
     }
 
     @Test
+    fun customArchiveAndOverrideResetPreserveSavedTrainingAndExerciseIdentity() {
+        val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as android.app.Application
+        val vm = WorkoutViewModel(app)
+        val backup = vm.export()
+        try {
+            vm.discard()
+            val id = vm.addCustom(CustomExerciseDraft(name = "Archive contract", metric1 = SetMetric.REPS, bodyPercent = "0"))
+            vm.saveExerciseDefaults(id, ExerciseDefaults("Keep pinned", 0, true))
+            vm.start("Archive control", listOf(id))
+            val entry = vm.data.value.active!!.exercises.single()
+            vm.exerciseNotes(entry.id, "Keep history note")
+            vm.editSet(entry.id, entry.sets.single().id) { it.copy(reps = 13, completed = true) }
+            vm.finish()
+            vm.start("Still resolvable", listOf(id))
+            val before = vm.data.value
+            val original = vm.exercises().single { it.id == id }
+            vm.archiveExercise(vm.catalog.first().id, true)
+            assertEquals(before, vm.data.value)
+            vm.archiveExercise(id, true)
+            assertEquals(before.copy(customExercises = before.customExercises.map { if (it.id == id) it.copy(archived = true) else it }), vm.data.value)
+            assertEquals(original.copy(archived = true), WorkoutViewModel(app).exercises().single { it.id == id })
+            assertEquals(vm.data.value, DataCodec.decode(vm.export()))
+            vm.saveExerciseDefaults(id, vm.data.value.exerciseDefaults.getValue(id).withoutOverrides())
+            assertEquals(ExerciseDefaults("Keep pinned", doNotRecommend = true), vm.data.value.exerciseDefaults[id])
+            assertEquals(before.active, vm.data.value.active)
+            assertEquals(before.history, vm.data.value.history)
+            assertEquals(before.workoutDraft, vm.data.value.workoutDraft)
+            assertEquals(before.programs, vm.data.value.programs)
+            assertEquals(before.scaleWeights, vm.data.value.scaleWeights)
+            assertEquals(before.bodyMeasurements, vm.data.value.bodyMeasurements)
+            assertEquals(before.progressPhotos, vm.data.value.progressPhotos)
+            vm.archiveExercise(id, false)
+            assertEquals(original, WorkoutViewModel(app).exercises().single { it.id == id })
+        } finally {
+            vm.restore(backup)
+        }
+    }
+
+    @Test
     fun fullCatalogHasResolvableLocalMedia() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val imported =
@@ -173,13 +212,22 @@ class TrainingFlowTest {
             "Barbell bench press" to CustomExerciseType.COMPOUND_UPPER,
             "Weighted Roman chair hip hinge" to CustomExerciseType.ISOLATION_LOWER,
             "Burpee" to CustomExerciseType.COMPOUND_FULL,
+            "Barbell Jefferson curl" to CustomExerciseType.COMPOUND_LOWER,
+            "Barbell fixed-hip Jefferson curl" to CustomExerciseType.ISOLATION_LOWER,
         )) {
             assertEquals(name, type, resolved.single { it.name == name }.duplicateDraft().type)
         }
+        assertEquals("Core", resolved.single { it.name == "Barbell Jefferson curl" }.properties["Region"])
+        assertEquals(listOf("Lower Back Accessory"), resolved.single { it.name == "Barbell Jefferson curl" }.movementPatterns)
+        assertEquals("Compound Lower", resolved.single { it.name == "Barbell Jefferson curl" }.infoTypeLabel)
+        assertEquals("Lower Isolation", resolved.single { it.name == "Barbell fixed-hip Jefferson curl" }.infoTypeLabel)
+        assertEquals("Compound Lower", resolved.single { it.name == "Burpee" }.infoTypeLabel)
+        assertEquals(9, resolved.count { it.infoTypeLabel == null })
+        assertTrue(resolved.all { it.movementPatterns != null })
         imported?.forEach { source ->
             val actual = resolved.single { it.id == source.id }
             assertEquals(source, actual.copy(properties = source.properties))
-            source.properties["Region"]?.let { assertEquals(it, actual.properties["Region"]) }
+            source.properties.forEach { (key, value) -> assertEquals(value, actual.properties[key]) }
         }
         val duplicateDraft = resolved.single { it.id == bench.id }.duplicateDraft(resistance, supports)
         val duplicate = duplicateDraft.toExercise(equipment.items)
