@@ -53,8 +53,9 @@ confirmation. These local outcomes do not claim unobserved source equivalence.
 
 Data Visibility hides circumference inputs without removing their draft or saved
 values. Saving a different visible field preserves hidden values at their stored
-precision. Visual Body Fat and the scale-weight fields remain visible because
-they are source Default metrics. History, raw charts, and complete backups do
+precision. Visual Body Fat and Scale Weight are source Default metrics and stay
+visible. Optional scale fat stays with Scale Weight as a local companion.
+History, raw charts, and complete backups do
 not apply the visibility filter. Circumferences remain in cm; the separate height
 unit preference does not establish a circumference conversion rule.
 

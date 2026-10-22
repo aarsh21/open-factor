@@ -153,8 +153,13 @@ def dismiss(method, close='Close photos'):
             assert bottom - max(top, safe_top) >= 48 * density - 1, 'Outside dismissal needs a reachable 48dp strip below system insets'
             adb('shell', 'input', 'tap', str((left+right)//2), str((max(top, safe_top)+bottom)//2))
         elif method == 'drag':
-            left, top, right, bottom = bounds(target('Drag handle', 'content-desc'))
-            adb('shell', 'input', 'swipe', str((left+right)//2), str((top+bottom)//2), str((left+right)//2), str(height-80), '600')
+            if close == 'Close measurements':
+                left, top, right, bottom = bounds(target('Drag handle', 'content-desc'))
+                start = (top+bottom)//2
+            else:
+                # Photos uses a compact custom handle without Material's label.
+                start = top-15
+            adb('shell', 'input', 'swipe', str((left+right)//2), str(start), str((left+right)//2), str(height-80), '600')
         else:
             raise AssertionError(method)
 
