@@ -5,7 +5,7 @@ plugins {
 }
 android {
     namespace = "org.openfactor.app"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "org.openfactor.app"
         minSdk = 26
