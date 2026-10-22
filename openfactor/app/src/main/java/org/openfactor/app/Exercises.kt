@@ -761,7 +761,7 @@ fun RoutineBuilder(
             if (selected.isNotEmpty())
                 item { HorizontalDivider(Modifier.padding(vertical = 12.dp), color = OF.line) }
             items(
-                exercises.filter { it.name.contains(query, true) }.sortedBy { it.name },
+                exercises.filter { !it.archived && it.name.contains(query, true) }.sortedBy { it.name },
                 key = { it.id },
             ) { e ->
                 ListItem(

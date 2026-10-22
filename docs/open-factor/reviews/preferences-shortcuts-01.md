@@ -91,8 +91,12 @@ source-device operation has run in this thread.
 - The third build passed all 58 JVM tests with zero failures, errors, or skips.
   It assembled the debug application and instrumentation APKs. Lint then failed
   on one new error: profile height read `StateFlow.value` during composition.
-  Commit `0f91274d` changes that read to collected state. Its build/lint recheck
-  waits for the reserved Dashboard build; a passing lint result is not claimed.
+  Commit `0f91274d` changes that read to collected state.
+- The reserved corrected-state recheck passed after Programs released the lock:
+  all 58 JVM tests, `lintDebug`, `assembleDebug`, and `assembleDebugAndroidTest`.
+  It completed in 59 seconds. Lint reports zero errors and nine warnings. The
+  genuine log is `build-5.log`; copied JVM XML, lint XML, and APK SHA-256 values
+  are alongside it. The lock was released and relayed directly to Lifecycle.
 
 The kept codec test uses asymmetric shortcut order/colors, hidden actions,
 contrasting flags, explicit legacy expectations, training records, and separate

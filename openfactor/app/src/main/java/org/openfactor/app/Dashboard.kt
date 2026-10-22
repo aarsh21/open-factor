@@ -80,7 +80,12 @@ fun DashboardScreen(
         return
     }
     chart?.let { key ->
-        BodyChartScreen(data, key, range, { chart = it }, { range = it }, { chart = null })
+        BodyChartScreen(
+            data, key, range, { chart = it }, { range = it }, { chart = null },
+            onDismissTutorial = {
+                vm.settings { it.copy(dismissedTutorials = it.dismissedTutorials + "bodyCharts") }
+            },
+        )
         return
     }
     detail?.let { key ->
