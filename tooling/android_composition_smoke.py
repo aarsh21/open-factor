@@ -30,9 +30,11 @@ def adb(*command, raw=False):
 def nodes():
     for attempt in range(8):
         try:
-            adb('shell', 'uiautomator', 'dump', '/sdcard/of-composition.xml')
+            output = adb('shell', 'uiautomator', 'dump', '/sdcard/of-composition.xml')
+            if 'dumped to:' not in output:
+                raise RuntimeError('UI tree was not refreshed')
             return list(ET.fromstring(adb('shell', 'cat', '/sdcard/of-composition.xml')).iter('node'))
-        except (subprocess.CalledProcessError, ET.ParseError):
+        except (subprocess.CalledProcessError, ET.ParseError, RuntimeError):
             if attempt == 7:
                 raise
             time.sleep(.4)
@@ -111,6 +113,18 @@ def launch():
     adb('shell', 'am', 'start', '-n', 'org.openfactor.app/.MainActivity')
 
 
+def create_custom(name):
+    enter('Exercise Name', name)
+    tap('Trackable Metric 1', 'content-desc')
+    tap('Reps')
+    tap('Next')
+    tap('Skip')
+    tap('Next')
+    enter('Body Weight Contribution', '0')
+    tap('Next')
+    tap('Create')
+
+
 adb('shell', 'svc', 'wifi', 'disable')
 adb('shell', 'svc', 'data', 'disable')
 launch()
@@ -143,12 +157,11 @@ capture('populated-composition')
 # Custom Cancel and creation return to the requesting composition, with filters intact.
 tap('Add Exercises', 'content-desc')
 tap('Create custom exercise', 'content-desc')
-find('New Exercise')
+find('Create Custom Exercise')
 back()
 find('chin-up')
 tap('Create custom exercise', 'content-desc')
-enter('Exercise name', 'Synthetic Draft Exercise')
-tap('Create Exercise')
+create_custom('Synthetic Draft Exercise')
 find('Synthetic Draft Exercise')
 tap('Add Exercise', last=True)
 find('2 Exercises')
@@ -193,8 +206,7 @@ tap('Create custom exercise', 'content-desc')
 back()
 find('dip')
 tap('Create custom exercise', 'content-desc')
-enter('Exercise name', 'Synthetic Session Exercise')
-tap('Create Exercise')
+create_custom('Synthetic Session Exercise')
 tap('Add Exercise', last=True)
 find('Workout options', 'content-desc')
 active = state()['active']
@@ -213,12 +225,11 @@ tap('Next')
 tap('Add Day', prefix=True)
 tap('Add Exercises')
 tap('Create custom exercise', 'content-desc')
-find('New Exercise')
+find('Create Custom Exercise')
 back()
 find('Add Exercise')
 tap('Create custom exercise', 'content-desc')
-enter('Exercise name', 'Synthetic Plan Exercise')
-tap('Create Exercise')
+create_custom('Synthetic Plan Exercise')
 capture('program-custom-detail')
 tap('Add Exercise', last=True)
 plan = state()['programDraft']

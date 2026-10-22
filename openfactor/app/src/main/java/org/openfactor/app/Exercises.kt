@@ -521,9 +521,16 @@ fun ExerciseDetail(
                 item {
                     SectionTitle("Resistance Equipment")
                     Text(
-                        e.equipmentOptions.ifEmpty { listOf(e.equipment) }.joinToString(", "),
+                        e.equipmentOptions.ifEmpty { listOf(e.equipment) }.joinToString(if (e.custom) " or " else ", "),
                         style = MaterialTheme.typography.bodyLarge,
                     )
+                }
+                if (e.custom && e.supportEquipment.isNotEmpty()) item {
+                    SectionTitle("Support Equipment")
+                    val names = vm.equipmentCatalog.items.associate { it.id to it.name }
+                    Text(e.supportEquipment.joinToString(" or ") { group ->
+                        group.map { names[it] ?: it }.sorted().joinToString(" + ")
+                    })
                 }
                 item {
                     SectionTitle("Details")
@@ -601,63 +608,6 @@ private fun markdownItems(text: String): List<Pair<String?, String>> =
             else null to cleanMarkdown(part)
         }
         .filter { it.first != null || it.second.isNotBlank() }
-
-@Composable
-fun CustomExercise(onBack: () -> Unit, onSave: (String, String, String, String) -> Unit) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var muscle by rememberSaveable { mutableStateOf("Other") }
-    var equipment by rememberSaveable { mutableStateOf("Bodyweight") }
-    var instructions by rememberSaveable { mutableStateOf("") }
-    Column(Modifier.fillMaxSize()) {
-        PageHeading("New Exercise", onBack)
-        Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            OutlinedTextField(
-                name,
-                { name = it },
-                Modifier.fillMaxWidth(),
-                label = { Text("Exercise name") },
-                singleLine = true,
-            )
-            OutlinedTextField(
-                muscle,
-                { muscle = it },
-                Modifier.fillMaxWidth(),
-                label = { Text("Primary muscle") },
-                singleLine = true,
-            )
-            OutlinedTextField(
-                equipment,
-                { equipment = it },
-                Modifier.fillMaxWidth(),
-                label = { Text("Equipment") },
-                singleLine = true,
-            )
-            OutlinedTextField(
-                instructions,
-                { instructions = it },
-                Modifier.fillMaxWidth().heightIn(min = 160.dp),
-                label = { Text("Instructions and technique notes") },
-            )
-        }
-        Box(Modifier.padding(18.dp)) {
-            PrimaryAction(
-                "Create Exercise",
-                {
-                    onSave(
-                        name,
-                        muscle.ifBlank { "Other" },
-                        equipment.ifBlank { "Other" },
-                        instructions,
-                    )
-                },
-                enabled = name.isNotBlank(),
-            )
-        }
-    }
-}
 
 @Composable
 fun RoutineBuilder(

@@ -91,6 +91,14 @@ class EquipmentCatalog(context: Context) {
                     .getOrNull()
             }
     private val index = source?.optJSONObject("uuidIndex") ?: JSONObject()
+    val jointActions: List<String> = index.keys().asSequence().mapNotNull { id ->
+        index.getJSONObject(id).takeIf { it.optString("type") == "jointAction" }?.getString("name")
+    }.distinct().sorted().toList().ifEmpty {
+        context.assets.open("catalog.json").bufferedReader().use { DataCodec.catalog(it.readText()) }
+            .flatMap { exercise -> listOf("Primary Joint Action", "Secondary Joint Action").flatMap {
+                exercise.properties[it].orEmpty().split(',').map(String::trim)
+            } }.filter { it.isNotBlank() && it != "None" }.distinct().sorted()
+    }
     val items: List<EquipmentItem> =
         index
             .keys()
@@ -138,8 +146,9 @@ class EquipmentCatalog(context: Context) {
     }
 
     fun available(e: Exercise, gym: GymProfile?): Boolean {
-        if (gym == null || e.custom) return true
-        val (resistance, support) = exerciseRequirements[e.id] ?: return true
+        if (gym == null) return true
+        val (resistance, support) = if (e.custom) e.resistanceEquipment to e.supportEquipment
+            else exerciseRequirements[e.id] ?: return true
         return equipmentRequirementsMet(resistance, support, gym.equipmentIds)
     }
 

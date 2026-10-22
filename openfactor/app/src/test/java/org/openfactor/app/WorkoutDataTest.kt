@@ -5,6 +5,60 @@ import org.junit.Test
 
 class WorkoutDataTest {
     @Test
+    fun customExerciseMetadataDrivesLoggingAndSurvivesBackup() {
+        val draft = CustomExerciseDraft(
+            name = " Assisted Hold ", metric1 = SetMetric.ASSISTANCE, metric2 = SetMetric.DURATION,
+            primary = listOf("Lats", "Upper Back"), secondary = listOf("Biceps"),
+            resistance = listOf(setOf("machine"), setOf("bar", "plates")),
+            support = listOf(setOf("bench", "rack"), setOf("station")),
+            bodyPercent = "73", rom = 2, stability = 4,
+            primaryJoint = "Shoulder Adduction", alternateNames = "Supported Hang, Hang\nSupported Hang",
+        )
+        val custom = draft.toExercise(listOf(EquipmentItem("machine", "Assistance Machine", "Pin Loaded Machines")), "custom")
+        assertEquals("Assisted Hold", custom.name)
+        assertEquals(listOf("Supported Hang", "Hang"), custom.aliases)
+        assertEquals(0.73, custom.bodyweight, 0.0)
+        assertEquals("Multi-joint (compound)", custom.properties["Type"])
+        assertEquals("Upper body", custom.properties["Region"])
+        val source = AppData(customExercises = listOf(custom), workoutDraft = WorkoutDraft("Not started"), scaleWeights = listOf(ScaleWeightRecord(weightKg = 83.0)))
+        val restored = DataCodec.decode(DataCodec.encode(source))
+        assertEquals(source, restored)
+        assertEquals(custom, restored.customExercises.single())
+        assertEquals(listOf(SetMetric.ASSISTANCE, SetMetric.DURATION), restored.customExercises.single().loggingMetrics())
+        assertFalse(equipmentRequirementsMet(custom.resistanceEquipment, custom.supportEquipment, setOf("bar", "station")))
+        assertFalse(equipmentRequirementsMet(custom.resistanceEquipment, custom.supportEquipment, setOf("machine", "bench")))
+        assertTrue(equipmentRequirementsMet(custom.resistanceEquipment, custom.supportEquipment, setOf("machine", "station")))
+        assertTrue(equipmentRequirementsMet(custom.resistanceEquipment, custom.supportEquipment, setOf("bar", "plates", "bench", "rack")))
+        val legacy = DataCodec.decode("""{"schemaVersion":1,"customExercises":[{"id":"old","name":"Old","muscle":"Other","equipment":"Bodyweight"}]}""")
+        assertTrue(legacy.customExercises.single().custom)
+        assertEquals(listOf(SetMetric.WEIGHT, SetMetric.REPS), legacy.customExercises.single().loggingMetrics())
+        val catalogExercise = DataCodec.catalog("""[{"id":"air-bike","name":"Air Biking","muscle":"Other","muscles":[]}]""").single()
+        assertEquals(listOf("Other"), catalogExercise.muscles)
+    }
+
+    @Test
+    fun customCreationRequiresExplicitMetricsAndContributionButAllowsSkippedMuscles() {
+        val blank = CustomExerciseDraft(name = "Hold")
+        assertFalse(blank.validBasics)
+        assertFalse(blank.validDetails)
+        val ready = blank.copy(metric1 = SetMetric.DURATION, bodyPercent = "0")
+        assertTrue(ready.validBasics && ready.validDetails)
+        val saved = ready.toExercise(emptyList())
+        assertTrue(saved.muscles.isEmpty())
+        assertEquals(saved, DataCodec.decode(DataCodec.encode(AppData(customExercises = listOf(saved)))).customExercises.single())
+        assertTrue(equipmentRequirementsMet(saved.resistanceEquipment, saved.supportEquipment, emptySet()))
+        for (percent in listOf("", "-1", "100.1", "NaN")) assertFalse(ready.copy(bodyPercent = percent).validDetails)
+        assertEquals(100.0, ready.copy(bodyPercent = "100").contribution!!, 0.0)
+        val maximum = ready.copy(bodyPercent = "100").toExercise(emptyList())
+        assertEquals(maximum, DataCodec.decode(DataCodec.encode(AppData(customExercises = listOf(maximum)))).customExercises.single())
+        assertThrows(IllegalArgumentException::class.java) {
+            DataCodec.decode("""{"schemaVersion":1,"customExercises":[{"id":"invalid","name":"Hold","muscle":"Other","equipment":"Bodyweight","bodyweight":1.01}]}""")
+        }
+        assertFalse(ready.copy(metric2 = SetMetric.DURATION_PER_SIDE).validBasics)
+        assertTrue(ready.copy(metric2 = SetMetric.DISTANCE_LONG).validBasics)
+    }
+
+    @Test
     fun newSessionRowsHaveNoPerformedValuesAndDoNotCopyTargetsIntoActuals() {
         val entry = SessionExercise(exerciseId = "chin-up")
         assertEquals(1, entry.sets.size)

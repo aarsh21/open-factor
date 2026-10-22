@@ -316,8 +316,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                         )
                     }
                     "custom" ->
-                        CustomExercise({ route = customReturnRoute }) { n, m, e, i ->
-                            val id = vm.addCustom(n, m, e, i)
+                        CustomExercise(data, vm.equipmentCatalog, { route = customReturnRoute }) { draft ->
+                            val id = vm.addCustom(draft)
                             previousRoute = customReturnRoute
                             detailId = id
                             route = "exercise"

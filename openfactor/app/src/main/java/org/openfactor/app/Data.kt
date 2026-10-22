@@ -34,6 +34,8 @@ data class Exercise(
     val searchBoost: Double = 0.0,
     val clips: List<String> = emptyList(),
     val browseCategories: List<String> = emptyList(),
+    val resistanceEquipment: List<Set<String>> = emptyList(),
+    val supportEquipment: List<Set<String>> = emptyList(),
 )
 
 data class LoggedSet(
@@ -281,6 +283,19 @@ object DataCodec {
             .put("equipment", equipment)
             .put("instructions", instructions)
             .put("custom", custom)
+            .put("secondary", JSONArray(secondary))
+            .put("frames", JSONArray(frames))
+            .put("video", video)
+            .put("muscles", JSONArray(muscles))
+            .put("aliases", JSONArray(aliases))
+            .put("equipmentOptions", JSONArray(equipmentOptions))
+            .put("properties", JSONObject(properties))
+            .put("bodyweight", bodyweight)
+            .put("searchBoost", searchBoost)
+            .put("clips", JSONArray(clips))
+            .put("browseCategories", JSONArray(browseCategories))
+            .put("resistanceEquipment", JSONArray(resistanceEquipment.map { JSONArray(it.toList()) }))
+            .put("supportEquipment", JSONArray(supportEquipment.map { JSONArray(it.toList()) }))
 
     fun encode(d: AppData): String =
         JSONObject()
@@ -399,16 +414,7 @@ object DataCodec {
                 Routine(it.getString("id"), it.getString("name"), it.array("exerciseIds").strings())
             },
             j.array("favorites").strings().toSet(),
-            j.array("customExercises").objects().map {
-                Exercise(
-                    it.getString("id"),
-                    it.getString("name"),
-                    it.getString("muscle"),
-                    it.getString("equipment"),
-                    instructions = it.optString("instructions"),
-                    custom = true,
-                )
-            },
+            j.array("customExercises").objects().map { it.exercise(custom = true) },
             Preferences(
                 p.optBoolean("pounds"),
                 p.optInt("restSeconds", 120).coerceIn(0, 1800),
@@ -440,30 +446,38 @@ object DataCodec {
         )
     }
 
-    fun catalog(text: String): List<Exercise> =
-        JSONArray(text).objects().map { e ->
-            val properties = e.optJSONObject("properties")
-            Exercise(
-                e.getString("id"),
-                e.getString("name"),
-                e.optString("muscle", "Other"),
-                e.optString("equipment", "Other"),
-                e.array("secondary").strings(),
-                e.array("frames").strings(),
-                e.optString("instructions"),
-                e.optString("video").takeIf { it.isNotBlank() && it != "null" },
-                e.optBoolean("custom"),
-                e.array("muscles").strings().ifEmpty { listOf(e.optString("muscle", "Other")) },
-                e.array("aliases").strings(),
-                e.array("equipmentOptions").strings(),
-                properties?.keys()?.asSequence()?.associateWith { properties.getString(it) }
-                    ?: emptyMap(),
-                e.optDouble("bodyweight", 0.0),
-                e.optDouble("searchBoost", 0.0),
-                e.array("clips").strings(),
-                e.array("browseCategories").strings(),
-            )
+    private fun JSONObject.exercise(custom: Boolean = optBoolean("custom")): Exercise {
+        val properties = optJSONObject("properties")
+        val muscles = array("muscles").strings()
+        fun requirements(key: String): List<Set<String>> = array(key).let { groups ->
+            (0 until groups.length()).map { groups.getJSONArray(it).strings().toSet() }
         }
+        return Exercise(
+            getString("id"),
+            getString("name"),
+            optString("muscle", "Other"),
+            optString("equipment", "Other"),
+            array("secondary").strings(),
+            array("frames").strings(),
+            optString("instructions"),
+            optString("video").takeIf { it.isNotBlank() && it != "null" },
+            custom,
+            if (custom && has("muscles")) muscles else muscles.ifEmpty { listOf(optString("muscle", "Other")) },
+            array("aliases").strings(),
+            array("equipmentOptions").strings(),
+            properties?.keys()?.asSequence()?.associateWith { properties.getString(it) } ?: emptyMap(),
+            optDouble("bodyweight", 0.0).also {
+                require(it.isFinite() && it >= 0.0 && (!custom || it <= 1.0)) { "Invalid bodyweight contribution" }
+            },
+            optDouble("searchBoost", 0.0),
+            array("clips").strings(),
+            array("browseCategories").strings(),
+            requirements("resistanceEquipment"),
+            requirements("supportEquipment"),
+        ).also { if (custom) it.loggingMetrics() }
+    }
+
+    fun catalog(text: String): List<Exercise> = JSONArray(text).objects().map { it.exercise() }
 }
 
 class WorkoutStore(context: Context) {
@@ -845,16 +859,8 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         it.copy(preferences = block(it.preferences))
     }
 
-    fun addCustom(name: String, muscle: String, equipment: String, instructions: String): String {
-        val e =
-            Exercise(
-                newId(),
-                name.trim(),
-                muscle,
-                equipment,
-                instructions = instructions,
-                custom = true,
-            )
+    fun addCustom(draft: CustomExerciseDraft): String {
+        val e = draft.toExercise(equipmentCatalog.items)
         update { it.copy(customExercises = it.customExercises + e) }
         return e.id
     }
