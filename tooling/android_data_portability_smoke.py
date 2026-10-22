@@ -142,9 +142,11 @@ baseline = state()
 recovery = args.output / 'private-baseline'
 recovery.mkdir(exist_ok=True)
 (recovery / 'open_factor.xml').write_bytes(original_xml)
-original_photos = {ref: adb('exec-out', 'run-as', package, 'cat', 'no_backup/progress-photos/'+ref, raw=True)
-                   for record in baseline.get('progressPhotos', []) for ref in record['photos'].values()}
-for reference, payload in original_photos.items():
+original_files = {ref: adb('exec-out', 'run-as', package, 'cat', 'no_backup/progress-photos/'+ref, raw=True)
+                  for ref in adb('shell', 'run-as', package, 'ls', 'no_backup/progress-photos').split()
+                  if re.fullmatch('[a-f0-9]{64}', ref)}
+original_photos = {ref: original_files[ref] for record in baseline.get('progressPhotos', []) for ref in record['photos'].values()}
+for reference, payload in original_files.items():
     (recovery / reference).write_bytes(payload)
 font = adb('shell', 'settings', 'get', 'system', 'font_scale').strip()
 wifi = adb('shell', 'settings', 'get', 'global', 'wifi_on').strip()
@@ -176,7 +178,10 @@ try:
     adb('shell', 'settings', 'put', 'system', 'font_scale', '1.0')
     adb('shell', 'svc', 'wifi', 'disable'); adb('shell', 'svc', 'data', 'disable')
     write_state(fixture)
-    settings(); tap('Data Export'); target('Quick Export'); capture('quick-normal')
+    # Normalize the fixture once through the public preference writer before
+    # checking that visibility and tutorials leave canonical records unchanged.
+    settings(); tap('Units'); tap('Kilograms (kg)'); tap('Back', 'content-desc')
+    tap('Data Export'); target('Quick Export'); capture('quick-normal')
     before = state()
     tap('Last 7 Days'); capture('timeframes-normal')
     for label in ['Last 14 Days', 'Last 30 Days', 'This Month', 'Last Month', 'All Time']:
@@ -218,14 +223,15 @@ try:
     assert state() == hidden
     open_chart(); target('About body charts'); capture('tutorial-first-normal'); tap('Got it')
     assert 'bodyCharts' in state()['preferences']['dismissedTutorials']
-    open_chart(); target('Recorded values · kg')
+    tap('Back', 'content-desc'); target('Body Data'); tap('View Charts'); target('Recorded values · kg')
     assert not any(n.get('text') == 'About body charts' for n in nodes())
     tap('About body charts', 'content-desc'); target('About body charts'); tap('Got it')
-    settings(); tap('Tutorials'); tap('Reset Tutorials'); target('Reset Tutorials?'); capture('reset-confirm-normal'); tap('Cancel')
+    tap('Back', 'content-desc'); target('Body Data'); tap('Back', 'content-desc')
+    tap('Tutorials'); tap('Reset Tutorials'); target('Reset Tutorials?'); capture('reset-confirm-normal'); tap('Cancel')
     assert 'bodyCharts' in state()['preferences']['dismissedTutorials']
     tap('Reset Tutorials'); tap('Reset'); assert 'bodyCharts' not in state()['preferences']['dismissedTutorials']
     unchanged_records(before)
-    open_chart(); target('About body charts'); tap('Got it')
+    tap('Back', 'content-desc'); tap('Body Data'); tap('View Charts'); target('About body charts'); tap('Got it')
     final = state()
     settings(); tap('Export Backup'); target('Save')
     name = tag+'-complete.json'; downloads.append(name); save_as(name); target('Export Backup')
@@ -233,8 +239,13 @@ try:
     assert complete['preferences'] == final['preferences']
     assert {ref: base64.b64decode(value) for ref, value in complete['photoAssets'].items()} == original_photos
     empty = {'schemaVersion': 1, 'onboarding': {'completed': True}}
-    write_state(empty)
-    settings(); tap('Restore Backup'); choose(name); target('Restore Backup?'); tap('Restore'); target('Restore Backup')
+    empty_name = tag+'-empty.json'; downloads.append(empty_name)
+    empty_path = args.output / empty_name; empty_path.write_text(json.dumps(empty))
+    adb('push', str(empty_path), '/sdcard/Download/'+empty_name)
+    tap('Restore Backup'); choose(empty_name); target('Restore Backup?'); tap('Restore'); target('Restore Backup')
+    assert not state()['progressPhotos'] and not state()['preferences']['dismissedTutorials']
+    assert not set(original_photos).intersection(adb('shell', 'run-as', package, 'ls', 'no_backup/progress-photos').split())
+    tap('Restore Backup'); choose(name); target('Restore Backup?'); tap('Restore'); target('Restore Backup')
     launch(); assert state() == final
     open_chart(); target('Recorded values · kg'); unchanged_records(final)
     settings(); tap('Knowledge Base & Support'); capture('help-normal')
@@ -267,7 +278,7 @@ finally:
     adb('shell', 'am', 'force-stop', package)
     adb('exec-in', 'run-as', package, 'tee', 'shared_prefs/open_factor.xml', data=original_xml)
     adb('shell', 'run-as', package, 'mkdir', '-p', 'no_backup/progress-photos')
-    for reference, payload in original_photos.items():
+    for reference, payload in original_files.items():
         adb('exec-in', 'run-as', package, 'tee', 'no_backup/progress-photos/'+reference, data=payload)
         assert adb('exec-out', 'run-as', package, 'cat', 'no_backup/progress-photos/'+reference, raw=True) == payload
     assert adb('exec-out', 'run-as', package, 'cat', 'shared_prefs/open_factor.xml', raw=True) == original_xml

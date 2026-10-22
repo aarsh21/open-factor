@@ -14,8 +14,8 @@ around 34 seconds, Data Visibility around 47 seconds, default body metrics and
 photo controls around 52 seconds, and the Period control around 67 seconds.
 The retained `phone-media-extraction-2026-10-22/export-options.xml` independently
 contains the Quick/Granular tabs, Last 7 Days, and the Quick inclusion summary.
-The source export, reset, and visibility save outcomes were not executed in
-that recording. No source phone or account was changed for this implementation.
+The source export, reset, and visibility save outcomes are unobserved in that
+recording. No source phone or account was changed for this implementation.
 
 The retained ARM64 `libapp.so` has SHA-256
 `870dbb392efa8658b565303f8a83ffff470115cf79a52535f83ba138876a12b6`.
@@ -70,7 +70,7 @@ Local category mappings are:
 | User Profile | Display name only |
 | Exercise Settings | Saved per-exercise defaults |
 | Gym Profiles | Saved equipment and weight selections |
-| Workout Settings | Weight units, rest duration, automatic rest, RIR, auto-next |
+| Workout Settings | Weight and distance units, rest duration, automatic rest, RIR, auto-next, keep-alive, timer, and bodyweight contribution display |
 | Custom Exercises | Saved custom definitions |
 | Workout Log Notes | Dated workout and entry notes |
 | Workout Log | Dated history, with notes omitted in Granular Export |

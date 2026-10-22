@@ -93,7 +93,7 @@ private fun ScopedExportScreen(vm: WorkoutViewModel, snackbar: SnackbarHostState
                     val zone = ZoneId.of(pendingZone)
                     withContext(Dispatchers.IO) {
                         val document = ScopedDataExport.document(snapshot, vm.catalog, request, date, zone)
-                        context.contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use {
+                        context.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter(Charsets.UTF_8)?.use {
                             it.write(document.toString(2))
                         } ?: error("Could not open file. Choose another local folder.")
                     }
