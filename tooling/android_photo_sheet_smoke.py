@@ -193,6 +193,13 @@ try:
     (args.output/'connectivity.txt').write_text(connectivity)
     apk = adb('shell', 'pm', 'path', 'org.openfactor.app').strip().removeprefix('package:')
     (args.output/'apk-sha256.txt').write_text(adb('shell', 'sha256sum', apk))
+    # Serialize additive legacy preference defaults before strict shape checks.
+    # Choosing the current unit must not change any existing preference or record.
+    previous = baseline
+    settings(); tap('Units'); tap('Pounds (lb)' if previous['preferences']['pounds'] else 'Kilograms (kg)')
+    baseline = state()
+    assert {k:v for k,v in baseline.items() if k != 'preferences'} == {k:v for k,v in previous.items() if k != 'preferences'}
+    assert all(baseline['preferences'][key] == value for key,value in previous['preferences'].items())
     fixtures = {}
     for i, (name, color) in enumerate([('front', (139,49,49)), ('side', (43,112,86)), ('back', (55,93,155)), ('replacement', (137,114,34))]):
         fixtures[name] = png(color, i, tag)
