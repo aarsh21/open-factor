@@ -305,10 +305,15 @@ fun BodyMeasurementEditor(
     val fatValid = visualFat.isBlank() || visualFat.bodyDecimal()?.let { it in 0.0..100.0 } == true
     ModalBottomSheet(
         onDismissRequest = onBack,
+        // Keep a reachable outside-dismissal strip below status bars and display cutouts.
+        modifier =
+            Modifier.padding(
+                top = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding() + 48.dp
+            ),
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = OF.card,
     ) {
-        Column(Modifier.fillMaxWidth().fillMaxHeight(.95f).imePadding()) {
+        Column(Modifier.fillMaxWidth().fillMaxHeight().imePadding()) {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,

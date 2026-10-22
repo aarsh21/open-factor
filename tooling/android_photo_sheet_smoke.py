@@ -146,9 +146,15 @@ def dismiss(method, close='Close photos'):
         left, top, right, bottom = bounds(target(close, 'content-desc'))
         height = max(bounds(n)[3] for n in nodes())
         if method == 'scrim':
-            adb('shell', 'input', 'tap', str((left+right)//2), str(top//2))
+            left, top, right, bottom = bounds(target('Close sheet', 'content-desc'))
+            display = adb('shell', 'dumpsys', 'window', 'displays')
+            safe_top = max([0] + [int(y) for y in re.findall(r'type=(?:statusBars|displayCutout) frame=\[0,0\]\[\d+,(\d+)\]', display)])
+            density = int(adb('shell', 'wm', 'density').split()[-1]) / 160
+            assert bottom - max(top, safe_top) >= 48 * density - 1, 'Outside dismissal needs a reachable 48dp strip below system insets'
+            adb('shell', 'input', 'tap', str((left+right)//2), str((max(top, safe_top)+bottom)//2))
         elif method == 'drag':
-            adb('shell', 'input', 'swipe', str((left+right)//2), str(top-15), str((left+right)//2), str(height-80), '600')
+            left, top, right, bottom = bounds(target('Drag handle', 'content-desc'))
+            adb('shell', 'input', 'swipe', str((left+right)//2), str((top+bottom)//2), str((left+right)//2), str(height-80), '600')
         else:
             raise AssertionError(method)
 
@@ -281,15 +287,18 @@ try:
         enter('Visual Body Fat', '37.25')
         if root == 'Exercises':
             adb('shell', 'settings', 'put', 'system', 'font_scale', '1.3'); target('37.25')
-        measurement_dismissal = 'back' if method == 'back' else 'close'
-        if measurement_dismissal == 'back':
+        if method == 'back':
             # Native text input consumes Back to clear focus after the IME is hidden.
             assert any(n.get('class') == 'android.widget.EditText' and n.get('focused') == 'true' for n in nodes())
             back()
             assert not any(n.get('class') == 'android.widget.EditText' and n.get('focused') == 'true' for n in nodes())
-        dismiss(measurement_dismissal, close='Close measurements')
+        if method == 'scrim':
+            capture('full-body-quick-font-130')
+        dismiss(method, close='Close measurements')
         target(label, 'content-desc' if root == 'Dashboard' else 'text'); assert state() == final, (root, 'measurements')
         adb('shell', 'settings', 'put', 'system', 'font_scale', font)
+    settings(); tap('Shortcuts', 'content-desc'); tap('Log Measurements'); target('Full Body')
+    capture('full-body-quick-normal'); dismiss('scrim', close='Close measurements'); target('GENERAL')
     history(); tap('Edit photos '+day2, 'content-desc'); capture('photo-sheet-restored')
     tap('Close photos', 'content-desc'); target('Body Data'); target('Photos')
     assert state() == final and photo_bytes(state()) == assets
@@ -301,7 +310,7 @@ try:
               'enlarged_text_draft_recreation':True, 'full_view_after_source_deletion':True,
               'complete_native_export_restore_cancel_restart':True, 'invalid_restore_atomic':True,
               'quick_photo_and_measurement_caller_context':True, 'history_edit_return':True,
-              'full_body_outside_dismissal':'not exercised: near-full-height scrim is covered by the display cutout/status bar',
+              'full_body_close_back_scrim_drag_discard':True, 'full_body_reachable_scrim_normal_and_130':True,
               'existing_training_body_and_photos_preserved':True, 'source_save_semantics_claimed':False}
     (args.output/'result.json').write_text(json.dumps(result, indent=2)+'\n')
     print(json.dumps(result, indent=2), flush=True)

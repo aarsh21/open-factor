@@ -88,7 +88,9 @@ source deletion, replacement, removal, and all four dismissal paths. The flow
 also checks draft recreation at 1.3× text, complete native export and restore,
 rejected invalid backups, confirmation Cancel, deletion, and process restart.
 Quick-log photo and Full Body checks cover caller return from Settings, Workout,
-Exercises, and Dashboard. Full Body checks use Close and Back, not outside taps.
+Exercises, and Dashboard. Both editors exercise Close, Back, outside taps, and
+handle drags. Full Body outside taps require a reachable 48 dp strip below
+system insets at normal and 1.3× text size.
 The script leaves one synthetic photo record and restores prior network and
 font settings. Existing training, weights, measurements, and original private
 photo bytes remain unchanged. Keep app data, screenshots, and private source

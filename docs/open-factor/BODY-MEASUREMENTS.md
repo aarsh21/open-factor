@@ -94,7 +94,9 @@ controls, exact source typography and spacing, populated history, same-day
 policy, and saved source outcomes remain different or unobserved. The
 [photo editor](PROGRESS-PHOTOS.md) also uses a compact dated sheet.
 
-The near-full-height Full Body layout can leave its outside-tap area behind
-the display cutout and status bar. On the 5582 emulator, that area ends at
-110 px while the status bar ends at 128 px. Close and Back remain available;
-outside-tap dismissal on that device is not verified or claimed.
+Full Body reserves a 48 dp outside-dismissal strip below the top safe-drawing
+inset. The previous percentage-height layout left only 110 px above the sheet
+on emulator 5582, behind its 128 px status bar. The explicit inset keeps the
+near-full-height form, scrollable fields, and keyboard-aware Save footer while
+making the scrim reachable. This clearance is a local accessibility adaptation,
+not a recovered source spacing value.
