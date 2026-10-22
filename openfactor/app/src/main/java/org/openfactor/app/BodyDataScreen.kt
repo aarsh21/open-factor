@@ -21,17 +21,25 @@ import java.time.LocalDate
 @Composable
 fun BodyDataScreen(
     data: AppData,
-    measurements: Boolean,
-    onTab: (Boolean) -> Unit,
+    tab: Int,
+    onTab: (Int) -> Unit,
     onBack: () -> Unit,
     onWeight: (String) -> Unit,
     onMeasurements: (String) -> Unit,
+    onPhotos: (String) -> Unit,
+    photoStore: ProgressPhotoStore,
 ) {
+    val measurements = tab == 1
     Column(Modifier.fillMaxSize()) {
         PageHeading("Body Data", onBack)
-        TabRow(if (measurements) 1 else 0) {
-            Tab(!measurements, { onTab(false) }, text = { Text("Scale Weight") })
-            Tab(measurements, { onTab(true) }, text = { Text("Measurements") })
+        TabRow(tab) {
+            listOf("Scale Weight", "Measurements", "Photos").forEachIndexed { index, title ->
+                Tab(tab == index, { onTab(index) }, text = { Text(title) })
+            }
+        }
+        if (tab == 2) {
+            ProgressPhotoHistory(data.progressPhotos, photoStore, onPhotos)
+            return@Column
         }
         LazyColumn(
             contentPadding = PaddingValues(18.dp),
@@ -387,7 +395,7 @@ private fun BodyNumberField(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BodyDateField(value: String, onChange: (String) -> Unit) {
+internal fun BodyDateField(value: String, onChange: (String) -> Unit) {
     var picking by remember { mutableStateOf(false) }
     val parsed = runCatching { LocalDate.parse(value) }.getOrNull()
     OutlinedTextField(
@@ -429,12 +437,12 @@ private fun BodyDateField(value: String, onChange: (String) -> Unit) {
 }
 
 @Composable
-private fun BodySaveFooter(error: String, save: () -> Unit) {
+internal fun BodySaveFooter(error: String, enabled: Boolean = true, save: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
-        PrimaryAction("Save", save)
+        PrimaryAction("Save", save, enabled = enabled)
     }
 }

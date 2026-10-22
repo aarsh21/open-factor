@@ -57,7 +57,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
     var shortcuts by rememberSaveable { mutableStateOf(false) }
     var workoutSettings by rememberSaveable { mutableStateOf(false) }
     var gymsReturn by rememberSaveable { mutableStateOf("") }
-    var bodyMeasurementsTab by rememberSaveable { mutableStateOf(false) }
+    var bodyDataTab by rememberSaveable { mutableIntStateOf(0) }
     val exercises = vm.exercises(data)
     val snackbar = remember { SnackbarHostState() }
     val routeState = rememberSaveableStateHolder()
@@ -143,7 +143,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                 "draft-picker" -> "workout-draft"
                 "gym" -> "gyms"
                 "gyms" -> gymsReturn
-                "weight-entry", "measurement-entry" -> "body-data"
+                "weight-entry", "measurement-entry", "photo-entry" -> "body-data"
                 "program-picker" -> "program-editor"
                 "program-editor",
                 "program-setup" -> {
@@ -174,25 +174,30 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
             ) {
                 when (route) {
                     "body-data" -> BodyDataScreen(
-                        data, bodyMeasurementsTab, { bodyMeasurementsTab = it }, { route = "" },
+                        data, bodyDataTab, { bodyDataTab = it }, { route = "" },
                         { detailId = it; route = "weight-entry" },
                         { detailId = it; route = "measurement-entry" },
+                        { detailId = it; route = "photo-entry" }, vm.photoStore,
                     )
                     "weight-entry" -> key(detailId) {
                         ScaleWeightEditor(
                             data.scaleWeights.find { it.id == detailId }, data.preferences.pounds,
                             { route = "body-data" },
-                            { vm.saveScaleWeight(it); bodyMeasurementsTab = false; route = "body-data" },
-                            { vm.deleteScaleWeight(detailId); bodyMeasurementsTab = false; route = "body-data" },
+                            { vm.saveScaleWeight(it); bodyDataTab = 0; route = "body-data" },
+                            { vm.deleteScaleWeight(detailId); bodyDataTab = 0; route = "body-data" },
                         )
                     }
                     "measurement-entry" -> key(detailId) {
                         BodyMeasurementEditor(
                             data.bodyMeasurements.find { it.id == detailId },
                             { route = "body-data" },
-                            { vm.saveBodyMeasurements(it); bodyMeasurementsTab = true; route = "body-data" },
-                            { vm.deleteBodyMeasurements(detailId); bodyMeasurementsTab = true; route = "body-data" },
+                            { vm.saveBodyMeasurements(it); bodyDataTab = 1; route = "body-data" },
+                            { vm.deleteBodyMeasurements(detailId); bodyDataTab = 1; route = "body-data" },
                         )
+                    }
+                    "photo-entry" -> key(detailId) {
+                        ProgressPhotoEditor(data.progressPhotos.find { it.id == detailId }, vm,
+                            { route = "body-data" }, { bodyDataTab = 2; route = "body-data" })
                     }
                     "programs" ->
                         ProgramLibrary(
@@ -397,7 +402,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                     onResume = { route = "session" },
                                     onLevels = { route = "levels" },
                                     onBodyData = {
-                                        bodyMeasurementsTab = false
+                                        bodyDataTab = 0
                                         route = "body-data"
                                     },
                                 )
@@ -500,7 +505,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                     modifier = Modifier.clickable {
                         shortcuts = false
                         detailId = ""
-                        bodyMeasurementsTab = false
+                        bodyDataTab = 0
                         route = "weight-entry"
                     },
                     colors = ListItemDefaults.colors(containerColor = OF.top),
@@ -511,8 +516,19 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                     modifier = Modifier.clickable {
                         shortcuts = false
                         detailId = ""
-                        bodyMeasurementsTab = true
+                        bodyDataTab = 1
                         route = "measurement-entry"
+                    },
+                    colors = ListItemDefaults.colors(containerColor = OF.top),
+                )
+                ListItem(
+                    headlineContent = { Text("Log Photos") },
+                    leadingContent = { Icon(Icons.Rounded.PhotoLibrary, null) },
+                    modifier = Modifier.clickable {
+                        shortcuts = false
+                        detailId = ""
+                        bodyDataTab = 2
+                        route = "photo-entry"
                     },
                     colors = ListItemDefaults.colors(containerColor = OF.top),
                 )

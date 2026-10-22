@@ -19,7 +19,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.LocalDate
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen(
@@ -34,18 +37,26 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var dialog by remember { mutableStateOf("") }
-    var restoreText by remember { mutableStateOf<String?>(null) }
+    var restoreBackup by remember { mutableStateOf<PreparedPhotoBackup?>(null) }
+    var backupBusy by remember { mutableStateOf(false) }
+    DisposableEffect(restoreBackup) {
+        val prepared = restoreBackup
+        onDispose { prepared?.close() }
+    }
     val export =
         rememberLauncherForActivityResult(
             ActivityResultContracts.CreateDocument("application/json")
         ) { uri ->
             if (uri != null) {
-                val result = runCatching {
-                    context.contentResolver.openOutputStream(uri)?.use {
-                        it.write(vm.export().toByteArray())
-                    } ?: error("Could not open file")
-                }
+                backupBusy = true
                 scope.launch {
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching {
+                            context.contentResolver.openOutputStream(uri)?.use { vm.export(it) }
+                                ?: error("Could not open file")
+                        }
+                    }
+                    backupBusy = false
                     snackbar.showSnackbar(
                         if (result.isSuccess) "Backup exported"
                         else "Export failed: ${result.exceptionOrNull()?.message}"
@@ -56,21 +67,25 @@ fun SettingsScreen(
     val import =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) {
-                val result = runCatching {
-                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use {
-                        it.readText().also { s ->
-                            require(s.length <= 10_000_000) { "Backup is too large" }
-                            DataCodec.decode(s)
+                backupBusy = true
+                scope.launch(Dispatchers.IO) {
+                    var prepared: PreparedPhotoBackup? = null
+                    try {
+                        prepared = context.contentResolver.openInputStream(uri)?.use {
+                            vm.photoStore.prepare(it)
+                        } ?: error("Could not read backup")
+                        withContext(Dispatchers.Main) { restoreBackup = prepared }
+                        prepared = null
+                    } catch (error: Exception) {
+                        if (error is CancellationException) throw error
+                        withContext(Dispatchers.Main) {
+                            snackbar.showSnackbar("Could not read backup: ${error.message}")
                         }
-                    } ?: error("Could not read backup")
-                }
-                result
-                    .onSuccess { restoreText = it }
-                    .onFailure {
-                        scope.launch {
-                            snackbar.showSnackbar("Could not read backup: ${it.message}")
-                        }
+                    } finally {
+                        prepared?.close()
+                        withContext(Dispatchers.Main) { backupBusy = false }
                     }
+                }
             }
         }
     Column(
@@ -137,7 +152,7 @@ fun SettingsScreen(
             SettingsRow(
                 Icons.Rounded.MonitorWeight,
                 "Body Data",
-                "Weight, body fat and measurements",
+                "Weight, measurements and progress photos",
                 onClick = onBodyData,
             )
             SettingsRow(
@@ -149,16 +164,16 @@ fun SettingsScreen(
             SettingsRow(
                 Icons.Rounded.FileUpload,
                 "Export Backup",
-                "Save training, body data and preferences",
+                if (backupBusy) "Preparing backup…" else "Includes original photos; keep the file private",
             ) {
-                export.launch("open-factor-${LocalDate.now()}.json")
+                if (!backupBusy) export.launch("open-factor-${LocalDate.now()}.json")
             }
             SettingsRow(
                 Icons.Rounded.FileDownload,
                 "Restore Backup",
                 "Import an Open Factor JSON backup",
             ) {
-                import.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+                if (!backupBusy) import.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
             }
         }
         SettingsSection("OPEN FACTOR") {
@@ -290,15 +305,15 @@ fun SettingsScreen(
                 dialog = ""
             }
     }
-    restoreText?.let { text ->
+    restoreBackup?.let { prepared ->
         ConfirmDialog(
             "Restore Backup?",
-            "This replaces all training, body data and preferences on this device. Records absent from the backup will be removed, including body data when restoring an older backup.",
+            "This replaces all training, body data, private progress photos and preferences on this device. Records absent from the backup will be removed, including photos when restoring an older backup.",
             "Restore",
-            onDismiss = { restoreText = null },
+            onDismiss = { restoreBackup = null },
             onConfirm = {
-                val result = runCatching { vm.restore(text) }
-                restoreText = null
+                val result = runCatching { vm.restore(prepared) }
+                restoreBackup = null
                 scope.launch {
                     snackbar.showSnackbar(
                         if (result.isSuccess) "Backup restored"

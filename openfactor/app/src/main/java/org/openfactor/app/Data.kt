@@ -3,6 +3,9 @@ package org.openfactor.app
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.OutputStream
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -100,6 +103,7 @@ data class AppData(
     val scaleWeights: List<ScaleWeightRecord> = emptyList(),
     val bodyMeasurements: List<BodyMeasurementRecord> = emptyList(),
     val workoutDraft: WorkoutDraft? = null,
+    val progressPhotos: List<ProgressPhotoRecord> = emptyList(),
 )
 
 fun newId() = UUID.randomUUID().toString()
@@ -286,6 +290,7 @@ object DataCodec {
             .put("onboarding", d.onboarding.json())
             .put("scaleWeights", BodyDataCodec.weights(d.scaleWeights))
             .put("bodyMeasurements", BodyDataCodec.measurements(d.bodyMeasurements))
+            .put("progressPhotos", ProgressPhotoCodec.encode(d.progressPhotos))
             .put("gyms", JSONArray(d.gyms.map { GymCodec.encode(it) }))
             .put("active", d.active?.json())
             .put("history", JSONArray(d.history.map { it.json() }))
@@ -413,6 +418,7 @@ object DataCodec {
                     notes = it.optString("notes"),
                 )
             },
+            progressPhotos = ProgressPhotoCodec.decode(j),
         )
     }
 
@@ -458,6 +464,7 @@ class WorkoutStore(context: Context) {
 
 class WorkoutViewModel(application: Application) : AndroidViewModel(application) {
     private val store = WorkoutStore(application)
+    val photoStore = ProgressPhotoStore(application)
     private val _data = MutableStateFlow(store.load())
     val data = _data.asStateFlow()
     private val imported =
@@ -533,6 +540,23 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun deleteBodyMeasurements(id: String) = update {
         it.copy(bodyMeasurements = it.bodyMeasurements.filterNot { record -> record.id == id })
     }
+
+    fun saveProgressPhotos(record: ProgressPhotoRecord) {
+        record.validate()
+        val next = _data.value.copy(progressPhotos = listOf(record) +
+            _data.value.progressPhotos.filterNot { it.id == record.id })
+        photoStore.requireFiles(next)
+        update { next }
+        cleanPhotos()
+    }
+
+    fun deleteProgressPhotos(id: String) {
+        update { it.copy(progressPhotos = it.progressPhotos.filterNot { record -> record.id == id }) }
+        cleanPhotos()
+    }
+
+    fun cleanPhotos(draft: Collection<String> = emptyList()) =
+        photoStore.clean(_data.value.photoReferences() + draft)
 
     fun editOnboarding(block: (OnboardingState) -> OnboardingState) = update {
         it.copy(onboarding = block(it.onboarding))
@@ -821,7 +845,11 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun restore(text: String) {
-        val decoded = DataCodec.decode(text)
+        photoStore.prepare(ByteArrayInputStream(text.toByteArray())).use { restore(it) }
+    }
+
+    fun restore(backup: PreparedPhotoBackup) {
+        val decoded = backup.data
         val d =
             if (decoded.gyms.isEmpty())
                 decoded.copy(
@@ -834,11 +862,15 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                         )
                 )
             else decoded
+        backup.install()
         store.save(d)
         _data.value = d
+        cleanPhotos()
     }
 
-    fun export() = DataCodec.encode(_data.value)
+    fun export(output: OutputStream) = photoStore.export(_data.value, output)
+
+    fun export(): String = ByteArrayOutputStream().also { export(it) }.toString("UTF-8")
 }
 
 val Exercise.title: String
