@@ -91,6 +91,13 @@ data class Preferences(
     val showInsights: Boolean = true,
     val showHabits: Boolean = true,
     val exerciseAutoNext: Boolean = true,
+    val keepAlive: Boolean = false,
+    val showWorkoutTimer: Boolean = true,
+    val showBodyweightContribution: Boolean = true,
+    val distanceImperial: Boolean = false,
+    val heightInFeet: Boolean = false,
+    val clock24Hour: Boolean = false,
+    val dataVisibility: DataVisibility = DataVisibility(),
 )
 
 data class AppData(
@@ -344,7 +351,14 @@ object DataCodec {
                     .put("showWeeklyWorkouts", d.preferences.showWeeklyWorkouts)
                     .put("showInsights", d.preferences.showInsights)
                     .put("showHabits", d.preferences.showHabits)
-                    .put("exerciseAutoNext", d.preferences.exerciseAutoNext),
+                    .put("exerciseAutoNext", d.preferences.exerciseAutoNext)
+                    .put("keepAlive", d.preferences.keepAlive)
+                    .put("showWorkoutTimer", d.preferences.showWorkoutTimer)
+                    .put("showBodyweightContribution", d.preferences.showBodyweightContribution)
+                    .put("distanceImperial", d.preferences.distanceImperial)
+                    .put("heightInFeet", d.preferences.heightInFeet)
+                    .put("clock24Hour", d.preferences.clock24Hour)
+                    .put("dataVisibility", DataVisibilityCodec.encode(d.preferences.dataVisibility)),
             )
             .toString(2)
 
@@ -428,6 +442,14 @@ object DataCodec {
                 p.optBoolean("showInsights", true),
                 p.optBoolean("showHabits", true),
                 p.optBoolean("exerciseAutoNext", true),
+                keepAlive = p.optBoolean("keepAlive", false),
+                showWorkoutTimer = p.optBoolean("showWorkoutTimer", true),
+                showBodyweightContribution = p.optBoolean("showBodyweightContribution", true),
+                distanceImperial = p.optBoolean("distanceImperial", false),
+                heightInFeet = p.optBoolean("heightInFeet", false),
+                clock24Hour = p.optBoolean("clock24Hour", false),
+                dataVisibility = if (p.has("dataVisibility"))
+                    DataVisibilityCodec.decode(p.getJSONObject("dataVisibility")) else DataVisibility(),
             ),
             j.optString("activeProgramId").takeIf { it.isNotBlank() && it != "null" },
             j.array("gyms").objects().map { GymCodec.decode(it) },

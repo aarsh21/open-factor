@@ -5,6 +5,21 @@ import org.junit.Test
 
 class WorkoutDataTest {
     @Test
+    fun distanceUnitsConvertMilesAndYardsWithoutChangingOtherActuals() {
+        assertEquals(2414.016, SetMetric.DISTANCE_LONG.parse("1.5", false, true)!!, 0.000001)
+        assertEquals(1500.0, SetMetric.DISTANCE_LONG.parse("1.5", true, false)!!, 0.0)
+        assertEquals(22.86, SetMetric.DISTANCE_SHORT.parse("25", true, true)!!, 0.000001)
+        assertEquals(22.86, SetMetric.DISTANCE_PER_SIDE.parse("25", false, true)!!, 0.000001)
+        val set = LoggedSet(distanceMeters = 2414.016, durationSeconds = 73.0, weightKg = 31.0)
+        assertEquals("1.5 mi · 73 Seconds", set.describe(listOf(SetMetric.DISTANCE_LONG, SetMetric.DURATION), false, true))
+        assertEquals("2.414", SetMetric.DISTANCE_LONG.display(set, false, false))
+        assertEquals("31", SetMetric.WEIGHT.display(set, false, true))
+        assertEquals("73", SetMetric.DURATION.display(set, true, true))
+        assertEquals("yd / side", SetMetric.DISTANCE_PER_SIDE.label(false, true))
+        assertNull(SetMetric.DISTANCE_SHORT.parse("0", false, true))
+    }
+
+    @Test
     fun exerciseDefaultsRoundTripWithoutChangingSavedEntries() {
         val defaults = ExerciseDefaults("Global note", 75, true)
         val session = SessionExercise(exerciseId = "chin", notes = "Session note", restSeconds = 0)

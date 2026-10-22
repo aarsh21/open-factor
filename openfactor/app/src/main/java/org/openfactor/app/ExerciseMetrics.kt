@@ -19,7 +19,7 @@ enum class SetMetric(val catalogName: String) {
     val isReps get() = this == REPS || this == REPS_PER_SIDE
     val isLoad get() = this in listOf(WEIGHT, WEIGHT_PER_SIDE, WEIGHT_PER_SIDE_PERSISTENT, ASSISTANCE)
 
-    fun label(pounds: Boolean): String {
+    fun label(pounds: Boolean, distanceImperial: Boolean = false): String {
         val unit = if (pounds) "lb" else "kg"
         return when (this) {
             WEIGHT -> unit
@@ -29,9 +29,9 @@ enum class SetMetric(val catalogName: String) {
             REPS_PER_SIDE -> "Reps / side"
             DURATION -> "Seconds"
             DURATION_PER_SIDE -> "Seconds / side"
-            DISTANCE_LONG -> "km"
-            DISTANCE_SHORT -> "m"
-            DISTANCE_PER_SIDE -> "m / side"
+            DISTANCE_LONG -> if (distanceImperial) "mi" else "km"
+            DISTANCE_SHORT -> if (distanceImperial) "yd" else "m"
+            DISTANCE_PER_SIDE -> if (distanceImperial) "yd / side" else "m / side"
         }
     }
 
@@ -49,19 +49,23 @@ enum class SetMetric(val catalogName: String) {
         else -> value > 0.0
     }
 
-    fun parse(text: String, pounds: Boolean): Double? =
+    fun parse(text: String, pounds: Boolean, distanceImperial: Boolean = false): Double? =
         text.replace(',', '.').toDoubleOrNull()?.let { entered ->
             when {
                 isLoad && pounds -> entered / 2.2046226218
+                this == DISTANCE_LONG && distanceImperial -> entered * 1609.344
                 this == DISTANCE_LONG -> entered * 1000.0
+                distanceImperial && (this == DISTANCE_SHORT || this == DISTANCE_PER_SIDE) -> entered * 0.9144
                 else -> entered
             }
         }?.takeIf(::valid)
 
-    fun display(set: LoggedSet, pounds: Boolean): String = value(set)?.let {
+    fun display(set: LoggedSet, pounds: Boolean, distanceImperial: Boolean = false): String = value(set)?.let {
         val shown = when {
             isLoad && pounds -> it * 2.2046226218
+            this == DISTANCE_LONG && distanceImperial -> it / 1609.344
             this == DISTANCE_LONG -> it / 1000.0
+            distanceImperial && (this == DISTANCE_SHORT || this == DISTANCE_PER_SIDE) -> it / 0.9144
             else -> it
         }
         if (shown % 1.0 == 0.0) shown.toLong().toString()
@@ -94,9 +98,10 @@ fun LoggedSet.canComplete(metrics: List<SetMetric>): Boolean =
     metrics.all { metric -> metric.value(this)?.let(metric::valid) == true } &&
         (rir == null || rir in 0..10)
 
-fun LoggedSet.describe(metrics: List<SetMetric>, pounds: Boolean): String =
+fun LoggedSet.describe(metrics: List<SetMetric>, pounds: Boolean, distanceImperial: Boolean = false): String =
     (metrics.mapNotNull { metric ->
-        metric.display(this, pounds).takeIf { it.isNotEmpty() }?.let { "$it ${metric.label(pounds)}" }
+        metric.display(this, pounds, distanceImperial).takeIf { it.isNotEmpty() }
+            ?.let { "$it ${metric.label(pounds, distanceImperial)}" }
     } + listOfNotNull(rir?.let { "$it RIR" })).joinToString(" · ").ifEmpty { "Completed" }
 
 fun LoggedSet.targetDescription(): String = buildList {
