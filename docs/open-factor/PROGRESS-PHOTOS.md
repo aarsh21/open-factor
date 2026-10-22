@@ -77,10 +77,10 @@ python tooling/android_photo_sheet_smoke.py --serial emulator-5582 \
   --output .amp/in/artifacts/photo-sheet/ui
 ```
 
-The older `android_progress_photos_smoke.py` assumes an empty photo history and
-an inline date. Before use, its date steps need Change photo date, a typed date,
-and Apply date. Its final shortcut-dismissal check needs the caller instead of
-Body Data.
+The older `android_progress_photos_smoke.py` still requires an empty photo
+history. It now opens Change photo date, types the date and uses Apply date.
+Its final shortcut-dismissal check expects the Dashboard caller, then reopens
+Body Data to check the saved photo history.
 
 The photo-sheet smoke preserves existing photos. It checks the compact square
 slots, invalid dates, picker Cancel, three attachments, full-image reopen after

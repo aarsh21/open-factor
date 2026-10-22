@@ -30,9 +30,11 @@ def adb(*command, raw=False):
 def nodes():
     for attempt in range(8):
         try:
-            adb('shell', 'uiautomator', 'dump', '/sdcard/of-body-ui.xml')
+            dumped = adb('shell', 'uiautomator', 'dump', '/sdcard/of-body-ui.xml')
+            if 'dumped to:' not in dumped:
+                raise RuntimeError('UI hierarchy unavailable; do not read a stale dump')
             return list(ET.fromstring(adb('shell', 'cat', '/sdcard/of-body-ui.xml')).iter('node'))
-        except (subprocess.CalledProcessError, ET.ParseError):
+        except (subprocess.CalledProcessError, ET.ParseError, RuntimeError):
             if attempt == 7:
                 raise
             time.sleep(.4)
@@ -313,7 +315,9 @@ try:
     tap('Log Measurements')
     find('Full Body')
     back()
-    find('Log Measurements')
+    find('Dashboard')
+    assert any(n.get('selected') == 'true' and any(c.get('text') == 'Dashboard' for c in n.iter('node')) for n in nodes()), 'Measurement dismissal did not return to its Dashboard caller'
+    capture('measurement-caller-return')
     assert state() == exported_data
     (args.output / 'final-state.json').write_text(json.dumps(state(), indent=2) + '\n')
     offline()

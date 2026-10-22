@@ -33,9 +33,11 @@ def adb(*command, raw=False):
 def nodes():
     for attempt in range(8):
         try:
-            adb('shell', 'uiautomator', 'dump', '/sdcard/of-photo-ui.xml')
+            dumped = adb('shell', 'uiautomator', 'dump', '/sdcard/of-photo-ui.xml')
+            if 'dumped to:' not in dumped:
+                raise RuntimeError('UI hierarchy unavailable; do not read a stale dump')
             return list(ET.fromstring(adb('shell', 'cat', '/sdcard/of-photo-ui.xml')).iter('node'))
-        except (ET.ParseError, subprocess.CalledProcessError):
+        except (ET.ParseError, subprocess.CalledProcessError, RuntimeError):
             if attempt == 7:
                 raise
             time.sleep(.3)
@@ -168,7 +170,9 @@ try:
     tap('Log Photos'); capture('photos-empty-editor')
     tap('Save'); target('Attach at least one photo')
     assert state() == baseline
+    tap('Change photo date', 'content-desc')
     enter('Date (YYYY-MM-DD)', '2026-10-15')
+    tap('Apply date')
     tap('Add Front photo', 'content-desc'); target('Show roots', 'content-desc'); back()
     assert state() == baseline
     for position in ('Front', 'Side', 'Back'):
@@ -193,10 +197,13 @@ try:
     tap('View Front photo', 'content-desc'); target('Front · 2026-10-15'); capture('photos-full-view'); back()
     target('Progress Photos')
     tap('Remove Side photo', 'content-desc'); back()
+    target('Edit photos 2026-10-15', 'content-desc')
     assert state()['progressPhotos'][0] == saved
     assert set(saved['photos'].values()) <= private_names()
     tap('Edit photos 2026-10-15', 'content-desc')
+    tap('Change photo date', 'content-desc')
     enter('Date (YYYY-MM-DD)', '2026-10-16')
+    tap('Apply date')
     tap('Remove Side photo', 'content-desc'); tap('Save')
     target('Edit photos 2026-10-16', 'content-desc')
     changed = state()['progressPhotos'][0]
@@ -204,7 +211,9 @@ try:
     assert saved['photos']['side'] not in private_names()
     tap('Edit photos 2026-10-16', 'content-desc')
     tap('Replace Back photo', 'content-desc'); choose('ofphoto-replacement.png')
-    target('View Back photo', 'content-desc'); back()
+    target('View Back photo', 'content-desc')
+    assert hashlib.sha256(fixtures['replacement']).hexdigest() in private_names()
+    back(); target('Edit photos 2026-10-16', 'content-desc')
     assert state()['progressPhotos'][0] == changed
     assert hashlib.sha256(fixtures['replacement']).hexdigest() not in private_names()
     tap('Edit photos 2026-10-16', 'content-desc')
@@ -247,6 +256,10 @@ try:
         assert base64.b64decode(encoded) == private(reference)
     assert {k:v for k,v in state().items() if k != 'progressPhotos'} == {k:v for k,v in baseline.items() if k != 'progressPhotos'}
     tap('Shortcuts', 'content-desc'); tap('Log Photos'); target('Progress Photos'); back()
+    target('Dashboard')
+    assert any(n.get('selected') == 'true' and any(c.get('text') == 'Dashboard' for c in n.iter('node')) for n in nodes()), 'Photo dismissal did not return to its Dashboard caller'
+    capture('photos-caller-return')
+    settings(); tap('Body Data'); tap('Photos')
     target('Edit photos 2026-10-16', 'content-desc'); capture('photos-restored-history')
     assert state() == metadata
     assert 'Active default network: none' in adb('shell', 'dumpsys', 'connectivity')
