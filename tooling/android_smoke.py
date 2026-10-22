@@ -153,6 +153,7 @@ if a.media:
    time.sleep(.5)
   else:raise AssertionError('The emulator still has an active network')
   tap('Search exercises');adb('shell','input','text','chin-up');adb('shell','input','keyevent','4');tap('Chin-Up')
+  find('Info');capture('exercise-settings');tap('Info');find('Close Info','content-desc')
   assert_autoplay();capture('media-autoplay-opened')
   if a.parity_actions:
    phrase='While standing under a pull-up bar'
@@ -193,7 +194,7 @@ if a.media:
   assert not any(n.get('class')=='android.widget.VideoView' for n in nodes()), 'Video continued after backgrounding'
   tap('Play exercise video','content-desc');find('android.widget.VideoView','class')
   adb('shell','input','keyevent','4')
-  tap('Chin-Up');assert_autoplay();capture('media-autoplay-reopened');adb('shell','input','keyevent','4')
+  find('Info');tap('Info');assert_autoplay();capture('media-autoplay-reopened');adb('shell','input','keyevent','4')
   # Damage only disposable playback caches, never the bundled original clips.
   catalog=json.loads(Path('openfactor/app/src/main/assets/catalog.json').read_text())
   chin_id=next(exercise['id'] for exercise in catalog if exercise['name'].casefold()=='chin-up')
@@ -206,7 +207,7 @@ if a.media:
   assert len(expected)==3, 'Expected the three exercised camera caches'
   try:
    for path in cached:adb('shell','run-as','org.openfactor.app','truncate','-s','0',path)
-   tap('Chin-Up')
+   tap('Info')
    for view in range(1,4):
     tap(f'Camera view {view}','content-desc');assert_autoplay()
    actual={path:adb('shell','run-as','org.openfactor.app','sha256sum',path).split()[0] for path in cached}
@@ -218,6 +219,8 @@ if a.media:
     if adb('shell','run-as','org.openfactor.app','stat','-c','%s',path).strip()=='0':
      adb('shell','run-as','org.openfactor.app','rm',path)
   adb('shell','input','keyevent','4')
+  find('Info');tap('Back','content-desc');find('Chin-Up')
+  assert any(n.get('class')=='android.widget.EditText' and n.get('text')=='chin-up' for n in nodes()), 'Info return lost the library query'
  finally:
   if wifi in ('0','1'):adb('shell','svc','wifi','enable' if wifi=='1' else 'disable')
   if mobile in ('0','1'):adb('shell','svc','data','enable' if mobile=='1' else 'disable')
