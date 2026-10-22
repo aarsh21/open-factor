@@ -30,13 +30,103 @@ data class ProgramDay(
     val exercises: List<PlannedExercise> = emptyList(),
 )
 
+/** Presentation provenance, not an inference that every cycle lasts seven days. */
+enum class ProgramCycleUnit(val singular: String, val plural: String) {
+    CYCLE("Cycle", "Cycles"),
+    WEEK("Week", "Weeks"),
+}
+
 data class TrainingProgram(
     val id: String = newId(),
     val name: String,
     val color: Long = 0xFFFF2F4A,
     val days: List<ProgramDay> = listOf(ProgramDay()),
     val cycleCount: Int = 7,
+    val icon: String = "rocket",
+    val cycleUnit: ProgramCycleUnit = ProgramCycleUnit.CYCLE,
 )
+
+/** Local resize policy: keep existing cycles; new cycles copy the final prescription. */
+fun TrainingProgram.resizeCycles(count: Int): TrainingProgram {
+    require(count in 1..52) { "Program cycles must be between 1 and 52" }
+    return copy(
+        cycleCount = count,
+        days =
+            days.map { day ->
+                day.copy(
+                    exercises =
+                        day.exercises.map { exercise ->
+                            exercise.copy(
+                                cycles =
+                                    List(count) { index ->
+                                        exercise.cycles.getOrNull(index)
+                                            ?: exercise.cycles.last().let { target ->
+                                                target.copy(
+                                                    sets = target.sets.map { it.copy(id = newId()) }
+                                                )
+                                            }
+                                    }
+                            )
+                        }
+                )
+            },
+    )
+}
+
+enum class TargetSaveScope {
+    EXERCISE,
+    DAY,
+    PROGRAM,
+}
+
+/** Explicit local replacement policy; source scope controls are observed, save outcomes are not. */
+fun TrainingProgram.withTargets(
+    dayId: String,
+    plannedId: String,
+    targets: Map<Int, CycleTarget>,
+    scope: TargetSaveScope,
+    exercises: List<Exercise>,
+): TrainingProgram {
+    require(targets.keys.all { it in 0 until cycleCount }) { "Invalid target cycle" }
+    val source = days.find { it.id == dayId }?.exercises?.find { it.id == plannedId } ?: return this
+    return copy(
+        days =
+            days.map day@{ day ->
+                if (scope != TargetSaveScope.PROGRAM && day.id != dayId) return@day day
+                day.copy(
+                    exercises =
+                        day.exercises.map exercise@{ exercise ->
+                            val sameEntry = day.id == dayId && exercise.id == source.id
+                            if (scope == TargetSaveScope.EXERCISE && !sameEntry)
+                                return@exercise exercise
+                            val supportsReps =
+                                exercises
+                                    .find { it.id == exercise.exerciseId }
+                                    ?.loggingMetrics()
+                                    ?.any { it.isReps } != false
+                            val cycles =
+                                exercise.cycles.mapIndexed { index, old ->
+                                    val target = targets[index] ?: return@mapIndexed old
+                                    val sets =
+                                        target.sets.mapIndexed { setIndex, set ->
+                                            set.copy(
+                                                id =
+                                                    if (sameEntry) set.id
+                                                    else
+                                                        old.sets.getOrNull(setIndex)?.id ?: newId(),
+                                                repsMin = set.repsMin.takeIf { supportsReps },
+                                                repsMax = set.repsMax.takeIf { supportsReps },
+                                                rir = set.rir.takeIf { supportsReps },
+                                            )
+                                        }
+                                    target.copy(sets = sets)
+                                }
+                            exercise.copy(cycles = cycles)
+                        }
+                )
+            }
+    )
+}
 
 fun ProgramDay.addExercise(exerciseId: String, cycleCount: Int, workoutName: String): ProgramDay =
     copy(
@@ -49,7 +139,12 @@ fun ProgramDay.addExercise(exerciseId: String, cycleCount: Int, workoutName: Str
                 ),
     )
 
-fun TrainingProgram.toWorkout(dayId: String, cycle: Int, now: Long, defaults: Map<String, ExerciseDefaults> = emptyMap()): Workout? {
+fun TrainingProgram.toWorkout(
+    dayId: String,
+    cycle: Int,
+    now: Long,
+    defaults: Map<String, ExerciseDefaults> = emptyMap(),
+): Workout? {
     val day = days.find { it.id == dayId } ?: return null
     if (cycle !in 0 until cycleCount) return null
     val session =
@@ -94,6 +189,8 @@ object ProgramCodec {
             .put("name", p.name)
             .put("color", p.color)
             .put("cycleCount", p.cycleCount)
+            .put("icon", p.icon)
+            .put("cycleUnit", p.cycleUnit.name)
             .put(
                 "days",
                 JSONArray(
@@ -208,6 +305,11 @@ object ProgramCodec {
             j.optLong("color", 0xFFFF2F4A),
             days,
             count,
+            j.optString("icon", "rocket"),
+            j.optString("cycleUnit", "CYCLE").let { value ->
+                require(value in ProgramCycleUnit.entries.map { it.name }) { "Invalid cycle unit" }
+                ProgramCycleUnit.valueOf(value)
+            },
         )
     }
 }

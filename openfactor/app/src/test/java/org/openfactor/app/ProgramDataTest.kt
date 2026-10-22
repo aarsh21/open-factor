@@ -89,7 +89,8 @@ class ProgramDataTest {
                         ProgramDay(id = "rest"),
                     ),
             )
-        val w = p.toWorkout("day", 2, 1000, mapOf("press" to ExerciseDefaults("Default note", 75)))!!
+        val w =
+            p.toWorkout("day", 2, 1000, mapOf("press" to ExerciseDefaults("Default note", 75)))!!
         assertEquals("plan", w.programId)
         assertEquals("day", w.programDayId)
         assertEquals(2, w.programCycle)
@@ -105,8 +106,10 @@ class ProgramDataTest {
         assertFalse(set.completed)
         assertEquals(45, e.restSeconds)
         assertEquals("", e.notes)
-        val entered = w.copy(exercises = listOf(e.copy(sets = listOf(set.copy(weightKg = 37.5, reps = 9)))))
-        val complete = entered.toggleSetCompletion(e.id, set.id, Preferences(restSeconds = 120), 2000)
+        val entered =
+            w.copy(exercises = listOf(e.copy(sets = listOf(set.copy(weightKg = 37.5, reps = 9)))))
+        val complete =
+            entered.toggleSetCompletion(e.id, set.id, Preferences(restSeconds = 120), 2000)
         assertEquals(47000L, complete.restUntil)
         assertEquals(w, DataCodec.decode(DataCodec.encode(AppData(active = w))).active)
         assertNull(p.toWorkout("rest", 0, 1000))
@@ -128,7 +131,10 @@ class ProgramDataTest {
                                 listOf(
                                     PlannedExercise(
                                         exerciseId = "press",
-                                        cycles = List(7) { CycleTarget(restSeconds = if (it == 0) 0 else null) },
+                                        cycles =
+                                            List(7) {
+                                                CycleTarget(restSeconds = if (it == 0) 0 else null)
+                                            },
                                     )
                                 )
                         )
@@ -137,7 +143,11 @@ class ProgramDataTest {
         val defaults = mapOf("press" to ExerciseDefaults(restSeconds = 75))
         val w = p.toWorkout(p.days.first().id, 0, 1000, defaults)!!
         val e = w.exercises.single()
-        val entered = w.copy(exercises = listOf(e.copy(sets = listOf(e.sets.single().copy(weightKg = 37.5, reps = 9)))))
+        val entered =
+            w.copy(
+                exercises =
+                    listOf(e.copy(sets = listOf(e.sets.single().copy(weightKg = 37.5, reps = 9))))
+            )
         assertEquals(
             0L,
             entered.toggleSetCompletion(e.id, e.sets.single().id, Preferences(), 2000).restUntil,
@@ -263,5 +273,156 @@ class ProgramDataTest {
         val all = applyCycleTargetEdit(single, -1, changed, edited = true)
         assertTrue(all.all { it == changed })
         assertTrue(all.haveEquivalentTargets())
+    }
+
+    @Test
+    fun resizingKeepsAsymmetricTargetsAndExtendsOnlyTheFinalPrescription() {
+        val cycles =
+            List(3) { index ->
+                CycleTarget(
+                    listOf(SetTarget(id = "set-$index", repsMin = 5 + index, repsMax = 9 + index)),
+                    skip = index == 1,
+                    restSeconds = if (index == 2) 0 else null,
+                )
+            }
+        val plan =
+            TrainingProgram(
+                name = "Variable",
+                cycleCount = 3,
+                icon = "diamond",
+                cycleUnit = ProgramCycleUnit.WEEK,
+                days =
+                    listOf(
+                        ProgramDay(
+                            id = "upper",
+                            exercises =
+                                listOf(PlannedExercise(exerciseId = "press", cycles = cycles)),
+                        ),
+                        ProgramDay(id = "rest"),
+                    ),
+            )
+        val expanded = plan.resizeCycles(5)
+        val targets = expanded.days.first().exercises.single().cycles
+        assertEquals(cycles, targets.take(3))
+        assertEquals(listOf(7, 7), targets.drop(3).map { it.sets.single().repsMin })
+        assertTrue(targets.drop(3).all { it.restSeconds == 0 && !it.skip })
+        assertNotEquals(targets[2].sets.single().id, targets[3].sets.single().id)
+        assertNotEquals(targets[3].sets.single().id, targets[4].sets.single().id)
+        assertEquals(
+            cycles.take(2),
+            expanded.resizeCycles(2).days.first().exercises.single().cycles,
+        )
+        assertEquals(plan, ProgramCodec.decode(ProgramCodec.encode(plan)))
+        assertEquals(expanded, ProgramCodec.decode(ProgramCodec.encode(expanded)))
+        assertEquals(3, plan.cycleCount)
+        val legacy =
+            ProgramCodec.encode(plan).also {
+                it.remove("icon")
+                it.remove("cycleUnit")
+            }
+        val restored = ProgramCodec.decode(legacy)
+        assertEquals("rocket", restored.icon)
+        assertEquals(ProgramCycleUnit.CYCLE, restored.cycleUnit)
+    }
+
+    @Test
+    fun targetSavingScopesChangeOnlySelectedInstancesAndCycles() {
+        val catalog =
+            listOf(
+                Exercise("press", "Press", "Chest", "Barbell"),
+                Exercise(
+                    "hold",
+                    "Hold",
+                    "Abs",
+                    "Bodyweight",
+                    properties = mapOf("Metrics" to "Duration"),
+                ),
+            )
+        fun entry(id: String, min: Int) =
+            PlannedExercise(
+                id = id,
+                exerciseId = "press",
+                cycles =
+                    List(3) { index ->
+                        CycleTarget(
+                            listOf(SetTarget(id = "$id-$index", repsMin = min + index)),
+                            restSeconds = 75,
+                        )
+                    },
+            )
+        val plan =
+            TrainingProgram(
+                name = "Scopes",
+                cycleCount = 3,
+                days =
+                    listOf(
+                        ProgramDay(
+                            id = "upper",
+                            exercises = listOf(entry("source", 5), entry("second", 11)),
+                        ),
+                        ProgramDay(
+                            id = "lower",
+                            exercises = listOf(entry("third", 17).copy(exerciseId = "hold")),
+                        ),
+                    ),
+            )
+        val changed =
+            CycleTarget(
+                listOf(SetTarget(id = "new", repsMin = 8, repsMax = 13, rir = 1)),
+                skip = true,
+                restSeconds = 0,
+            )
+        val single =
+            plan.withTargets(
+                "upper",
+                "source",
+                mapOf(1 to changed),
+                TargetSaveScope.EXERCISE,
+                catalog,
+            )
+        assertEquals(changed, single.days[0].exercises[0].cycles[1])
+        assertEquals(plan.days[0].exercises[0].cycles[0], single.days[0].exercises[0].cycles[0])
+        assertEquals(plan.days[0].exercises[1], single.days[0].exercises[1])
+        assertEquals(plan.days[1], single.days[1])
+        val day =
+            plan.withTargets("upper", "source", mapOf(1 to changed), TargetSaveScope.DAY, catalog)
+        assertEquals(8, day.days[0].exercises[1].cycles[1].sets.single().repsMin)
+        assertEquals("second-1", day.days[0].exercises[1].cycles[1].sets.single().id)
+        assertTrue(day.days[0].exercises[1].cycles[1].skip)
+        assertEquals(0, day.days[0].exercises[1].cycles[1].restSeconds)
+        assertEquals(plan.days[1], day.days[1])
+        val all =
+            plan.withTargets(
+                "upper",
+                "source",
+                mapOf(1 to changed, 2 to changed),
+                TargetSaveScope.PROGRAM,
+                catalog,
+            )
+        all.days
+            .flatMap { it.exercises }
+            .forEach { exercise ->
+                val expected = if (exercise.exerciseId == "hold") null else 8
+                assertEquals(
+                    listOf(expected, expected),
+                    exercise.cycles.drop(1).map { it.sets.single().repsMin },
+                )
+                if (exercise.exerciseId == "hold")
+                    exercise.cycles.drop(1).forEach {
+                        assertNull(it.sets.single().repsMax)
+                        assertNull(it.sets.single().rir)
+                        assertTrue(it.skip)
+                        assertEquals(0, it.restSeconds)
+                    }
+            }
+        assertEquals(
+            plan.days[1].exercises.single().cycles[0],
+            all.days[1].exercises.single().cycles[0],
+        )
+        assertEquals(
+            plan,
+            plan.withTargets("upper", "source", emptyMap(), TargetSaveScope.PROGRAM, catalog),
+        )
+        assertEquals(all, ProgramCodec.decode(ProgramCodec.encode(all)))
     }
 }
