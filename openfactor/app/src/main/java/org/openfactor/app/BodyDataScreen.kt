@@ -28,6 +28,7 @@ fun BodyDataScreen(
     onMeasurements: (String) -> Unit,
     onPhotos: (String) -> Unit,
     photoStore: ProgressPhotoStore,
+    onCharts: () -> Unit,
 ) {
     val measurements = tab == 1
     Column(Modifier.fillMaxSize()) {
@@ -58,6 +59,13 @@ fun BodyDataScreen(
                     color = OF.muted,
                     style = MaterialTheme.typography.bodySmall,
                 )
+            }
+            item {
+                OutlinedButton(onCharts, Modifier.fillMaxWidth()) {
+                    Icon(Icons.Rounded.ShowChart, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("View Charts")
+                }
             }
             if (measurements) {
                 if (data.bodyMeasurements.isEmpty())

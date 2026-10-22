@@ -58,6 +58,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
     var workoutSettings by rememberSaveable { mutableStateOf(false) }
     var gymsReturn by rememberSaveable { mutableStateOf("") }
     var bodyDataTab by rememberSaveable { mutableIntStateOf(0) }
+    var bodyChartMetric by rememberSaveable { mutableStateOf("weight") }
+    var bodyChartRange by rememberSaveable { mutableStateOf(BodyChartRange.WEEK) }
     val exercises = vm.exercises(data)
     val snackbar = remember { SnackbarHostState() }
     val routeState = rememberSaveableStateHolder()
@@ -144,6 +146,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                 "gym" -> "gyms"
                 "gyms" -> gymsReturn
                 "weight-entry", "measurement-entry", "photo-entry" -> "body-data"
+                "body-charts" -> "body-data"
                 "program-picker" -> "program-editor"
                 "program-editor",
                 "program-setup" -> {
@@ -178,6 +181,14 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                         { detailId = it; route = "weight-entry" },
                         { detailId = it; route = "measurement-entry" },
                         { detailId = it; route = "photo-entry" }, vm.photoStore,
+                        {
+                            bodyChartMetric = if (bodyDataTab == 1) BodyMeasurement.NECK.key else "weight"
+                            route = "body-charts"
+                        },
+                    )
+                    "body-charts" -> BodyChartScreen(
+                        data, bodyChartMetric, bodyChartRange,
+                        { bodyChartMetric = it }, { bodyChartRange = it }, { route = "body-data" },
                     )
                     "weight-entry" -> key(detailId) {
                         ScaleWeightEditor(

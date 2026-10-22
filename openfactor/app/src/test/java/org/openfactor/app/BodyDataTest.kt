@@ -142,4 +142,83 @@ class BodyDataTest {
             good.withScaleWeight(ScaleWeightRecord(weightKg = Double.POSITIVE_INFINITY))
         }
     }
+
+    @Test
+    fun chartsKeepSeparateReadingsAndOmitMissingFieldsWithoutLosingZeroPercent() {
+        val data =
+            AppData(
+                scaleWeights =
+                    listOf(
+                        ScaleWeightRecord("first", date, 53.25, 0.0),
+                        ScaleWeightRecord("second", date, 54.0),
+                    ),
+                bodyMeasurements =
+                    listOf(
+                        BodyMeasurementRecord(
+                            "measure",
+                            date,
+                            mapOf(
+                                BodyMeasurement.LEFT_BICEP to 31.1,
+                                BodyMeasurement.RIGHT_BICEP to 34.2,
+                            ),
+                        )
+                    ),
+            )
+        val metric = data.bodyChartSeries().associateBy { it.key }
+        assertEquals(listOf(53.25, 54.0), metric.getValue("weight").points.map { it.value })
+        assertEquals(
+            listOf("first", "second"),
+            metric.getValue("weight").points.map { it.recordId },
+        )
+        assertEquals(listOf(0.0), metric.getValue("bodyFat").points.map { it.value })
+        assertTrue(metric.getValue("waist").points.isEmpty())
+        assertEquals(31.1, metric.getValue("leftBicep").points.single().value, 0.0)
+        assertEquals(34.2, metric.getValue("rightBicep").points.single().value, 0.0)
+        val pounds = data.copy(preferences = Preferences(pounds = true)).bodyChartSeries()
+        assertEquals("lb", pounds.first().unit)
+        assertEquals(117.39615461, pounds.first().points.first().value, .000001)
+        assertEquals(metric.getValue("leftBicep"), pounds.first { it.key == "leftBicep" })
+        assertEquals(
+            data.bodyChartSeries(),
+            DataCodec.decode(DataCodec.encode(data)).bodyChartSeries(),
+        )
+    }
+
+    @Test
+    fun chartCalendarWindowsIncludeBothBoundariesAcrossLeapAndYearTransitions() {
+        val today = LocalDate.of(2024, 3, 3)
+        val windows =
+            mapOf(
+                BodyChartRange.WEEK to ("2024-02-26" to "2024-03-03"),
+                BodyChartRange.MONTH to ("2024-03-01" to "2024-03-31"),
+                BodyChartRange.THREE_MONTHS to ("2024-01-01" to "2024-03-31"),
+                BodyChartRange.SIX_MONTHS to ("2023-10-01" to "2024-03-31"),
+                BodyChartRange.YEAR to ("2023-04-01" to "2024-03-31"),
+            )
+        windows.forEach { (range, dates) ->
+            val first = LocalDate.parse(dates.first)
+            val last = LocalDate.parse(dates.second)
+            val points =
+                listOf(
+                    BodyChartPoint("before", first.minusDays(1), 71.0),
+                    BodyChartPoint("last", last, 82.0),
+                    BodyChartPoint("after", last.plusDays(1), 63.0),
+                    BodyChartPoint("first", first, 94.0),
+                )
+            val series = BodyChartSeries("weight", "Scale Weight", "kg", points)
+            val window = range.window(today, points)
+            assertEquals(first..last, window)
+            assertEquals(listOf("first", "last"), series.inWindow(window).map { it.recordId })
+            assertEquals(
+                first.minusDays(1)..last.plusDays(1),
+                BodyChartRange.ALL.window(today, points),
+            )
+        }
+        assertEquals(today..today, BodyChartRange.ALL.window(today, emptyList()))
+        val single = listOf(BodyChartPoint("one", today.minusYears(3), 72.0))
+        assertEquals(
+            single.single().date..single.single().date,
+            BodyChartRange.ALL.window(today, single),
+        )
+    }
 }
