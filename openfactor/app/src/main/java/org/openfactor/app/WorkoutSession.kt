@@ -53,6 +53,7 @@ fun WorkoutSession(
     var confirm by remember { mutableStateOf("") }
     var menu by remember { mutableStateOf(false) }
     var rename by remember { mutableStateOf(false) }
+    var workoutNotes by remember { mutableStateOf(false) }
     val selected =
         workout.exercises.find { it.id == workout.selectedExerciseId }
             ?: workout.exercises.firstOrNull()
@@ -116,6 +117,10 @@ fun WorkoutSession(
                             menu = false
                             rename = true
                         },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Workout notes") },
+                        onClick = { menu = false; workoutNotes = true },
                     )
                     DropdownMenuItem(
                         text = { Text("Save as Workout Template") },
@@ -217,28 +222,55 @@ fun WorkoutSession(
                 val e =
                     exercises.find { it.id == se.exerciseId }
                         ?: Exercise(se.exerciseId, "Exercise", "Other", "Other")
+                val metrics = remember(e) { e.loggingMetrics() }
+                val showRir = data.preferences.showRir && metrics.any { it.isReps }
                 var remove by remember { mutableStateOf(false) }
-                Surface(shape = OF.shape, color = OF.card) {
-                    Column(Modifier.padding(14.dp)) {
+                var exerciseMenu by remember { mutableStateOf(false) }
+                var exerciseNotes by remember { mutableStateOf(false) }
+                Surface(color = OF.background) {
+                    Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            ExerciseImage(e, Modifier.size(48.dp).clickable { onExercise(e.id) })
                             Column(
-                                Modifier.weight(1f).padding(horizontal = 10.dp).clickable {
+                                Modifier.weight(1f).clickable {
                                     onExercise(e.id)
                                 }
                             ) {
                                 Text(e.title, style = MaterialTheme.typography.titleMedium)
-                                Text(e.muscle, color = OF.muted, fontSize = 12.sp)
+                                Text(
+                                    "${se.sets.count { it.completed }} of ${se.sets.size} sets completed",
+                                    color = OF.muted, fontSize = 12.sp,
+                                )
                             }
-                            IconButton({ remove = true }) {
-                                Icon(Icons.Rounded.Close, "Remove ${e.name}", tint = OF.muted)
+                            if (e.bodyweight > 0.0) {
+                                val weight = data.scaleWeights.filter { it.date <= workout.localDate() }.maxByOrNull { it.date }
+                                val unit = if (data.preferences.pounds) "lb" else "kg"
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp), color = OF.background,
+                                    border = BorderStroke(1.dp, OF.green),
+                                ) {
+                                    Text(
+                                        if (weight == null) "No scale weight\n${(e.bodyweight * 100).toInt()}% contribution"
+                                        else "${weight.weightKg.displayWeight(data.preferences.pounds)} $unit\n" +
+                                            "+${(weight.weightKg * e.bodyweight).displayWeight(data.preferences.pounds)} $unit (${(e.bodyweight * 100).toInt()}%)",
+                                        Modifier.padding(horizontal = 8.dp, vertical = 4.dp), color = OF.green,
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
                             }
                         }
                         var targets by remember { mutableStateOf(false) }
                         var warmup by remember { mutableStateOf(false) }
                         Row {
-                            TextButton({ targets = true }) { Text("Targets") }
+                            Box {
+                                IconButton({ exerciseMenu = true }) { Icon(Icons.Rounded.MoreVert, "Exercise options for ${e.title}") }
+                                DropdownMenu(exerciseMenu, { exerciseMenu = false }) {
+                                    DropdownMenuItem(text = { Text("Exercise notes") }, onClick = { exerciseMenu = false; exerciseNotes = true })
+                                    DropdownMenuItem(text = { Text("Remove Exercise") }, onClick = { exerciseMenu = false; remove = true })
+                                }
+                            }
+                            TextButton({ onExercise(e.id) }) { Text("Info") }
                             TextButton({ warmup = true }) { Text("Warm Up") }
+                            TextButton({ targets = true }) { Text("Targets") }
                         }
                         if (targets)
                             WorkoutTargetsDialog(se, { targets = false }) { values, rest ->
@@ -259,28 +291,17 @@ fun WorkoutSession(
                                     TextButton({ warmup = false }) { Text("Cancel") }
                                 },
                             )
-                        OutlinedTextField(
-                            se.notes,
-                            { vm.exerciseNotes(se.id, it) },
-                            Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                            placeholder = { Text("Exercise notes") },
-                            textStyle = MaterialTheme.typography.bodySmall,
-                            maxLines = 3,
-                        )
                         Row(
                             Modifier.fillMaxWidth().padding(bottom = 6.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Set", Modifier.width(48.dp), color = OF.muted, fontSize = 12.sp)
-                            Text(
-                                if (data.preferences.pounds) "lb" else "kg",
-                                Modifier.weight(1f),
-                                color = OF.muted,
-                                fontSize = 12.sp,
-                            )
-                            Text("Reps", Modifier.weight(1f), color = OF.muted, fontSize = 12.sp)
-                            if (data.preferences.showRir)
+                            Text("Set", Modifier.width(40.dp), color = OF.muted, fontSize = 12.sp)
+                            Text("Auto", Modifier.width(48.dp), color = OF.muted, fontSize = 12.sp)
+                            metrics.forEach { metric ->
+                                Text(metric.label(data.preferences.pounds), Modifier.weight(if (metric.isLoad) 1.3f else 1f), color = OF.muted, fontSize = 12.sp)
+                            }
+                            if (showRir)
                                 Text(
                                     "RIR",
                                     Modifier.weight(0.65f),
@@ -295,6 +316,7 @@ fun WorkoutSession(
                                     index,
                                     s,
                                     data.preferences,
+                                    metrics,
                                     exerciseName = e.title,
                                     onChange = { changed -> vm.editSet(se.id, s.id) { changed } },
                                     onComplete = { vm.toggleSetCompletion(se.id, s.id) },
@@ -302,11 +324,14 @@ fun WorkoutSession(
                                 )
                             }
                         }
-                        TextButton({ vm.addSet(se.id) }, Modifier.fillMaxWidth()) {
-                            Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
-                            Text(" Add Set")
+                        FilledTonalIconButton({ vm.addSet(se.id) }) {
+                            Icon(Icons.Rounded.Add, "Add Set")
                         }
                     }
+                }
+                if (exerciseNotes) SessionNotesDialog("Exercise notes", se.notes, { exerciseNotes = false }) {
+                    vm.exerciseNotes(se.id, it)
+                    exerciseNotes = false
                 }
                 if (remove)
                     ConfirmDialog(
@@ -320,34 +345,11 @@ fun WorkoutSession(
                         },
                     )
             }
-            item {
-                OutlinedButton(
-                    onAdd,
-                    Modifier.fillMaxWidth().heightIn(min = 50.dp),
-                    shape = RoundedCornerShape(8.dp),
-                ) {
-                    Icon(Icons.Rounded.Add, null)
-                    Text(" Add Exercise")
-                }
-            }
-            item {
-                OutlinedTextField(
-                    workout.notes,
-                    vm::workoutNotes,
-                    Modifier.fillMaxWidth(),
-                    label = { Text("Workout notes") },
-                    minLines = 2,
-                )
-            }
         }
-        Box(Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
-            PrimaryAction(
-                "Finish Workout",
-                { confirm = "finish" },
-                enabled = workout.completedSets() > 0,
-                icon = Icons.Rounded.Check,
-            )
-        }
+    }
+    if (workoutNotes) SessionNotesDialog("Workout notes", workout.notes, { workoutNotes = false }) {
+        vm.workoutNotes(it)
+        workoutNotes = false
     }
     if (rename)
         NameDialog(
@@ -398,6 +400,18 @@ fun WorkoutSession(
             },
             dismissButton = { TextButton({ confirm = "" }) { Text("Keep Training") } },
         )
+}
+
+@Composable
+private fun SessionNotesDialog(title: String, initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var notes by rememberSaveable { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { OutlinedTextField(notes, { notes = it }, Modifier.fillMaxWidth(), label = { Text(title) }, minLines = 3) },
+        confirmButton = { TextButton({ onSave(notes) }) { Text("Save") } },
+        dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
@@ -469,21 +483,17 @@ private fun SetRow(
     index: Int,
     set: LoggedSet,
     prefs: Preferences,
+    metrics: List<SetMetric>,
     exerciseName: String,
     onChange: (LoggedSet) -> Unit,
     onComplete: () -> Unit,
     onRemove: () -> Unit,
 ) {
     var options by remember { mutableStateOf(false) }
-    var weight by
-        remember(set.id, prefs.pounds) { mutableStateOf(set.weightKg.displayWeight(prefs.pounds)) }
-    var reps by remember(set.id) { mutableStateOf(set.reps.toString()) }
     var rir by remember(set.id) { mutableStateOf(set.rir?.toString() ?: "") }
-    val weightError = weight.toWeightKg(prefs.pounds) == null
-    val repsValue = reps.toIntOrNull()
-    val repsError = repsValue == null || repsValue !in 1..9999
     val rirValue = rir.toIntOrNull()
     val rirError = rir.isNotEmpty() && (rirValue == null || rirValue !in 0..10)
+    val showRir = prefs.showRir && metrics.any { it.isReps }
     Row(
         Modifier.fillMaxWidth()
             .padding(vertical = 4.dp)
@@ -497,7 +507,7 @@ private fun SetRow(
         Box {
             TextButton(
                 { options = true },
-                Modifier.width(48.dp).semantics {
+                Modifier.width(40.dp).semantics {
                     contentDescription = "Set ${index + 1} options for $exerciseName"
                 },
                 contentPadding = PaddingValues(0.dp),
@@ -521,57 +531,44 @@ private fun SetRow(
                 )
             }
         }
-        OutlinedTextField(
-            weight,
-            {
-                weight = it
-                it.toWeightKg(prefs.pounds)?.let { kg -> onChange(set.copy(weightKg = kg)) }
-            },
-            Modifier.weight(1f).semantics {
-                contentDescription =
-                    "$exerciseName set ${index + 1} weight (${if(prefs.pounds) "lb" else "kg"})"
-                if (weightError) error("Enter a weight from 0 to 5000")
-            },
-            supportingText =
-                if (weightError) {
-                    { Text("Enter 0–5000") }
-                } else null,
-            singleLine = true,
-            isError = weightError,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            textStyle = MaterialTheme.typography.bodyMedium,
+        Text(
+            set.targetDescription(), Modifier.width(48.dp),
+            color = OF.muted, style = MaterialTheme.typography.labelSmall,
         )
-        OutlinedTextField(
-            reps,
-            {
-                reps = it
-                it.toIntOrNull()
-                    ?.takeIf { n -> n in 1..9999 }
-                    ?.let { n -> onChange(set.copy(reps = n)) }
-            },
-            Modifier.weight(1f).semantics {
-                contentDescription = "$exerciseName set ${index + 1} reps"
-                if (repsError) error("Enter reps from 1 to 9999")
-            },
-            supportingText =
-                if (repsError) {
-                    { Text("Enter 1–9999") }
-                } else null,
-            singleLine = true,
-            isError = repsError,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            textStyle = MaterialTheme.typography.bodyMedium,
-        )
-        if (prefs.showRir)
+        metrics.forEach { metric ->
+            key(metric) {
+                var text by rememberSaveable(set.id, prefs.pounds, metric) {
+                    mutableStateOf(metric.display(set, prefs.pounds))
+                }
+                val invalid = text.isNotBlank() && metric.parse(text, prefs.pounds) == null
+                OutlinedTextField(
+                    text,
+                    { entered ->
+                        text = entered
+                        val changed = metric.update(set, metric.parse(entered, prefs.pounds))
+                        onChange(changed.copy(completed = set.completed && changed.canComplete(metrics)))
+                    },
+                    Modifier.weight(if (metric.isLoad) 1.3f else 1f).semantics {
+                        contentDescription = "$exerciseName set ${index + 1} ${metric.catalogName.lowercase()} (${metric.label(prefs.pounds)})"
+                        if (invalid) error(if (metric.isReps) "Enter a whole number from 1 to 9999" else "Enter a valid ${metric.label(prefs.pounds)} value")
+                    },
+                    isError = invalid,
+                    supportingText = if (invalid) {
+                        { Text(if (metric.isReps) "Use 1–9999" else "Invalid value") }
+                    } else null,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = if (metric.isReps) KeyboardType.Number else KeyboardType.Decimal),
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+        if (showRir)
             OutlinedTextField(
                 rir,
                 {
                     rir = it
-                    if (it.isBlank()) onChange(set.copy(rir = null))
-                    else
-                        it.toIntOrNull()
-                            ?.takeIf { n -> n in 0..10 }
-                            ?.let { n -> onChange(set.copy(rir = n)) }
+                    val value = it.toIntOrNull()?.takeIf { n -> n in 0..10 }
+                    onChange(set.copy(rir = value, completed = set.completed && (it.isBlank() || value != null)))
                 },
                 Modifier.weight(0.65f).semantics {
                     contentDescription = "$exerciseName set ${index + 1} reps in reserve"
@@ -590,7 +587,7 @@ private fun SetRow(
             onComplete,
             Modifier.size(48.dp)
                 .background(if (set.completed) OF.green else OF.elevated, RoundedCornerShape(8.dp)),
-            enabled = !weightError && !repsError && !rirError,
+            enabled = set.completed || set.canComplete(metrics) && (!showRir || !rirError),
         ) {
             Icon(
                 Icons.Rounded.Check,
@@ -730,7 +727,7 @@ fun WorkoutSummary(
                                         color = OF.muted,
                                     )
                                     Text(
-                                        "${s.weightKg.displayWeight(prefs.pounds)} ${if(prefs.pounds)"lb" else "kg"} × ${s.reps}${s.rir?.let {" · $it RIR"} ?: ""}"
+                                        s.describe(e?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS), prefs.pounds)
                                     )
                                 }
                             }

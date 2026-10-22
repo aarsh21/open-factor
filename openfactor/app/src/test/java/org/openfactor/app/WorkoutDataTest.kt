@@ -5,6 +5,74 @@ import org.junit.Test
 
 class WorkoutDataTest {
     @Test
+    fun newSessionRowsHaveNoPerformedValuesAndDoNotCopyTargetsIntoActuals() {
+        val entry = SessionExercise(exerciseId = "chin-up")
+        assertEquals(1, entry.sets.size)
+        assertNull(entry.sets.single().reps)
+        assertNull(entry.sets.single().weightKg)
+        val program = TrainingProgram(name = "Plan", cycleCount = 1, days = listOf(
+            ProgramDay(id = "day", exercises = listOf(PlannedExercise(
+                exerciseId = "press", cycles = listOf(CycleTarget(sets = listOf(SetTarget(repsMin = 7, repsMax = 11)))),
+            ))),
+        ))
+        val set = program.toWorkout("day", 0, 1000)!!.exercises.single().sets.single()
+        assertNull(set.reps)
+        assertEquals(7, set.targetRepsMin)
+        assertEquals(11, set.targetRepsMax)
+    }
+
+    @Test
+    fun metricActualsRemainDistinctAndBlankAcrossActiveHistoryAndDraftBackups() {
+        val rows = listOf(
+            LoggedSet(),
+            LoggedSet(reps = 13, completed = true),
+            LoggedSet(weightKg = 0.0, reps = 7, completed = true),
+            LoggedSet(assistanceKg = 17.25, reps = 9, completed = true),
+            LoggedSet(durationSeconds = 83.5, distanceMeters = 2312.0, completed = true),
+        )
+        val entry = SessionExercise(exerciseId = "mixed", sets = rows)
+        val workout = Workout(name = "Metrics", exercises = listOf(entry))
+        val source = AppData(active = workout, history = listOf(workout.copy(finishedAt = 9000)), workoutDraft = WorkoutDraft(exercises = listOf(entry)))
+        val restored = DataCodec.decode(DataCodec.encode(source))
+        assertEquals(source, restored)
+        assertNull(restored.active!!.exercises.single().sets.first().weightKg)
+        assertNull(restored.active.exercises.single().sets.first().reps)
+        assertEquals(0.0, workout.volumeKg(), 0.0)
+        val old = DataCodec.decode("""{"schemaVersion":1,"active":{"id":"old","name":"Old","startedAt":1000,"exercises":[{"id":"e","exerciseId":"press","sets":[{"id":"s","completed":true}]}]}}""")
+        assertEquals(8, old.active!!.exercises.single().sets.single().reps)
+        assertEquals(0.0, old.active.exercises.single().sets.single().weightKg!!, 0.0)
+    }
+
+    @Test
+    fun completionUsesOnlyRequiredMetricsAndRejectsBlankActuals() {
+        val exercise = Exercise("run", "Run", "Other", "Other", properties = mapOf("Metrics" to "Duration, Distance long"))
+        val metrics = exercise.loggingMetrics()
+        val entry = SessionExercise(id = "entry", exerciseId = exercise.id, sets = listOf(LoggedSet(id = "set")))
+        val workout = Workout(name = "Training", exercises = listOf(entry))
+        assertEquals(workout, workout.toggleSetCompletion(entry.id, "set", Preferences(), 1000, metrics))
+        val seconds = SetMetric.DURATION.update(entry.sets.single(), SetMetric.DURATION.parse("83,5", false))
+        assertFalse(seconds.canComplete(metrics))
+        val run = SetMetric.DISTANCE_LONG.update(seconds, SetMetric.DISTANCE_LONG.parse("2.312", false))
+        assertEquals(2312.0, run.distanceMeters!!, 0.00001)
+        assertNull(run.reps)
+        assertNull(run.weightKg)
+        assertTrue(run.canComplete(metrics))
+        assertEquals("83.5 Seconds · 2.312 km", run.describe(metrics, false))
+        val changed = workout.copy(exercises = listOf(entry.copy(sets = listOf(run))))
+        assertTrue(changed.toggleSetCompletion(entry.id, "set", Preferences(), 1000, metrics).exercises.single().sets.single().completed)
+        assertTrue(LoggedSet(reps = 9).canComplete(listOf(SetMetric.REPS)))
+        assertFalse(LoggedSet(reps = 9).canComplete(listOf(SetMetric.WEIGHT, SetMetric.REPS)))
+        assertTrue(LoggedSet(reps = 9, weightKg = 0.0).canComplete(listOf(SetMetric.WEIGHT, SetMetric.REPS)))
+        assertFalse(LoggedSet(reps = 9, weightKg = 12.0).canComplete(listOf(SetMetric.ASSISTANCE, SetMetric.REPS)))
+        assertEquals(100.0, SetMetric.ASSISTANCE.parse("220.46226218", true)!!, 0.000001)
+        assertEquals(5000.0, SetMetric.WEIGHT.parse("11023.113109", true)!!, 0.000001)
+        for ((metric, invalid) in listOf(SetMetric.REPS to "1.5", SetMetric.REPS to "0", SetMetric.WEIGHT to "-1", SetMetric.WEIGHT to "5001", SetMetric.DURATION to "0", SetMetric.DISTANCE_LONG to "NaN")) {
+            assertNull(metric.parse(invalid, false))
+        }
+        assertTrue(LoggedSet().canComplete(Exercise("none", "None", "Other", "Other", properties = mapOf("Metrics" to "None")).loggingMetrics()))
+    }
+
+    @Test
     fun compositionSurvivesBackupWithoutStartingAndBeginsAtExplicitStartTime() {
         val first = SessionExercise(exerciseId = "dip", sets = listOf(
             LoggedSet(reps = 0, targetRepsMin = 6, targetRepsMax = 9, targetRir = 2),
@@ -106,8 +174,8 @@ class WorkoutDataTest {
         assertEquals(4, sets.map { it.id }.distinct().size)
         sets.subList(1, 3).forEach {
             assertTrue(it.warmup)
-            assertEquals(0, it.reps)
-            assertEquals(0.0, it.weightKg, 0.0)
+            assertNull(it.reps)
+            assertNull(it.weightKg)
             assertFalse(it.completed)
             assertNull(it.targetRepsMin)
         }
@@ -161,10 +229,10 @@ class WorkoutDataTest {
             SessionExercise(
                 id = "first",
                 exerciseId = "chin-up",
-                sets = listOf(LoggedSet(id = "a"), LoggedSet(id = "b", completed = true)),
+                sets = listOf(LoggedSet(id = "a", reps = 7, weightKg = 0.0), LoggedSet(id = "b", reps = 9, weightKg = 0.0, completed = true)),
             )
         val second =
-            SessionExercise(id = "second", exerciseId = "dip", sets = listOf(LoggedSet(id = "c")))
+            SessionExercise(id = "second", exerciseId = "dip", sets = listOf(LoggedSet(id = "c", reps = 11, weightKg = 0.0)))
         val workout =
             Workout(
                 name = "Training",
@@ -192,7 +260,7 @@ class WorkoutDataTest {
             SessionExercise(
                 id = "first",
                 exerciseId = "chin-up",
-                sets = listOf(LoggedSet(id = "a"), LoggedSet(id = "b")),
+                sets = listOf(LoggedSet(id = "a", reps = 7, weightKg = 0.0), LoggedSet(id = "b", reps = 9, weightKg = 0.0)),
             )
         val second = SessionExercise(id = "second", exerciseId = "dip")
         val workout =

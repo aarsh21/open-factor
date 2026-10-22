@@ -561,7 +561,7 @@ fun ExerciseDetail(
                                 .filter { it.completed }
                                 .forEach { s ->
                                     Text(
-                                        "${s.weightKg.displayWeight(data.preferences.pounds)} ${if(data.preferences.pounds)"lb" else "kg"} × ${s.reps}${s.rir?.let {" · $it RIR"} ?: ""}",
+                                        s.describe(e.loggingMetrics(), data.preferences.pounds),
                                         Modifier.padding(top = 8.dp),
                                     )
                                 }

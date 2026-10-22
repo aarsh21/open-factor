@@ -61,7 +61,6 @@ fun TrainingProgram.toWorkout(dayId: String, cycle: Int, now: Long): Workout? {
                 sets =
                     targets.sets.map {
                         LoggedSet(
-                            reps = it.repsMin ?: it.repsMax ?: 8,
                             targetRepsMin = it.repsMin,
                             targetRepsMax = it.repsMax,
                             targetRir = it.rir,

@@ -38,20 +38,23 @@ data class Exercise(
 
 data class LoggedSet(
     val id: String = newId(),
-    val weightKg: Double = 0.0,
-    val reps: Int = 8,
+    val weightKg: Double? = null,
+    val reps: Int? = null,
     val rir: Int? = null,
     val completed: Boolean = false,
     val warmup: Boolean = false,
     val targetRepsMin: Int? = null,
     val targetRepsMax: Int? = null,
     val targetRir: Int? = null,
+    val assistanceKg: Double? = null,
+    val durationSeconds: Double? = null,
+    val distanceMeters: Double? = null,
 )
 
 data class SessionExercise(
     val id: String = newId(),
     val exerciseId: String,
-    val sets: List<LoggedSet> = listOf(LoggedSet(), LoggedSet(), LoggedSet()),
+    val sets: List<LoggedSet> = listOf(LoggedSet()),
     val notes: String = "",
     val restSeconds: Int? = null,
 )
@@ -153,7 +156,7 @@ fun Workout.withEmptyWarmupSet(exerciseId: String): Workout =
                 if (it < 0) exercise.sets.size else it
             }
             exercise.copy(sets = exercise.sets.toMutableList().apply {
-                add(index, LoggedSet(weightKg = 0.0, reps = 0, warmup = true))
+                add(index, LoggedSet(warmup = true))
             })
         }
     })
@@ -162,7 +165,7 @@ fun Workout.completedSets() = exercises.sumOf { e -> e.sets.count { it.completed
 
 fun Workout.volumeKg() =
     exercises.sumOf { e ->
-        e.sets.filter { it.completed && !it.warmup }.sumOf { it.weightKg * it.reps }
+        e.sets.filter { it.completed && !it.warmup }.sumOf { (it.weightKg ?: 0.0) * (it.reps ?: 0) }
     }
 
 fun Workout.localDate(): LocalDate =
@@ -188,12 +191,14 @@ fun Workout.toggleSetCompletion(
     setId: String,
     preferences: Preferences,
     now: Long,
+    metrics: List<SetMetric> = listOf(SetMetric.WEIGHT, SetMetric.REPS),
 ): Workout {
     val index = exercises.indexOfFirst { it.id == exerciseId }
     if (index < 0) return this
     val exercise = exercises[index]
     val set = exercise.sets.find { it.id == setId } ?: return this
     val completing = !set.completed
+    if (completing && !set.canComplete(metrics)) return this
     val changed =
         exercise.copy(
             sets = exercise.sets.map { if (it.id == setId) it.copy(completed = completing) else it }
@@ -231,14 +236,17 @@ object DataCodec {
     private fun LoggedSet.json() =
         JSONObject()
             .put("id", id)
-            .put("weightKg", weightKg)
-            .put("reps", reps)
+            .put("weightKg", weightKg ?: JSONObject.NULL)
+            .put("reps", reps ?: JSONObject.NULL)
             .put("rir", rir)
             .put("completed", completed)
             .put("warmup", warmup)
             .put("targetRepsMin", targetRepsMin)
             .put("targetRepsMax", targetRepsMax)
             .put("targetRir", targetRir)
+            .put("assistanceKg", assistanceKg)
+            .put("durationSeconds", durationSeconds)
+            .put("distanceMeters", distanceMeters)
 
     private fun SessionExercise.json() =
         JSONObject()
@@ -329,6 +337,11 @@ object DataCodec {
 
     private fun JSONObject.array(k: String) = optJSONArray(k) ?: JSONArray()
 
+    private fun JSONObject.actual(key: String, maximum: Double = Double.MAX_VALUE): Double? =
+        if (isNull(key)) null else getDouble(key).also {
+            require(it.isFinite() && it in 0.0..maximum) { "Invalid $key actual" }
+        }
+
     private fun JSONObject.sessionExercise(): SessionExercise =
         SessionExercise(
             getString("id"),
@@ -336,14 +349,19 @@ object DataCodec {
             array("sets").objects().map { s ->
                 LoggedSet(
                     s.getString("id"),
-                    s.optDouble("weightKg", 0.0).coerceIn(0.0, 5000.0),
-                    s.optInt("reps", 8).coerceIn(0, 9999),
+                    if (!s.has("weightKg")) 0.0 else s.actual("weightKg", 5000.0),
+                    if (!s.has("reps")) 8 else s.actual("reps", 9999.0)?.also {
+                        require(it % 1.0 == 0.0) { "Reps must be a whole number" }
+                    }?.toInt(),
                     if (s.isNull("rir")) null else s.getInt("rir").coerceIn(0, 10),
                     s.optBoolean("completed"),
                     s.optBoolean("warmup"),
                     if (s.isNull("targetRepsMin")) null else s.getInt("targetRepsMin"),
                     if (s.isNull("targetRepsMax")) null else s.getInt("targetRepsMax"),
                     if (s.isNull("targetRir")) null else s.getInt("targetRir"),
+                    assistanceKg = s.actual("assistanceKg", 5000.0),
+                    durationSeconds = s.actual("durationSeconds"),
+                    distanceMeters = s.actual("distanceMeters"),
                 )
             },
             optString("notes"),
@@ -625,7 +643,6 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun addDraftExercise(id: String) = editWorkoutDraft {
         it.copy(exercises = it.exercises + SessionExercise(
             exerciseId = id,
-            sets = listOf(LoggedSet(reps = 0)),
         ))
     }
 
@@ -741,11 +758,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                     if (it.id == exerciseId)
                         it.copy(
                             sets =
-                                it.sets +
-                                    LoggedSet(
-                                        weightKg = it.sets.lastOrNull()?.weightKg ?: 0.0,
-                                        reps = it.sets.lastOrNull()?.reps ?: 8,
-                                    )
+                                it.sets + LoggedSet()
                         )
                     else it
                 }
@@ -783,6 +796,8 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                     setId,
                     d.preferences,
                     System.currentTimeMillis(),
+                    exercises(d).find { it.id == d.active?.exercises?.find { entry -> entry.id == exerciseId }?.exerciseId }
+                        ?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS),
                 )
         )
     }

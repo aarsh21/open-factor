@@ -97,14 +97,15 @@ class ProgramDataTest {
         assertEquals(1000L, w.startedAt)
         val e = w.exercises.single()
         val set = e.sets.single()
-        assertEquals(8, set.reps)
+        assertNull(set.reps)
         assertEquals(8, set.targetRepsMin)
         assertEquals(12, set.targetRepsMax)
         assertEquals(2, set.targetRir)
         assertNull(set.rir)
         assertFalse(set.completed)
         assertEquals(45, e.restSeconds)
-        val complete = w.toggleSetCompletion(e.id, set.id, Preferences(restSeconds = 120), 2000)
+        val entered = w.copy(exercises = listOf(e.copy(sets = listOf(set.copy(weightKg = 37.5, reps = 9)))))
+        val complete = entered.toggleSetCompletion(e.id, set.id, Preferences(restSeconds = 120), 2000)
         assertEquals(47000L, complete.restUntil)
         assertEquals(w, DataCodec.decode(DataCodec.encode(AppData(active = w))).active)
         assertNull(p.toWorkout("rest", 0, 1000))
@@ -134,9 +135,10 @@ class ProgramDataTest {
             )
         val w = p.toWorkout(p.days.first().id, 0, 1000)!!
         val e = w.exercises.single()
+        val entered = w.copy(exercises = listOf(e.copy(sets = listOf(e.sets.single().copy(weightKg = 37.5, reps = 9)))))
         assertEquals(
             0L,
-            w.toggleSetCompletion(e.id, e.sets.single().id, Preferences(), 2000).restUntil,
+            entered.toggleSetCompletion(e.id, e.sets.single().id, Preferences(), 2000).restUntil,
         )
     }
 
