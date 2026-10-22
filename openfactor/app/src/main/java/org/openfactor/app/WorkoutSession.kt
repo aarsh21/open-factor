@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -54,6 +55,7 @@ fun WorkoutSession(
     var menu by remember { mutableStateOf(false) }
     var rename by remember { mutableStateOf(false) }
     var workoutNotes by remember { mutableStateOf(false) }
+    var restSettings by remember { mutableStateOf(false) }
     val selected =
         workout.exercises.find { it.id == workout.selectedExerciseId }
             ?: workout.exercises.firstOrNull()
@@ -139,14 +141,22 @@ fun WorkoutSession(
                 }
             }
             Column(Modifier.weight(1f)) {
-                Text(
-                    "%d:%02d:%02d".format(elapsed / 3600, elapsed / 60 % 60, elapsed % 60),
-                    fontSize = 22.sp,
-                )
+                if (data.preferences.showWorkoutTimer)
+                    Text(
+                        "%d:%02d:%02d".format(elapsed / 3600, elapsed / 60 % 60, elapsed % 60),
+                        fontSize = 22.sp,
+                    )
                 if (workout.pausedAt != null) Text("Paused", color = OF.muted, fontSize = 12.sp)
             }
-            Icon(Icons.Rounded.Timer, null, Modifier.size(20.dp))
-            Text("${remaining/60}:${(remaining%60).toString().padStart(2, '0')}", fontSize = 20.sp)
+            TextButton({ restSettings = true }) {
+                Icon(Icons.Rounded.Timer, null, Modifier.size(20.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "${remaining/60}:${(remaining%60).toString().padStart(2, '0')}",
+                    Modifier.semantics { contentDescription = "Rest timer settings, $remaining seconds remaining" },
+                    fontSize = 20.sp,
+                )
+            }
         }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
@@ -241,7 +251,7 @@ fun WorkoutSession(
                                     color = OF.muted, fontSize = 12.sp,
                                 )
                             }
-                            if (e.bodyweight > 0.0) {
+                            if (data.preferences.showBodyweightContribution && e.bodyweight > 0.0) {
                                 val weight = data.scaleWeights.filter { it.date <= workout.localDate() }.maxByOrNull { it.date }
                                 val unit = if (data.preferences.pounds) "lb" else "kg"
                                 Surface(
@@ -316,7 +326,7 @@ fun WorkoutSession(
                             Text("Set", Modifier.width(40.dp), color = OF.muted, fontSize = 12.sp)
                             Text("Auto", Modifier.width(48.dp), color = OF.muted, fontSize = 12.sp)
                             metrics.forEach { metric ->
-                                Text(metric.label(data.preferences.pounds), Modifier.weight(if (metric.isLoad) 1.3f else 1f), color = OF.muted, fontSize = 12.sp)
+                                Text(metric.label(data.preferences.pounds, data.preferences.distanceImperial), Modifier.weight(if (metric.isLoad) 1.3f else 1f), color = OF.muted, fontSize = 12.sp)
                             }
                             if (showRir)
                                 Text(
@@ -364,6 +374,31 @@ fun WorkoutSession(
             }
         }
     }
+    if (restSettings)
+        AlertDialog(
+            onDismissRequest = { restSettings = false },
+            title = { Text("Rest Timers") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Changes apply to the next set you complete. A running timer keeps its deadline.")
+                    listOf(
+                        Triple("Use Rest Timers", data.preferences.autoRest, { checked: Boolean -> vm.settings { it.copy(autoRest = checked) } }),
+                        Triple("Rest After Last Warm-up Set", data.preferences.restAfterLastWarmupSet, { checked: Boolean -> vm.settings { it.copy(restAfterLastWarmupSet = checked) } }),
+                        Triple("Rest Between Exercises", data.preferences.restBetweenExercises, { checked: Boolean -> vm.settings { it.copy(restBetweenExercises = checked) } }),
+                    ).forEach { (label, checked, change) ->
+                        Row(
+                            Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = change),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Text(label, Modifier.weight(1f))
+                            Switch(checked, onCheckedChange = null)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton({ restSettings = false }) { Text("Done") } },
+        )
     if (workoutNotes) SessionNotesDialog("Workout notes", workout.notes, { workoutNotes = false }) {
         vm.workoutNotes(it)
         workoutNotes = false
@@ -554,20 +589,20 @@ private fun SetRow(
         )
         metrics.forEach { metric ->
             key(metric) {
-                var text by rememberSaveable(set.id, prefs.pounds, metric) {
-                    mutableStateOf(metric.display(set, prefs.pounds))
+                var text by rememberSaveable(set.id, prefs.pounds, prefs.distanceImperial, metric) {
+                    mutableStateOf(metric.display(set, prefs.pounds, prefs.distanceImperial))
                 }
-                val invalid = text.isNotBlank() && metric.parse(text, prefs.pounds) == null
+                val invalid = text.isNotBlank() && metric.parse(text, prefs.pounds, prefs.distanceImperial) == null
                 OutlinedTextField(
                     text,
                     { entered ->
                         text = entered
-                        val changed = metric.update(set, metric.parse(entered, prefs.pounds))
+                        val changed = metric.update(set, metric.parse(entered, prefs.pounds, prefs.distanceImperial))
                         onChange(changed.copy(completed = set.completed && changed.canComplete(metrics)))
                     },
                     Modifier.weight(if (metric.isLoad) 1.3f else 1f).semantics {
-                        contentDescription = "$exerciseName set ${index + 1} ${metric.catalogName.lowercase()} (${metric.label(prefs.pounds)})"
-                        if (invalid) error(if (metric.isReps) "Enter a whole number from 1 to 9999" else "Enter a valid ${metric.label(prefs.pounds)} value")
+                        contentDescription = "$exerciseName set ${index + 1} ${metric.catalogName.lowercase()} (${metric.label(prefs.pounds, prefs.distanceImperial)})"
+                        if (invalid) error(if (metric.isReps) "Enter a whole number from 1 to 9999" else "Enter a valid ${metric.label(prefs.pounds, prefs.distanceImperial)} value")
                     },
                     isError = invalid,
                     supportingText = if (invalid) {
@@ -744,7 +779,7 @@ fun WorkoutSummary(
                                         color = OF.muted,
                                     )
                                     Text(
-                                        s.describe(e?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS), prefs.pounds)
+                                        s.describe(e?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS), prefs.pounds, prefs.distanceImperial)
                                     )
                                 }
                             }

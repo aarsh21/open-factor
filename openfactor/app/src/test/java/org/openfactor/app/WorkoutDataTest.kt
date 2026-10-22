@@ -453,6 +453,73 @@ class WorkoutDataTest {
     }
 
     @Test
+    fun warmupRestUsesTheLastWarmupRowAndItsOwnPolicy() {
+        val entry = SessionExercise(id = "entry", exerciseId = "press", restSeconds = 73, sets = listOf(
+            LoggedSet(id = "warm1", warmup = true, reps = 5),
+            LoggedSet(id = "warm2", warmup = true, reps = 3),
+            LoggedSet(id = "work", reps = 9),
+        ))
+        val workout = Workout(name = "Rest", exercises = listOf(entry), restUntil = 81234)
+        val metrics = listOf(SetMetric.REPS)
+        for (lastWarmupRest in listOf(false, true)) for (betweenExercises in listOf(false, true)) {
+            val prefs = Preferences(restAfterLastWarmupSet = lastWarmupRest, restBetweenExercises = betweenExercises)
+            val first = workout.toggleSetCompletion("entry", "warm1", prefs, 1000, metrics)
+            assertEquals(81234L, first.restUntil)
+            // The last warm-up is determined by row order even when logged out of order.
+            val last = workout.toggleSetCompletion("entry", "warm2", prefs, 2000, metrics)
+            assertEquals(if (lastWarmupRest) 75000L else 81234L, last.restUntil)
+            val onlyWarmups = workout.copy(exercises = listOf(entry.copy(sets = entry.sets.filter { it.warmup })))
+            assertEquals(
+                if (lastWarmupRest) 75000L else 81234L,
+                onlyWarmups.toggleSetCompletion("entry", "warm2", prefs, 2000, metrics).restUntil,
+            )
+            val uncompleted = last.toggleSetCompletion("entry", "warm2", prefs, 3000, metrics)
+            assertEquals(last.restUntil, uncompleted.restUntil)
+            assertFalse(uncompleted.exercises.single().sets[1].completed)
+            val restored = DataCodec.decode(DataCodec.encode(AppData(active = last, preferences = prefs)))
+            assertEquals(last, restored.active)
+            assertEquals(prefs, restored.preferences)
+        }
+        assertEquals(81234L, workout.toggleSetCompletion("entry", "warm2", Preferences(autoRest = false), 2000, metrics).restUntil)
+        val zero = workout.copy(exercises = listOf(entry.copy(restSeconds = 0)))
+        assertEquals(81234L, zero.toggleSetCompletion("entry", "warm2", Preferences(restSeconds = 137), 2000, metrics).restUntil)
+    }
+
+    @Test
+    fun betweenExerciseRestDoesNotDependOnAutomaticSelectionOrOverwriteExistingDeadlines() {
+        val first = SessionExercise(id = "first", exerciseId = "press", restSeconds = 67, sets = listOf(
+            LoggedSet(id = "a", reps = 13), LoggedSet(id = "b", reps = 7),
+        ))
+        val second = SessionExercise(id = "second", exerciseId = "curl")
+        val workout = Workout(name = "Rest", exercises = listOf(first, second), selectedExerciseId = "first", restUntil = 91234)
+        for (autoNext in listOf(false, true)) for (betweenExercises in listOf(false, true)) {
+            val prefs = Preferences(exerciseAutoNext = autoNext, restBetweenExercises = betweenExercises, restAfterLastWarmupSet = false)
+            val partial = workout.toggleSetCompletion("first", "a", prefs, 1000, listOf(SetMetric.REPS))
+            assertEquals(68000L, partial.restUntil)
+            val finished = partial.toggleSetCompletion("first", "b", prefs, 2000, listOf(SetMetric.REPS))
+            assertEquals(if (betweenExercises) 69000L else 68000L, finished.restUntil)
+            assertEquals(if (autoNext) "second" else "first", finished.selectedExerciseId)
+            assertEquals(second, finished.exercises[1])
+            val unchecked = finished.toggleSetCompletion("first", "b", prefs, 3000, listOf(SetMetric.REPS))
+            assertEquals(finished.restUntil, unchecked.restUntil)
+            assertEquals(finished.selectedExerciseId, unchecked.selectedExerciseId)
+            // The last working set remains a boundary with no following exercise,
+            // and a skipped warm-up must not turn it into an ordinary between-set rest.
+            for (skippedWarmup in listOf(false, true)) {
+                val only = workout.copy(exercises = listOf(first.copy(sets =
+                    (if (skippedWarmup) listOf(LoggedSet(id = "skipped", warmup = true)) else emptyList()) +
+                        first.sets.map { it.copy(completed = it.id == "a") }
+                )))
+                val last = only.toggleSetCompletion("first", "b", prefs, 4000, listOf(SetMetric.REPS))
+                assertEquals(if (betweenExercises) 71000L else 91234L, last.restUntil)
+                assertEquals("first", last.selectedExerciseId)
+            }
+        }
+        val legacy = DataCodec.decode("""{"schemaVersion":1}""").preferences
+        assertTrue(legacy.restAfterLastWarmupSet && legacy.restBetweenExercises)
+    }
+
+    @Test
     fun volumeCountsOnlyCompletedWorkingSets() {
         val workout =
             Workout(

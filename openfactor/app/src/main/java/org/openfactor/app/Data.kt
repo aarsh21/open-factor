@@ -103,6 +103,9 @@ data class Preferences(
     val theme: AppTheme = AppTheme.DARK,
     val shortcuts: ShortcutPreferences = ShortcutPreferences(),
     val dashboard: DashboardPreferences = DashboardPreferences(),
+    // Older backups keep rest enabled at these boundaries; these are compatibility defaults.
+    val restAfterLastWarmupSet: Boolean = true,
+    val restBetweenExercises: Boolean = true,
 )
 
 data class AppData(
@@ -219,19 +222,27 @@ fun Workout.toggleSetCompletion(
             sets = exercise.sets.map { if (it.id == setId) it.copy(completed = completing) else it }
         )
     val updated = exercises.map { if (it.id == exerciseId) changed else it }
-    val next =
-        if (completing && preferences.exerciseAutoNext && changed.sets.all { it.completed }) {
+    val nextUnfinished =
+        if (completing && changed.sets.all { it.completed }) {
             (1 until updated.size)
                 .map { updated[(index + it) % updated.size] }
                 .firstOrNull { candidate -> candidate.sets.any { !it.completed } }
                 ?.id
         } else null
+    // Warm-up rest belongs only to the last warm-up row, not every warm-up completion.
+    val eligibleForRest = when {
+        set.warmup -> exercise.sets.lastOrNull { it.warmup }?.id == setId &&
+            preferences.restAfterLastWarmupSet
+        changed.sets.filterNot { it.warmup }.all { it.completed } -> preferences.restBetweenExercises
+        else -> true
+    }
     val rest = exercise.restSeconds ?: preferences.restSeconds
     return copy(
         exercises = updated,
-        selectedExerciseId = next ?: selectedExerciseId,
+        selectedExerciseId = nextUnfinished.takeIf { preferences.exerciseAutoNext } ?: selectedExerciseId,
         restUntil =
-            if (completing && preferences.autoRest && rest > 0) now + rest * 1000L else restUntil,
+            if (completing && preferences.autoRest && eligibleForRest && rest > 0)
+                now + rest * 1000L else restUntil,
     )
 }
 
@@ -368,7 +379,9 @@ object DataCodec {
                     .put("dismissedTutorials", JSONArray(d.preferences.dismissedTutorials.sorted()))
                     .put("theme", d.preferences.theme.name)
                     .put("shortcuts", d.preferences.shortcuts.json())
-                    .put("dashboard", d.preferences.dashboard.json()),
+                    .put("dashboard", d.preferences.dashboard.json())
+                    .put("restAfterLastWarmupSet", d.preferences.restAfterLastWarmupSet)
+                    .put("restBetweenExercises", d.preferences.restBetweenExercises),
             )
             .toString(2)
 
@@ -465,6 +478,8 @@ object DataCodec {
                 theme = AppTheme.valueOf(p.optString("theme", AppTheme.DARK.name)),
                 shortcuts = ShortcutPreferences.decode(p.optJSONObject("shortcuts")),
                 dashboard = DashboardPreferences.decode(p.optJSONObject("dashboard")),
+                restAfterLastWarmupSet = p.optBoolean("restAfterLastWarmupSet", true),
+                restBetweenExercises = p.optBoolean("restBetweenExercises", true),
             ),
             j.optString("activeProgramId").takeIf { it.isNotBlank() && it != "null" },
             j.array("gyms").objects().map { GymCodec.decode(it) },
