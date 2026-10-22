@@ -2,6 +2,11 @@
 
 Development checkpoint, 21 October 2026. This record validates the current training foundation, not full reference-app parity.
 
+Current source builds require Android SDK Platform 36 for the stable Health
+Connect dependency. Target API 35 and minimum API 26 remain unchanged. The
+SDK-35 results below describe earlier checkpoints. The [parity acceptance
+ledger](PARITY.md) records later combined builds and their native-test limits.
+
 ## Build and static checks
 
 - Debug Android APK builds with JDK 17, Gradle 8.11.1, AGP 8.9.2 and Android SDK 35.

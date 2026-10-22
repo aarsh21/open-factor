@@ -10,7 +10,7 @@ Download the installable APK from [Open Factor 0.1.0-alpha.4](https://github.com
 
 ## Build
 
-Open Factor is the independent Android project in `openfactor/`. It does not need Nuvio's media engines or service keys. Use JDK 17 and Android SDK 35.
+Open Factor is the independent Android project in `openfactor/`. It does not need Nuvio's media engines or service keys. Use JDK 17 and Android SDK Platform 36. The app still targets API 35 and supports Android 8.0 or newer.
 
 ```sh
 cd openfactor
@@ -29,7 +29,7 @@ The debug APK is `openfactor/app/build/outputs/apk/debug/app-debug.apk`, package
 - Gym profiles, literal equipment preset prefills, weight lists and gym-aware exercise filtering.
 - Local muscle set levels over week/month/three-month windows.
 - Create custom exercises and reusable workout templates.
-- Build manual programs with ordered rest/workout days, gym selection, seven-cycle set targets, library saving and activation.
+- Build manual programs with ordered rest/workout days, gym selection, variable-cycle set targets, library saving and activation.
 - Launch a selected program day/cycle with rep/RIR targets and per-exercise rest overrides.
 - Persist active workouts, selected exercise, pause/resume, weight, reps, RIR, warm-ups and notes.
 - Automatic rest timer and exercise auto-next, pause-excluding summaries, completion, history and repeat workout.
