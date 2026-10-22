@@ -306,7 +306,7 @@ private fun WeeklyRing(
         Text(
             label,
             Modifier.padding(top = 20.dp),
-            fontSize = if (small) 18.sp else 20.sp,
+            fontSize = if (small) 16.sp else 20.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = MaterialTheme.typography.headlineMedium.fontFamily,
         )
