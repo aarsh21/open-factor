@@ -44,6 +44,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var dialog by rememberSaveable { mutableStateOf("") }
+    var portabilityPage by rememberSaveable { mutableStateOf("") }
     var restoreBackup by remember { mutableStateOf<PreparedPhotoBackup?>(null) }
     var backupBusy by remember { mutableStateOf(false) }
     DisposableEffect(restoreBackup) {
@@ -95,6 +96,10 @@ fun SettingsScreen(
                 }
             }
         }
+    if (portabilityPage.isNotEmpty()) {
+        PortabilityScreen(portabilityPage, p, vm, snackbar, onClose = { portabilityPage = "" })
+        return
+    }
     if (dialog == "shortcuts") {
         ShortcutEditor(p.shortcuts, { dialog = "" }) { changed ->
             vm.settings { it.copy(shortcuts = changed) }
@@ -189,6 +194,7 @@ fun SettingsScreen(
                 "Review your training",
                 onClick = onHistory,
             )
+            DataPortabilityRows(onOpen = { portabilityPage = it })
             SettingsRow(
                 Icons.Rounded.FileUpload,
                 "Export Backup",
@@ -205,6 +211,7 @@ fun SettingsScreen(
             }
         }
         SettingsSection("OPEN FACTOR") {
+            OfflineHelpRows(onOpen = { portabilityPage = it })
             SettingsRow(Icons.Rounded.Info, "About", "Version ${BuildConfig.VERSION_NAME}") {
                 dialog = "about"
             }

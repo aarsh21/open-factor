@@ -21,7 +21,13 @@ class ProgressPhotoStorageTest {
         val vm = WorkoutViewModel(context.applicationContext as Application)
         val originalBackup = vm.export()
         try {
-            val training = vm.data.value.copy(progressPhotos = emptyList())
+            val training = vm.data.value.copy(
+                progressPhotos = emptyList(),
+                preferences = vm.data.value.preferences.copy(
+                    dataVisibility = DataVisibility().withVisible("sidePhoto", false).withVisible("waist", false),
+                    dismissedTutorials = setOf("bodyCharts"),
+                ),
+            )
             vm.restore(DataCodec.encode(training))
             fun image(color: Int): ByteArray {
                 val bitmap = Bitmap.createBitmap(31, 47, Bitmap.Config.ARGB_8888)
@@ -77,8 +83,14 @@ class ProgressPhotoStorageTest {
             reopened.deleteProgressPhotos(shared.id)
             assertEquals(training, reopened.data.value)
             assertFalse(reopened.photoStore.file(references.first()).exists())
+            // Restore onto an empty store, not onto retained records or attachment files.
+            reopened.restore(DataCodec.encode(AppData()))
+            assertTrue(reopened.data.value.preferences.dismissedTutorials.isEmpty())
             reopened.restore(backup)
             assertEquals(saved, reopened.data.value)
+            assertEquals(saved, WorkoutViewModel(context.applicationContext as Application).data.value)
+            assertFalse(reopened.data.value.preferences.dataVisibility.isVisible("sidePhoto"))
+            assertTrue("bodyCharts" in reopened.data.value.preferences.dismissedTutorials)
             references.zip(originals).forEach { (reference, bytes) ->
                 assertArrayEquals(bytes, reopened.photoStore.file(reference).readBytes())
             }
