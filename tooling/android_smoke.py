@@ -123,6 +123,17 @@ adb('shell','am','force-stop','org.openfactor.app');launch();tap('Exercises',las
 if a.media:
  wifi=adb('shell','settings','get','global','wifi_on').strip()
  mobile=adb('shell','settings','get','global','mobile_data').strip()
+ def native_position():
+  start=time.monotonic();n=find('Exercise video, view ','content-desc',prefix=True)[0];end=time.monotonic()
+  position,duration=map(float,re.findall(r'\d+\.\d+',n.get('content-desc')))
+  assert duration>4, 'Native video has no measurable duration'
+  return (start+end)/2,position,duration
+ def assert_autoplay():
+  find('android.widget.VideoView','class');find('Pause exercise video','content-desc')
+  start,first,duration=native_position();time.sleep(.75);end,last,_=native_position()
+  assert end-start<duration/2, 'Autoplay sample spans more than one possible loop'
+  rate=((last-first)%duration)/(end-start)
+  assert .65<rate<1.35, ('Expected native autoplay at 1X without tapping Play',rate,first,last)
  try:
   adb('shell','svc','wifi','disable');adb('shell','svc','data','disable')
   for _ in range(10):
@@ -131,7 +142,7 @@ if a.media:
    time.sleep(.5)
   else:raise AssertionError('The emulator still has an active network')
   tap('Search exercises');adb('shell','input','text','chin-up');adb('shell','input','keyevent','4');tap('Chin-Up')
-  find('Play exercise video','content-desc');capture('media-photo-preview')
+  assert_autoplay();capture('media-autoplay-opened')
   if a.parity_actions:
    phrase='While standing under a pull-up bar'
    assert any(phrase in n.get('text','') for n in nodes()), 'Expected installed Chin-Up instructions'
@@ -140,23 +151,17 @@ if a.media:
    tap('Expand Setting up','content-desc');find('Collapse Setting up','content-desc')
    assert any(phrase in n.get('text','') for n in nodes()), 'Expanded instructions did not return'
   for view in range(1,4):
-   tap(f'Camera view {view}','content-desc');find('Play exercise video','content-desc')
-   tap('Play exercise video','content-desc');find('android.widget.VideoView','class')
+   tap(f'Camera view {view}','content-desc');assert_autoplay()
    recording=subprocess.Popen(['adb','-s',a.serial,'shell','screenrecord','--time-limit','5',f'/sdcard/of-media-{view}.mp4'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
    time.sleep(2);capture(f'media-playing-view-{view}')
    assert recording.wait(timeout=15)==0, 'Screen recording failed'
    adb('pull',f'/sdcard/of-media-{view}.mp4',str(a.output/f'media-playing-view-{view}.mp4'))
    assert not any('unavailable' in n.get('text','').lower() for n in nodes()), 'Video fell back to a photo'
   if a.parity_actions:
-   def native_position():
-    start=time.monotonic();n=find('Exercise video, view ','content-desc',prefix=True)[0];end=time.monotonic()
-    position,duration=map(float,re.findall(r'\d+\.\d+',n.get('content-desc')))
-    assert duration>4, 'Native video has no measurable duration'
-    return (start+end)/2,position,duration
    assert not any(n.get('class')=='android.widget.SeekBar' or 'Exercise video progress:' in n.get('content-desc','') for n in nodes()), 'Unwanted player bar is visible'
    for label in ['.2X','.5X']:
     assert not any(n.get('content-desc')=='Playback speed '+label for n in nodes()), 'Unwanted slow playback option remains'
-   tap('Camera view 1','content-desc');tap('Play exercise video','content-desc');find('android.widget.VideoView','class')
+   tap('Camera view 1','content-desc');assert_autoplay()
    rates=[]
    for label,low,high in [('1X',.65,1.35),('2.5X',1.8,3.2),('5X',3.8,6.2)]:
     tap('Playback speed '+label,'content-desc');tap('Replay exercise video','content-desc');time.sleep(.2)
@@ -171,12 +176,13 @@ if a.media:
    tap('Pause exercise video','content-desc');_,first,duration=native_position();time.sleep(2);_,last,_=native_position()
    assert abs(last-first)<.3, ('Video advanced while explicitly paused',first,last)
    capture('media-paused')
-   tap('Playback speed 1X','content-desc');tap('Camera view 3','content-desc');tap('Play exercise video','content-desc');find('android.widget.VideoView','class')
+   tap('Playback speed 1X','content-desc');tap('Camera view 3','content-desc');assert_autoplay()
   adb('shell','input','keyevent','3');time.sleep(2);launch()
   find('Play exercise video','content-desc');capture('media-paused-after-background')
   assert not any(n.get('class')=='android.widget.VideoView' for n in nodes()), 'Video continued after backgrounding'
   tap('Play exercise video','content-desc');find('android.widget.VideoView','class')
   adb('shell','input','keyevent','4')
+  tap('Chin-Up');assert_autoplay();capture('media-autoplay-reopened');adb('shell','input','keyevent','4')
  finally:
   if wifi in ('0','1'):adb('shell','svc','wifi','enable' if wifi=='1' else 'disable')
   if mobile in ('0','1'):adb('shell','svc','data','enable' if mobile=='1' else 'disable')

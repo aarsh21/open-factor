@@ -35,3 +35,7 @@ Status: authenticated source evidence established; implementation fidelity and c
 ## Verification and remaining boundaries
 
 Use unit/Android storage tests and ADB smoke flows to validate training continuity. Review enlarged type, IME and semantic labels in the next native pass. The native HTML/CSS detector does not apply. `docs/open-factor/reviews/` records independent dispositions at their actual scope; the foundation review is `fix`, not complete clone acceptance. Do not close the full goal while the parity ledger has required work outstanding.
+
+## Body-data extension
+
+The body-data routes reuse `PageHeading`, charcoal surfaces, native outlined metric fields, and the white `PrimaryAction`. A dated Scale Weight form supports kg/lb input and optional manual body fat. Full Body groups the 18 observed circumference fields into Upper Body, Arms and Legs. Editors scroll above an IME-aware Save action; the shared Scaffold accounts for system bars and display cutouts. Body Data history opens from grouped Settings, Dashboard and the pill's Shortcuts actions. The pill's geometry and motion remain unchanged. Source sheet geometry, photo entry, Weight Trend and the Visual Body Fat reference are not reproduced by these local forms. `docs/open-factor/PARITY.md` records the local record and backup policies separately from source evidence. No new visual system, generated images or bundled private evidence is introduced.

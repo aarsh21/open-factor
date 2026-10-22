@@ -38,8 +38,8 @@ import kotlin.math.roundToInt
 @Composable
 fun ExerciseMedia(e: Exercise) {
     var selected by rememberSaveable(e.id) { mutableIntStateOf(0) }
-    var playing by rememberSaveable(e.id, selected) { mutableStateOf(false) }
-    var started by remember(e.id, selected) { mutableStateOf(false) }
+    var playing by rememberSaveable(e.id, selected) { mutableStateOf(true) }
+    var started by remember(e.id, selected) { mutableStateOf(true) }
     var speed by rememberSaveable(e.id) { mutableFloatStateOf(1f) }
     val latestSpeed by rememberUpdatedState(speed)
     val latestPlaying by rememberUpdatedState(playing)
@@ -63,8 +63,8 @@ fun ExerciseMedia(e: Exercise) {
         context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime
     }
     val clip = e.clips.getOrNull(selected)?.takeIf { it.isNotBlank() } ?: e.video
-    val uri by
-        produceState<Uri?>(null, clip) {
+    val uri by key(clip) {
+        produceState<Uri?>(null) {
             value =
                 withContext(Dispatchers.IO) {
                     runCatching {
@@ -93,6 +93,7 @@ fun ExerciseMedia(e: Exercise) {
                 }
             if (clip != null && value == null) failed = true
         }
+    }
     if (e.frames.isEmpty() && clip == null) {
         EmptyContent(
             Icons.Rounded.FitnessCenter,

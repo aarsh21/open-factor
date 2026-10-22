@@ -41,6 +41,7 @@ fun DashboardScreen(
     onStart: () -> Unit,
     onResume: () -> Unit,
     onLevels: () -> Unit,
+    onBodyData: () -> Unit,
 ) {
     var customize by remember { mutableStateOf(false) }
     val metrics = data.dashboardMetrics(exercises)
@@ -198,6 +199,26 @@ fun DashboardScreen(
                     }
                 }
             }
+        item {
+            Column(Modifier.padding(horizontal = 18.dp)) {
+                SectionTitle("Body Data", "History", onBodyData)
+                val latest = data.scaleWeights.maxByOrNull { it.date }
+                Surface(shape = OF.shape, color = OF.card) {
+                    ListItem(
+                        headlineContent = { Text("Scale Weight") },
+                        supportingContent = {
+                            Text(latest?.let {
+                                "${it.weightKg.bodyWeightNumber(data.preferences.pounds)} ${if (data.preferences.pounds) "lb" else "kg"} · ${it.date}"
+                            } ?: "No weigh-ins yet")
+                        },
+                        leadingContent = { Icon(Icons.Rounded.MonitorWeight, null) },
+                        trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
+                        modifier = Modifier.clickable(onClick = onBodyData),
+                        colors = ListItemDefaults.colors(containerColor = OF.card),
+                    )
+                }
+            }
+        }
         item {
             Box(Modifier.padding(18.dp)) {
                 OutlinedButton(onWorkout, Modifier.fillMaxWidth()) { Text("Workout Library") }

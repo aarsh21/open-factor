@@ -29,7 +29,7 @@ fun ExerciseLibrary(
     onDetail: (String) -> Unit,
     onPick: ((String) -> Unit)? = null,
     onBack: (() -> Unit)? = null,
-    onCustom: () -> Unit = {},
+    onCustom: () -> Unit,
     picking: Boolean = false,
     gyms: List<GymProfile> = emptyList(),
     equipmentCatalog: EquipmentCatalog? = null,
@@ -572,7 +572,7 @@ fun ExerciseDetail(
         }
         Box(Modifier.padding(18.dp)) {
             PrimaryAction(
-                if (data.active == null) "Start Workout with Exercise" else "Add to Workout",
+                "Add Exercise",
                 onAdd,
                 icon = Icons.Rounded.Add,
             )

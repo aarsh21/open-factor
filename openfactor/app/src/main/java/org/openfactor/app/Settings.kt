@@ -29,6 +29,7 @@ fun SettingsScreen(
     onExercises: () -> Unit,
     onHistory: () -> Unit,
     onGyms: () -> Unit,
+    onBodyData: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -134,6 +135,12 @@ fun SettingsScreen(
         }
         SettingsSection("YOUR DATA") {
             SettingsRow(
+                Icons.Rounded.MonitorWeight,
+                "Body Data",
+                "Weight, body fat and measurements",
+                onClick = onBodyData,
+            )
+            SettingsRow(
                 Icons.Rounded.History,
                 "Workout History",
                 "Review your training",
@@ -142,7 +149,7 @@ fun SettingsScreen(
             SettingsRow(
                 Icons.Rounded.FileUpload,
                 "Export Backup",
-                "Save workouts, templates and preferences",
+                "Save training, body data and preferences",
             ) {
                 export.launch("open-factor-${LocalDate.now()}.json")
             }
@@ -286,7 +293,7 @@ fun SettingsScreen(
     restoreText?.let { text ->
         ConfirmDialog(
             "Restore Backup?",
-            "This replaces the workouts, templates and preferences currently stored on this device.",
+            "This replaces all training, body data and preferences on this device. Records absent from the backup will be removed, including body data when restoring an older backup.",
             "Restore",
             onDismiss = { restoreText = null },
             onConfirm = {

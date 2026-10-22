@@ -5,6 +5,47 @@ import org.junit.Test
 
 class WorkoutDataTest {
     @Test
+    fun compositionSurvivesBackupWithoutStartingAndBeginsAtExplicitStartTime() {
+        val first = SessionExercise(exerciseId = "dip", sets = listOf(
+            LoggedSet(reps = 0, targetRepsMin = 6, targetRepsMax = 9, targetRir = 2),
+        ), restSeconds = 73, notes = "Use neutral grip")
+        val second = SessionExercise(exerciseId = "press", sets = listOf(LoggedSet(reps = 0)))
+        val draft = WorkoutDraft("Upper", listOf(second, first), "gym", "Keep this composition")
+        val prior = Workout(name = "Previous", startedAt = 2000, finishedAt = 62000)
+        val source = AppData(
+            workoutDraft = draft,
+            history = listOf(prior),
+            scaleWeights = listOf(ScaleWeightRecord(weightKg = 79.3)),
+        )
+        val restored = DataCodec.decode(DataCodec.encode(source))
+        assertEquals(source, restored)
+        assertNull(restored.active)
+        val started = restored.startWorkoutDraft(800000)
+        assertNull(started.workoutDraft)
+        assertEquals(source.history, started.history)
+        assertEquals(source.scaleWeights, started.scaleWeights)
+        val workout = started.active!!
+        assertEquals(draft.exercises, workout.exercises)
+        assertEquals(draft.name, workout.name)
+        assertEquals(draft.gymId, workout.gymId)
+        assertEquals(draft.notes, workout.notes)
+        assertEquals(second.id, workout.selectedExerciseId)
+        assertEquals(800000L, workout.startedAt)
+        assertEquals(7L, workout.elapsedSeconds(807000))
+        assertEquals(started, started.startWorkoutDraft(900000))
+        assertEquals(started, DataCodec.decode(DataCodec.encode(started)))
+        assertNull(DataCodec.decode("{\"schemaVersion\":1}").workoutDraft)
+    }
+
+    @Test
+    fun startingACompositionCannotReplaceAnActiveWorkoutOrConsumeItsDraft() {
+        val active = Workout(name = "In progress", startedAt = 5000, notes = "Do not replace")
+        val source = AppData(active = active, workoutDraft = WorkoutDraft("Later"))
+        assertEquals(source, source.startWorkoutDraft(800000))
+        assertEquals(source, DataCodec.decode(DataCodec.encode(source)))
+    }
+
+    @Test
     fun sessionTargetsPreserveActualsOtherExerciseHistoryAndProgramAcrossBackup() {
         val first = LoggedSet(id = "a", weightKg = 72.5, reps = 11, rir = 4, completed = true)
         val second = LoggedSet(id = "b", weightKg = 61.0, reps = 7, rir = 1)

@@ -11,8 +11,9 @@ media, or a service-dependent integrity check. Preserve the Nuvio floating pill
 and grouped Settings presentation. The global plus sits inside the middle of the
 pill, between Workout and Exercises. It is an action, not a selected destination.
 The user's latest media requirements are full-width, filled demonstrations,
-1X/2.5X/5X playback options, and no progress or seek bar. These explicit choices
-override the earlier lower-speed and separate-plus interpretation.
+1X/2.5X/5X playback options, autoplay on opening or changing cameras, and no
+progress or seek bar. Explicit pause and background pause remain available.
+These choices override the earlier lower-speed and separate-plus interpretation.
 
 Offline-only does **not** excuse missing measurements, photos, charts, local
 export, accessibility, language support or device-local Health Connect. Those
@@ -22,6 +23,9 @@ excluded; unimplemented local functions remain gaps.
 ## Evidence and interpretation
 
 The [reference tour](REFERENCE-TOUR.md) indexes fourteen retained source chapters.
+The [whole-app audit](reviews/whole-app-parity-2026-10-22.md) records the committed
+baseline and fifteen functional and UX acceptance units. Its body-data and
+autoplay findings describe that baseline, not acceptance of subsequent work.
 Private source evidence lives under the prior investigation's
 `inspection/private/`; it is not a public application asset. The October 22
 continuation also captured the connected source phone's Workout, Shortcuts,
@@ -73,8 +77,8 @@ below is not an acceptance pass.
 | Surface | Evidence-backed state | Remaining acceptance work |
 | --- | --- | --- |
 | Navigation | Nuvio shell retained; plus inside its middle with two destinations on each side. All four roots and shortcuts checked at normal and 1.3× text size; full navigation labels remain visible | System Back and IME clearance still need broader coverage. Source shortcut customization, color and Up Next composition remain absent. |
-| Shortcuts | History, empty/resume workout, new program and new workout have local routes | Weight, Photos and Metrics destinations and source Up Next card remain missing. Do not add inert buttons to imply completion. |
-| Dashboard | Rings, data scope and section visibility exist | Recent Records focus, configurable analytics/muscle/exercise/body tiles, weigh-in habits, Weight Trend, Steps and reset defaults differ or are absent. Source totals/target algorithms are unobserved. |
+| Shortcuts | History, empty/resume workout, new program, new workout, Log Weight and Log Measurements have local routes | Photos and the source Up Next card remain missing. Shortcut layout and customization are not source-equivalent. |
+| Dashboard | Rings, data scope and section visibility exist. A local Scale Weight row opens body history and shows the latest dated reading in the selected weight unit | Recent Records focus, configurable analytics/muscle/exercise/body tiles, weigh-in habits, Weight Trend, Steps and reset defaults differ or are absent. Source totals/target algorithms are unobserved. |
 | Workout/calendar | Local program library and workout history entry points exist | Source calendar expansion/placement, day/program composition, drag/drop library and program controls are not equivalent. |
 | Manual programs | Drafts, days, targets, local save/activation and backup exist | Variable count editing, contextual Week/Cycle terminology, icons, circular target controls, exact saving scopes, advanced sets and calendar placement remain open. Source save/activation outcomes were not captured. |
 | Smart programs | Wizard inputs and some static tables were recovered | No complete offline generator, progression or deload engine. Never substitute an invented formula and call it source parity. |
@@ -83,15 +87,36 @@ below is not an acceptance pass.
 | Live settings | Workout and gym settings entry points return to the session | Complete source settings are absent. Showing RIR is not equivalent to source auto-population under RIR Tracking. |
 | History/summary | Local completion, repeat, deletion and stored sets exist | Populated source history, summary, record handling, incomplete-set rules and bodyweight-volume calculations are unobserved. Existing local arithmetic is not a source oracle. |
 | Exercise library | Bundled catalog, gym/type/laterality filters, grouped browse, name/alias search and favorites exist | Source All/Performed/Deprioritized/Modified/Archived scopes, literal resistance selector, selected-muscle ordering and exact ranking need work. Archived was confirmed by horizontally scrolling the live source tab row; the fifth scope is not Custom. Full filter combinations remain unobserved. |
-| Exercise detail | Imported properties, instructions, media and local history exist. Offline emulator checks passed for Chin-Up's three cameras, instruction collapse and expansion, native 1X/2.5X/5X playback, pause and background reset. Rendered full-width center-cropped media has no seek bar | Source modal/contextual Add action and history analytics still differ. Physical-device compatibility is not certified. Source autoplay and camera-switch continuity remain unobserved. |
+| Exercise detail | Imported properties, instructions, media and local history exist. Offline emulator checks passed for Chin-Up autoplay on opening, all three cameras and reopening, instruction collapse and expansion, native 1X/2.5X/5X playback, explicit pause and background reset. Clip loading resets for each selected clip instead of temporarily reopening the previous camera. Rendered full-width center-cropped media has no seek bar | Source modal/contextual Add action and history analytics still differ. Physical-device compatibility is not certified. Source autoplay and camera-switch continuity remain unobserved. Fault injection of an empty cached clip leaves an unprepared player rather than the expected photo fallback; normal installed-media and absent-demo checks do not certify corrupt-cache handling. |
 | Custom exercises | Basic local name/muscle/equipment/instructions form exists | Source staged required metrics, structured muscles/equipment alternatives/support, ROM/stability, final details/review and durable rich metadata are missing. |
 | Gyms | Local presets, equipment, weights and gym selection exist | Category bulk selection, default-weight summaries, quantity/enabled states, local unit editor and source presentation differ. Everything/Warehouse/Home counts differ between retained runtime and bundled catalog; resolve snapshot identity before deleting entities. |
-| Body data/photos | Source dated Scale Weight, Full Body and Front/Side/Back photo forms observed | No equivalent local record/photo/trend implementation. Full Body inventory observed live includes neck, shoulders, bust, chest, waist, hips and left/right bicep, forearm, wrist, thigh, calf and ankle. Do not derive a trend/visual-fat estimator from captured values. |
+| Body data/photos | Local dated scale-weight records support kg/lb input, unit-aware history, optional manual body fat, editing and confirmed deletion. Full Body records support the 18 observed circumference fields in cm. Both record types use durable app storage and JSON backup | Photos, Weight Trend, the Visual Body Fat reference/input, measurement charts and source form/history layout remain absent or different. Source save, same-day record policy and populated trend calculations are unobserved. No smoothing or visual-fat algorithm is inferred. |
 | Levels | Front/back map, period selection and contribution foundation exist | Source row order/sheet differ. Populated weighting, averaging, map colors and drilldown rules remain unobserved. |
 | Onboarding | Local defer/resume, validation and gym/program handoff exist | Source post-login forms were not captured sufficiently for parity. Onboarding body values are not dated body-data records. Account/login gates are intentionally omitted. |
 | Settings | Grouped Nuvio appearance, weight units, rest and backup exist | Energy/height/clock units, language, theme, full workout controls, shortcut configuration, visibility and tutorials/help remain incomplete. |
-| Data export | Full Open Factor JSON backup/restore exists | Source quick/granular category/time export is not equivalent. Body/photos/visibility additions must participate in backup, not live in an unexported side store. |
+| Data export | Full Open Factor JSON backup/restore includes scale weights and body measurements. Older backups remain readable and invalid body records reject the restore before storage changes | Source quick/granular category/time export is not equivalent. Future photos/visibility additions must participate in backup, not live in an unexported side store. |
 | Integrations | No required remote service | Optional device-local Health Connect is unimplemented; source grant/sync was not executed. |
+
+## Local body-data policy
+
+Retained `source-log-weight.xml` establishes a date, weight and optional body fat.
+`source-body-metrics.xml` and the lower Full Body captures establish neck,
+shoulders, bust, chest, waist, hips, and separate left/right bicep, forearm, wrist,
+thigh, calf and ankle fields. The source forms show cm. Private captures remain
+outside Git and are not bundled as application assets.
+
+Local records use stable IDs and ISO calendar dates, with kg and cm as storage
+units. Multiple records on the same date coexist; editing replaces only the
+selected ID. This is a local policy, not a recovered source rule. History sorts
+by date, and onboarding profile values do not create dated records. Weight input
+can switch kg/lb independently; history follows Settings → Units. Display rounds
+to two decimals, while an unchanged edit preserves the stored value.
+
+The local input limits are 0 < weight ≤ 5000 kg, 0–100% body fat, and
+0 < circumference ≤ 1000 cm. At least one circumference is required. These
+validation limits are not source restrictions or medical guidance. Full restore
+replaces all app data, so an older backup without body records removes current
+body records after confirmation. Export a current backup before restoring one.
 
 ## Media compression decision
 
@@ -133,3 +158,18 @@ settings, original-media cameras/lifecycle, manual programs and onboarding flows
 The package test verifies absence of Internet permission. Local checks still do
 not certify the missing/unobserved rows above. Record actual run outcomes in the
 review artifacts, including failures; do not mark this entire matrix accepted.
+
+The body-data smoke check uses a separate disposable emulator with no body
+records. It exercises native input, editing, deletion, restart, enlarged type,
+and Android document export/restore with synthetic data:
+
+```sh
+python tooling/android_body_data_smoke.py --serial emulator-5582 \
+  --output .amp/in/artifacts/body-data/ui
+```
+
+It requires no reference media, records the installed APK and offline network
+state, and restores network/font settings in `finally`. `BodyDataTest` covers
+calendar-date and legacy-backup behavior. `BodyDataStorageTest` checks a new
+store/view model, full restore, invalid-restore atomicity, and preservation of
+nonempty workouts and programs.

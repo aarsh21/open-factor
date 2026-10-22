@@ -97,6 +97,9 @@ data class AppData(
     val programs: List<TrainingProgram> = emptyList(),
     val programDraft: TrainingProgram? = null,
     val onboarding: OnboardingState = OnboardingState(),
+    val scaleWeights: List<ScaleWeightRecord> = emptyList(),
+    val bodyMeasurements: List<BodyMeasurementRecord> = emptyList(),
+    val workoutDraft: WorkoutDraft? = null,
 )
 
 fun newId() = UUID.randomUUID().toString()
@@ -273,7 +276,16 @@ object DataCodec {
             .put("activeProgramId", d.activeProgramId)
             .put("programs", JSONArray(d.programs.map { ProgramCodec.encode(it) }))
             .put("programDraft", d.programDraft?.let { ProgramCodec.encode(it) })
+            .put("workoutDraft", d.workoutDraft?.let {
+                JSONObject()
+                    .put("name", it.name)
+                    .put("gymId", it.gymId)
+                    .put("notes", it.notes)
+                    .put("exercises", JSONArray(it.exercises.map { entry -> entry.json() }))
+            })
             .put("onboarding", d.onboarding.json())
+            .put("scaleWeights", BodyDataCodec.weights(d.scaleWeights))
+            .put("bodyMeasurements", BodyDataCodec.measurements(d.bodyMeasurements))
             .put("gyms", JSONArray(d.gyms.map { GymCodec.encode(it) }))
             .put("active", d.active?.json())
             .put("history", JSONArray(d.history.map { it.json() }))
@@ -312,33 +324,34 @@ object DataCodec {
 
     private fun JSONObject.array(k: String) = optJSONArray(k) ?: JSONArray()
 
+    private fun JSONObject.sessionExercise(): SessionExercise =
+        SessionExercise(
+            getString("id"),
+            getString("exerciseId"),
+            array("sets").objects().map { s ->
+                LoggedSet(
+                    s.getString("id"),
+                    s.optDouble("weightKg", 0.0).coerceIn(0.0, 5000.0),
+                    s.optInt("reps", 8).coerceIn(0, 9999),
+                    if (s.isNull("rir")) null else s.getInt("rir").coerceIn(0, 10),
+                    s.optBoolean("completed"),
+                    s.optBoolean("warmup"),
+                    if (s.isNull("targetRepsMin")) null else s.getInt("targetRepsMin"),
+                    if (s.isNull("targetRepsMax")) null else s.getInt("targetRepsMax"),
+                    if (s.isNull("targetRir")) null else s.getInt("targetRir"),
+                )
+            },
+            optString("notes"),
+            if (isNull("restSeconds")) null else getInt("restSeconds"),
+        )
+
     private fun JSONObject.workout(): Workout =
         Workout(
             getString("id"),
             getString("name"),
             getLong("startedAt"),
             if (isNull("finishedAt")) null else getLong("finishedAt"),
-            array("exercises").objects().map { e ->
-                SessionExercise(
-                    e.getString("id"),
-                    e.getString("exerciseId"),
-                    e.array("sets").objects().map { s ->
-                        LoggedSet(
-                            s.getString("id"),
-                            s.optDouble("weightKg", 0.0).coerceIn(0.0, 5000.0),
-                            s.optInt("reps", 8).coerceIn(0, 9999),
-                            if (s.isNull("rir")) null else s.getInt("rir").coerceIn(0, 10),
-                            s.optBoolean("completed"),
-                            s.optBoolean("warmup"),
-                            if (s.isNull("targetRepsMin")) null else s.getInt("targetRepsMin"),
-                            if (s.isNull("targetRepsMax")) null else s.getInt("targetRepsMax"),
-                            if (s.isNull("targetRir")) null else s.getInt("targetRir"),
-                        )
-                    },
-                    e.optString("notes"),
-                    if (e.isNull("restSeconds")) null else e.getInt("restSeconds"),
-                )
-            },
+            array("exercises").objects().map { it.sessionExercise() },
             optString("notes"),
             optLong("restUntil", 0),
             optString("programId").takeIf { it.isNotBlank() && it != "null" },
@@ -390,6 +403,16 @@ object DataCodec {
             programs,
             j.optJSONObject("programDraft")?.let { ProgramCodec.decode(it) },
             OnboardingState.decode(j.optJSONObject("onboarding")),
+            BodyDataCodec.readWeights(j),
+            BodyDataCodec.readMeasurements(j),
+            workoutDraft = j.optJSONObject("workoutDraft")?.let {
+                WorkoutDraft(
+                    name = it.getString("name"),
+                    exercises = it.array("exercises").objects().map { entry -> entry.sessionExercise() },
+                    gymId = it.optString("gymId").takeIf { id -> id.isNotBlank() && id != "null" },
+                    notes = it.optString("notes"),
+                )
+            },
         )
     }
 
@@ -499,6 +522,18 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         _data.value = next
     }
 
+    fun saveScaleWeight(record: ScaleWeightRecord) = update { it.withScaleWeight(record) }
+
+    fun deleteScaleWeight(id: String) = update {
+        it.copy(scaleWeights = it.scaleWeights.filterNot { record -> record.id == id })
+    }
+
+    fun saveBodyMeasurements(record: BodyMeasurementRecord) = update { it.withBodyMeasurements(record) }
+
+    fun deleteBodyMeasurements(id: String) = update {
+        it.copy(bodyMeasurements = it.bodyMeasurements.filterNot { record -> record.id == id })
+    }
+
     fun editOnboarding(block: (OnboardingState) -> OnboardingState) = update {
         it.copy(onboarding = block(it.onboarding))
     }
@@ -552,6 +587,31 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun finishOnboarding() = update {
         it.copy(onboarding = it.onboarding.copy(completed = true, deferred = false))
+    }
+
+    fun prepareWorkout() = update { d ->
+        if (d.workoutDraft != null) d
+        else d.copy(workoutDraft = WorkoutDraft(gymId = d.gyms.firstOrNull()?.id))
+    }
+
+    fun editWorkoutDraft(block: (WorkoutDraft) -> WorkoutDraft) = update { d ->
+        d.copy(workoutDraft = d.workoutDraft?.let(block))
+    }
+
+    fun addDraftExercise(id: String) = editWorkoutDraft {
+        it.copy(exercises = it.exercises + SessionExercise(
+            exerciseId = id,
+            sets = listOf(LoggedSet(reps = 0)),
+        ))
+    }
+
+    fun discardWorkoutDraft() = update { it.copy(workoutDraft = null) }
+
+    fun startWorkoutDraft(): Boolean {
+        val d = _data.value
+        if (d.active != null || d.workoutDraft == null) return false
+        update { it.startWorkoutDraft(System.currentTimeMillis()) }
+        return true
     }
 
     fun start(name: String = "Workout", ids: List<String> = emptyList()) {

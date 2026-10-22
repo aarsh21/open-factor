@@ -8,11 +8,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -49,17 +51,54 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
     var route by rememberSaveable { mutableStateOf("") }
     var detailId by rememberSaveable { mutableStateOf("") }
     var previousRoute by rememberSaveable { mutableStateOf("") }
+    var customReturnRoute by rememberSaveable { mutableStateOf("") }
     var programDayId by rememberSaveable { mutableStateOf("") }
     var programExit by remember { mutableStateOf(false) }
     var shortcuts by rememberSaveable { mutableStateOf(false) }
     var workoutSettings by rememberSaveable { mutableStateOf(false) }
     var gymsReturn by rememberSaveable { mutableStateOf("") }
+    var bodyMeasurementsTab by rememberSaveable { mutableStateOf(false) }
     val exercises = vm.exercises(data)
     val snackbar = remember { SnackbarHostState() }
+    val routeState = rememberSaveableStateHolder()
     fun openExercise(id: String) {
         previousRoute = route
         detailId = id
         route = "exercise"
+    }
+    fun openCustom() {
+        customReturnRoute = route
+        route = "custom"
+    }
+    fun pickExercise(id: String, origin: String) {
+        when (origin) {
+            "program-picker" -> {
+                vm.editProgramDraft { plan ->
+                    plan.copy(days = plan.days.map { day ->
+                        if (day.id == programDayId) day.addExercise(
+                            id,
+                            plan.cycleCount,
+                            "Workout ${('A'.code + plan.days.count { it.exercises.isNotEmpty() }).toChar()}",
+                        ) else day
+                    })
+                }
+                route = "program-editor"
+            }
+            "workout-draft", "draft-picker" -> {
+                vm.addDraftExercise(id)
+                route = "workout-draft"
+            }
+            else -> {
+                if (data.active != null) {
+                    vm.addExercise(id)
+                    route = "session"
+                } else {
+                    vm.prepareWorkout()
+                    vm.addDraftExercise(id)
+                    route = "workout-draft"
+                }
+            }
+        }
     }
     if (!data.onboarding.completed && !data.onboarding.deferred) {
         OnboardingScreen(data, vm) {
@@ -99,8 +138,12 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
         route =
             when (route) {
                 "exercise" -> previousRoute
+                "custom" -> customReturnRoute
+                "picker" -> "session"
+                "draft-picker" -> "workout-draft"
                 "gym" -> "gyms"
                 "gyms" -> gymsReturn
+                "weight-entry", "measurement-entry" -> "body-data"
                 "program-picker" -> "program-editor"
                 "program-editor",
                 "program-setup" -> {
@@ -114,6 +157,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = OF.background,
+        contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
         snackbarHost = {
             SnackbarHost(snackbar, Modifier.padding(bottom = if (route.isBlank()) 94.dp else 0.dp))
         },
@@ -129,6 +173,27 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                     .background(OF.background)
             ) {
                 when (route) {
+                    "body-data" -> BodyDataScreen(
+                        data, bodyMeasurementsTab, { bodyMeasurementsTab = it }, { route = "" },
+                        { detailId = it; route = "weight-entry" },
+                        { detailId = it; route = "measurement-entry" },
+                    )
+                    "weight-entry" -> key(detailId) {
+                        ScaleWeightEditor(
+                            data.scaleWeights.find { it.id == detailId }, data.preferences.pounds,
+                            { route = "body-data" },
+                            { vm.saveScaleWeight(it); bodyMeasurementsTab = false; route = "body-data" },
+                            { vm.deleteScaleWeight(detailId); bodyMeasurementsTab = false; route = "body-data" },
+                        )
+                    }
+                    "measurement-entry" -> key(detailId) {
+                        BodyMeasurementEditor(
+                            data.bodyMeasurements.find { it.id == detailId },
+                            { route = "body-data" },
+                            { vm.saveBodyMeasurements(it); bodyMeasurementsTab = true; route = "body-data" },
+                            { vm.deleteBodyMeasurements(detailId); bodyMeasurementsTab = true; route = "body-data" },
+                        )
+                    }
                     "programs" ->
                         ProgramLibrary(
                             data,
@@ -179,34 +244,20 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                             },
                             { route = "programs" },
                         )
-                    "program-picker" ->
+                    "program-picker" -> routeState.SaveableStateProvider("program-picker") {
                         ExerciseLibrary(
                             exercises,
                             data.favorites,
                             vm::favorite,
                             ::openExercise,
-                            { id ->
-                                vm.editProgramDraft { plan ->
-                                    plan.copy(
-                                        days =
-                                            plan.days.map { day ->
-                                                if (day.id == programDayId)
-                                                    day.addExercise(
-                                                        id,
-                                                        plan.cycleCount,
-                                                        "Workout ${('A'.code + plan.days.count { it.exercises.isNotEmpty() }).toChar()}",
-                                                    )
-                                                else day
-                                            }
-                                    )
-                                }
-                                route = "program-editor"
-                            },
+                            { id -> pickExercise(id, "program-picker") },
                             onBack = { route = "program-editor" },
+                            onCustom = ::openCustom,
                             picking = true,
                             gyms = data.gyms,
                             equipmentCatalog = vm.equipmentCatalog,
                         )
+                    }
                     "gyms" ->
                         GymProfilesScreen(data, vm, { route = gymsReturn }) {
                             detailId = it
@@ -228,14 +279,10 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                     data,
                                     vm,
                                     { route = previousRoute },
-                                    {
-                                        vm.start()
-                                        vm.addExercise(e.id)
-                                        route = "session"
-                                    },
+                                    { pickExercise(e.id, previousRoute) },
                                 )
                             }
-                    "picker" ->
+                    "picker" -> routeState.SaveableStateProvider("picker") {
                         ExerciseLibrary(
                             exercises,
                             data.favorites,
@@ -246,16 +293,49 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                 route = "session"
                             },
                             onBack = { route = "session" },
-                            onCustom = { route = "custom" },
+                            onCustom = ::openCustom,
                             picking = true,
                             gyms = data.gyms,
                             equipmentCatalog = vm.equipmentCatalog,
                         )
+                    }
                     "custom" ->
-                        CustomExercise({ route = "" }) { n, m, e, i ->
+                        CustomExercise({ route = customReturnRoute }) { n, m, e, i ->
                             val id = vm.addCustom(n, m, e, i)
-                            openExercise(id)
+                            previousRoute = customReturnRoute
+                            detailId = id
+                            route = "exercise"
                         }
+                    "draft-picker" -> routeState.SaveableStateProvider("draft-picker") {
+                        ExerciseLibrary(
+                            exercises,
+                            data.favorites,
+                            vm::favorite,
+                            ::openExercise,
+                            { id -> pickExercise(id, "draft-picker") },
+                            onBack = { route = "workout-draft" },
+                            onCustom = ::openCustom,
+                            picking = true,
+                            gyms = data.gyms,
+                            equipmentCatalog = vm.equipmentCatalog,
+                        )
+                    }
+                    "workout-draft" ->
+                        data.workoutDraft?.let { draft ->
+                            WorkoutComposition(
+                                draft,
+                                exercises,
+                                data.gyms,
+                                vm::editWorkoutDraft,
+                                onBack = { route = "" },
+                                onAdd = { route = "draft-picker" },
+                                onDetail = ::openExercise,
+                                onStart = {
+                                    if (vm.startWorkoutDraft()) route = "session"
+                                },
+                                onDiscard = { vm.discardWorkoutDraft(); route = "" },
+                            )
+                        } ?: run { LaunchedEffect(Unit) { route = "" } }
                     "session" ->
                         WorkoutSession(
                             data,
@@ -316,6 +396,10 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                     onStart = { shortcuts = true },
                                     onResume = { route = "session" },
                                     onLevels = { route = "levels" },
+                                    onBodyData = {
+                                        bodyMeasurementsTab = false
+                                        route = "body-data"
+                                    },
                                 )
                             1 ->
                                 WorkoutScreen(
@@ -332,16 +416,17 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                     onPrograms = { route = "programs" },
                                     onHistory = { route = "history" },
                                 )
-                            2 ->
+                            2 -> routeState.SaveableStateProvider("exercise-library") {
                                 ExerciseLibrary(
                                     exercises,
                                     data.favorites,
                                     vm::favorite,
                                     ::openExercise,
-                                    onCustom = { route = "custom" },
+                                    onCustom = ::openCustom,
                                     gyms = data.gyms,
                                     equipmentCatalog = vm.equipmentCatalog,
                                 )
+                            }
                             3 ->
                                 SettingsScreen(
                                     data.preferences,
@@ -349,6 +434,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                     snackbar,
                                     onExercises = { tab = 2 },
                                     onHistory = { route = "history" },
+                                    onBodyData = { route = "body-data" },
                                     onGyms = {
                                         gymsReturn = ""
                                         route = "gyms"
@@ -400,13 +486,36 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
         WorkoutSettings(data.preferences, vm) { workoutSettings = false }
     if (shortcuts)
         ModalBottomSheet(onDismissRequest = { shortcuts = false }, containerColor = OF.top) {
-            Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton({ shortcuts = false }) {
                         Icon(Icons.Rounded.Close, "Close shortcuts")
                     }
                     Text("Shortcuts", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
                 }
+                ListItem(
+                    headlineContent = { Text("Log Weight") },
+                    leadingContent = { Icon(Icons.Rounded.MonitorWeight, null) },
+                    modifier = Modifier.clickable {
+                        shortcuts = false
+                        detailId = ""
+                        bodyMeasurementsTab = false
+                        route = "weight-entry"
+                    },
+                    colors = ListItemDefaults.colors(containerColor = OF.top),
+                )
+                ListItem(
+                    headlineContent = { Text("Log Measurements") },
+                    leadingContent = { Icon(Icons.Rounded.Straighten, null) },
+                    modifier = Modifier.clickable {
+                        shortcuts = false
+                        detailId = ""
+                        bodyMeasurementsTab = true
+                        route = "measurement-entry"
+                    },
+                    colors = ListItemDefaults.colors(containerColor = OF.top),
+                )
                 ListItem(
                     headlineContent = { Text("History") },
                     leadingContent = { Icon(Icons.Rounded.History, null) },
@@ -423,8 +532,11 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                     trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
                     modifier = Modifier.clickable {
                             shortcuts = false
-                            vm.start()
-                            route = "session"
+                            if (data.active != null) route = "session"
+                            else {
+                                vm.prepareWorkout()
+                                route = "workout-draft"
+                            }
                         },
                     colors = ListItemDefaults.colors(containerColor = OF.top),
                 )
