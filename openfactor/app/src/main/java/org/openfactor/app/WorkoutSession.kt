@@ -33,6 +33,8 @@ fun WorkoutSession(
     onAdd: () -> Unit,
     onExercise: (String) -> Unit,
     onFinished: (String) -> Unit,
+    onWorkoutSettings: () -> Unit,
+    onGymSettings: () -> Unit,
 ) {
     val workout = data.active
     if (workout == null) {
@@ -74,6 +76,14 @@ fun WorkoutSession(
             Box {
                 IconButton({ menu = true }) { Icon(Icons.Rounded.Menu, "Workout options") }
                 DropdownMenu(menu, { menu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Workout settings") },
+                        onClick = { menu = false; onWorkoutSettings() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Gym settings") },
+                        onClick = { menu = false; onGymSettings() },
+                    )
                     DropdownMenuItem(
                         text = {
                             Text(
@@ -224,27 +234,31 @@ fun WorkoutSession(
                                 Icon(Icons.Rounded.Close, "Remove ${e.name}", tint = OF.muted)
                             }
                         }
-                        if (
-                            se.sets.any {
-                                it.targetRepsMin != null ||
-                                    it.targetRepsMax != null ||
-                                    it.targetRir != null
-                            }
-                        ) {
-                            var targets by remember { mutableStateOf(false) }
+                        var targets by remember { mutableStateOf(false) }
+                        var warmup by remember { mutableStateOf(false) }
+                        Row {
                             TextButton({ targets = true }) { Text("Targets") }
-                            if (targets)
-                                InfoDialog(
-                                    "Targets",
-                                    se.sets
-                                        .mapIndexed { index, set ->
-                                            "Set ${index + 1}: ${set.targetRepsMin?.toString() ?: "—"}–${set.targetRepsMax?.toString() ?: "—"} reps · ${set.targetRir?.toString() ?: "—"} RIR"
-                                        }
-                                        .joinToString("\n"),
-                                ) {
-                                    targets = false
-                                }
+                            TextButton({ warmup = true }) { Text("Warm Up") }
                         }
+                        if (targets)
+                            WorkoutTargetsDialog(se, { targets = false }) { values, rest ->
+                                vm.saveExerciseTargets(se.id, values, rest)
+                                targets = false
+                            }
+                        if (warmup)
+                            AlertDialog(
+                                onDismissRequest = { warmup = false },
+                                title = { Text("Warm Up") },
+                                text = { Text("Add an empty warm-up set before your working sets.") },
+                                confirmButton = {
+                                    TextButton({ vm.addWarmupSet(se.id); warmup = false }) {
+                                        Text("Add empty warm-up set")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton({ warmup = false }) { Text("Cancel") }
+                                },
+                            )
                         OutlinedTextField(
                             se.notes,
                             { vm.exerciseNotes(se.id, it) },
@@ -384,6 +398,70 @@ fun WorkoutSession(
             },
             dismissButton = { TextButton({ confirm = "" }) { Text("Keep Training") } },
         )
+}
+
+@Composable
+private fun WorkoutTargetsDialog(
+    exercise: SessionExercise,
+    onDismiss: () -> Unit,
+    onSave: (Map<String, WorkingSetTarget>, Int?) -> Unit,
+) {
+    val sets = remember { exercise.sets.filterNot { it.warmup } }
+    var values by remember {
+        mutableStateOf(sets.associate { it.id to listOf(
+            it.targetRepsMin?.toString().orEmpty(),
+            it.targetRepsMax?.toString().orEmpty(),
+            it.targetRir?.toString().orEmpty(),
+        ) })
+    }
+    var rest by remember { mutableStateOf(exercise.restSeconds?.toString().orEmpty()) }
+    val parsed = values.mapValues { (_, fields) ->
+        WorkingSetTarget(fields[0].toIntOrNull(), fields[1].toIntOrNull(), fields[2].toIntOrNull())
+    }
+    val valid = values.values.all { fields ->
+        fields.all { it.isBlank() || it.toIntOrNull() != null }
+    } && parsed.values.all { it.isValid() } &&
+        (rest.isBlank() || rest.toIntOrNull()?.let { it in 0..1800 } == true)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Workout Targets") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Today's targets apply only to this workout. Set minimum/maximum reps and RIR, or leave fields blank for no target.")
+                sets.forEachIndexed { index, set ->
+                    Text("Working set ${index + 1}", style = MaterialTheme.typography.titleSmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("Reps Min" to "Min", "Reps Max" to "Max", "RIR" to "RIR").forEachIndexed { field, (description, label) ->
+                            OutlinedTextField(
+                                values.getValue(set.id)[field],
+                                { text ->
+                                    values = values + (set.id to values.getValue(set.id).toMutableList().apply { this[field] = text })
+                                },
+                                Modifier.weight(1f).semantics {
+                                    contentDescription = "Set ${index + 1} $description target"
+                                },
+                                label = { Text(label) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    rest, { rest = it }, Modifier.fillMaxWidth(),
+                    label = { Text("Set Rest Timers (seconds)") },
+                    supportingText = { Text("0–1800; blank uses workout settings") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                )
+                if (!valid) Text("Use positive ordered rep bounds, RIR 0–10 and rest 0–1800.", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = {
+            TextButton({ onSave(parsed, rest.toIntOrNull()) }, enabled = valid) { Text("Save") }
+        },
+        dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable

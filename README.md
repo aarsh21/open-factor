@@ -2,7 +2,7 @@
 
 An independently maintained open source Android workout tracker. Open Factor uses [NuvioMobile](https://github.com/NuvioMedia/NuvioMobile) as its base, with Nuvio-derived floating navigation and grouped settings. Workout screens and behavior are being reconstructed from an explicitly supplied reference application.
 
-**Development status:** a working training foundation, not yet a complete one-to-one replacement. Original exercise-video acquisition awaits a [Mac-assisted pass](docs/open-factor/media-handoff/README.md); automated programming, body metrics and complete visual/interaction parity remain unfinished. Gym profiles and Levels have partial local implementations. See [the investigation ledger](docs/open-factor/INVESTIGATION.md).
+**Development status:** a working training foundation, not yet a complete one-to-one replacement. The private [Mac media return](docs/open-factor/media-handoff/RECEIPT.md) supplies all 1,831 expected original videos for 619 exercises. Automated programming, body metrics and complete visual/interaction parity remain unfinished. Gym profiles and Levels have partial local implementations. See [the investigation ledger](docs/open-factor/INVESTIGATION.md).
 
 ## Test on Android
 
@@ -51,9 +51,9 @@ cd openfactor
 ./gradlew :app:assembleDebug
 ```
 
-For the inspected specimen, the importer produces 1,345 catalog entries, exact images for 619 exercises, and instructions for 1,213. It copies equipment and muscle assets, preserves the full source metadata, and records SHA-256 provenance. **No source videos have been retrieved or verified.** Static analysis resolves 1,831 object paths, but server access requires valid App Check. For matching local MP4 exports, add `--video-directory /path/to/export`; missing clips show photo previews.
+For the inspected specimen, the importer produces 1,345 catalog entries, exact images for 619 exercises, and 1,213 instruction-file links. Of those files, 1,212 contain text and one is empty. It copies equipment and muscle assets, preserves the full source metadata, and records SHA-256 provenance.
 
-The original-media task and Mac agent handoff are recorded in [TODO.md](docs/open-factor/TODO.md).
+The private Mac export supplies all 1,831 expected original MP4s. Add `--video-directory /path/to/mac-media-export` to import them into a new pack. The original video payload is 2.73 GB and produces a large local APK. Videos cover 619 exercises, not the full catalog; missing clips retain photo previews or an explicit unavailable state. The [return receipt](docs/open-factor/media-handoff/RECEIPT.md) records verification and the remaining media and instruction gaps. The published alpha.4 release predates this video import.
 
 The importer never fetches remote content, executes the APK, or publishes imported files. Do not describe imported proprietary content as GPL-licensed. See [asset provenance](docs/open-factor/ASSETS.md).
 

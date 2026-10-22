@@ -2,6 +2,8 @@
 
 Manual programs are a local development feature. Smart generation, automatic progression and complete reference-app parity remain unfinished.
 
+"Cycles" is source terminology, not an invented feature: captured manual drafts show **7 Cycles**, and the connected source app displays **Cycle 1**. Seven is the observed scratch default; a fixed seven-cycle editor is our current limitation, not a proven source restriction. Weekly generated plans use **Weeks** and a separate **Deload**. The complete labeling rule and programming algorithms remain unresolved; see [the parity ledger](PARITY.md).
+
 1. Open **Workout → Programs → Create program**. Name the plan, choose its color, and continue.
 2. The first day is **Rest**. Add exercises to convert it into a workout day, or use **Add Day** to keep the rest day and create another day.
 3. Choose a gym, rename the workout day, and use the horizontal day actions to reorder it. An exercise's overflow menu removes or reorders that exercise.
@@ -13,4 +15,4 @@ Opening targets, changing the viewing scope or saving without edits preserves ex
 
 Programs and drafts are included in local JSON backups. Finishing a program workout retains program, day, cycle and target identity in history. Deleting a library plan preserves workout history.
 
-The current editor supports seven cycles and Standard Sets. Its Day/Cycle muscle summaries use primary-muscle targets from the first cycle. Variable cycle counts, exact source saving scopes, all icons, Myo/Failure sets, supersets, XLSX, calendar placement and automatic progression remain on the parity backlog. Original exercise-video acquisition is separately deferred in [TODO.md](TODO.md).
+The current editor supports seven cycles and Standard Sets. Its Day/Cycle muscle summaries use primary-muscle targets from the first cycle. Variable cycle counts, exact source saving scopes, all icons, Myo/Failure sets, supersets, XLSX, calendar placement and automatic progression remain on the parity backlog. Original exercise videos are now imported locally; see [the media receipt](media-handoff/RECEIPT.md).

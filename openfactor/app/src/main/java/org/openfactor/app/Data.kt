@@ -101,6 +101,56 @@ data class AppData(
 
 fun newId() = UUID.randomUUID().toString()
 
+data class WorkingSetTarget(
+    val repsMin: Int? = null,
+    val repsMax: Int? = null,
+    val rir: Int? = null,
+) {
+    fun isValid(): Boolean =
+        (repsMin == null || repsMin > 0) &&
+            (repsMax == null || repsMax > 0) &&
+            (repsMin == null || repsMax == null || repsMin <= repsMax) &&
+            (rir == null || rir in 0..10)
+}
+
+/** Updates only current working rows, keyed by stable set ID, in one session change. */
+fun Workout.withExerciseTargets(
+    exerciseId: String,
+    targets: Map<String, WorkingSetTarget>,
+    restSeconds: Int?,
+): Workout {
+    require(restSeconds == null || restSeconds in 0..1800) { "Rest must be 0–1800 seconds" }
+    require(targets.values.all { it.isValid() }) { "Invalid working set targets" }
+    return copy(exercises = exercises.map { exercise ->
+        if (exercise.id != exerciseId) exercise
+        else exercise.copy(
+            restSeconds = restSeconds,
+            sets = exercise.sets.map { set ->
+                val target = targets[set.id]
+                if (set.warmup || target == null) set
+                else set.copy(
+                    targetRepsMin = target.repsMin,
+                    targetRepsMax = target.repsMax,
+                    targetRir = target.rir,
+                )
+            },
+        )
+    })
+}
+
+fun Workout.withEmptyWarmupSet(exerciseId: String): Workout =
+    copy(exercises = exercises.map { exercise ->
+        if (exercise.id != exerciseId) exercise
+        else {
+            val index = exercise.sets.indexOfFirst { !it.warmup }.let {
+                if (it < 0) exercise.sets.size else it
+            }
+            exercise.copy(sets = exercise.sets.toMutableList().apply {
+                add(index, LoggedSet(weightKg = 0.0, reps = 0, warmup = true))
+            })
+        }
+    })
+
 fun Workout.completedSets() = exercises.sumOf { e -> e.sets.count { it.completed } }
 
 fun Workout.volumeKg() =
@@ -591,6 +641,14 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun removeExercise(id: String) = editActive {
         it.copy(exercises = it.exercises.filterNot { e -> e.id == id })
     }
+
+    fun saveExerciseTargets(
+        exerciseId: String,
+        targets: Map<String, WorkingSetTarget>,
+        restSeconds: Int?,
+    ) = editActive { it.withExerciseTargets(exerciseId, targets, restSeconds) }
+
+    fun addWarmupSet(exerciseId: String) = editActive { it.withEmptyWarmupSet(exerciseId) }
 
     fun addSet(exerciseId: String) = editActive { w ->
         w.copy(

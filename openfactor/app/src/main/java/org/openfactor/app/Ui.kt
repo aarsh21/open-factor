@@ -23,9 +23,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -116,10 +118,12 @@ fun OpenFactorTheme(content: @Composable () -> Unit) {
 fun NuvioWorkoutNavigation(
     selected: Int,
     scrollEnergy: Float,
+    onAdd: () -> Unit,
     modifier: Modifier = Modifier,
     onSelect: (Int) -> Unit,
 ) {
     val labels = listOf("Dashboard", "Workout", "Exercises", "Settings")
+    val textMeasurer = rememberTextMeasurer()
     val icons =
         listOf(
             Icons.Rounded.Dashboard,
@@ -134,16 +138,17 @@ fun NuvioWorkoutNavigation(
             label = "navigation scroll depth",
         )
     Box(
-        modifier.fillMaxWidth().padding(start = 28.dp, end = 28.dp, bottom = 14.dp),
+        modifier.widthIn(max = 480.dp).fillMaxWidth()
+            .padding(horizontal = 12.dp).padding(bottom = 14.dp),
         contentAlignment = Alignment.BottomCenter,
     ) {
         BoxWithConstraints(
-            Modifier.widthIn(max = 440.dp).fillMaxWidth().height(66.dp).selectableGroup()
+            Modifier.fillMaxWidth().height(66.dp).selectableGroup()
         ) {
-            val slot = (maxWidth - 8.dp) / 4
+            val slot = (maxWidth - 8.dp) / 5
             val offset by
                 animateDpAsState(
-                    4.dp + slot * selected,
+                    4.dp + slot * (if (selected < 2) selected else selected + 1),
                     tween(280, easing = FastOutSlowInEasing),
                     label = "navigation pill",
                 )
@@ -175,12 +180,38 @@ fun NuvioWorkoutNavigation(
             }
             Row(Modifier.fillMaxSize().padding(4.dp)) {
                 labels.forEachIndexed { i, label ->
+                    if (i == 2)
+                        Box(
+                            Modifier.weight(1f).fillMaxHeight(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            FilledIconButton(
+                                onAdd,
+                                Modifier.size(48.dp),
+                                colors = IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = Color.White,
+                                    contentColor = Color.Black,
+                                ),
+                            ) {
+                                Icon(Icons.Rounded.Add, "Shortcuts", Modifier.size(28.dp))
+                            }
+                        }
                     val iconScale by
                         animateFloatAsState(
                             if (i == selected) 1.04f else 1f,
                             tween(180),
                             label = "navigation icon",
                         )
+                    val labelStyle = LocalTextStyle.current.copy(
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        fontWeight = if (i == selected) FontWeight.Bold else FontWeight.Normal,
+                        fontFamily =
+                            if (i == selected) MaterialTheme.typography.headlineMedium.fontFamily
+                            else MaterialTheme.typography.bodyLarge.fontFamily,
+                    )
+                    val labelWidth = textMeasurer.measure(label, labelStyle, softWrap = false).size.width
+                    val labelScale = minOf(1f, with(LocalDensity.current) { (slot - 16.dp).toPx() } / labelWidth)
                     Column(
                         Modifier.weight(1f)
                             .fillMaxHeight()
@@ -200,13 +231,7 @@ fun NuvioWorkoutNavigation(
                         )
                         Text(
                             label,
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp,
-                            fontWeight = if (i == selected) FontWeight.Bold else FontWeight.Normal,
-                            fontFamily =
-                                if (i == selected)
-                                    MaterialTheme.typography.headlineMedium.fontFamily
-                                else MaterialTheme.typography.bodyLarge.fontFamily,
+                            style = labelStyle.copy(fontSize = 12.sp * labelScale, lineHeight = 16.sp * labelScale),
                             color = if (i == selected) Color.White else Color(0xFFA1A4AA),
                             maxLines = 1,
                         )
@@ -327,7 +352,12 @@ fun EmptyContent(
 }
 
 @Composable
-fun ExerciseImage(exercise: Exercise, modifier: Modifier = Modifier, frame: Int = 0) {
+fun ExerciseImage(
+    exercise: Exercise,
+    modifier: Modifier = Modifier,
+    frame: Int = 0,
+    contentScale: androidx.compose.ui.layout.ContentScale = androidx.compose.ui.layout.ContentScale.Fit,
+) {
     Box(
         modifier.clip(RoundedCornerShape(8.dp)).background(OF.elevated),
         contentAlignment = Alignment.Center,
@@ -339,7 +369,7 @@ fun ExerciseImage(exercise: Exercise, modifier: Modifier = Modifier, frame: Int 
                         exercise.frames[frame.coerceIn(0, exercise.frames.lastIndex)],
                 contentDescription = exercise.name,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                contentScale = contentScale,
             )
         else Icon(Icons.Rounded.FitnessCenter, null, Modifier.size(28.dp), tint = OF.muted)
     }

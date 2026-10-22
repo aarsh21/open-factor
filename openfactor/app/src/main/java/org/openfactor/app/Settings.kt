@@ -267,43 +267,7 @@ fun SettingsScreen(
             )
         }
         "workout" ->
-            AlertDialog(
-                onDismissRequest = { dialog = "" },
-                title = { Text("Workout") },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Reps in reserve")
-                                Text(
-                                    "Show RIR when logging sets",
-                                    color = OF.muted,
-                                    fontSize = 12.sp,
-                                )
-                            }
-                            Switch(
-                                p.showRir,
-                                { checked -> vm.settings { it.copy(showRir = checked) } },
-                            )
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Exercise Auto-Next")
-                                Text(
-                                    "Move to unfinished exercises after the last set",
-                                    color = OF.muted,
-                                    fontSize = 12.sp,
-                                )
-                            }
-                            Switch(
-                                p.exerciseAutoNext,
-                                { checked -> vm.settings { it.copy(exerciseAutoNext = checked) } },
-                            )
-                        }
-                    }
-                },
-                confirmButton = { TextButton({ dialog = "" }) { Text("Done") } },
-            )
+            WorkoutSettings(p, vm) { dialog = "" }
         "about" ->
             InfoDialog(
                 "Open Factor",
@@ -337,6 +301,33 @@ fun SettingsScreen(
             },
         )
     }
+}
+
+@Composable
+fun WorkoutSettings(p: Preferences, vm: WorkoutViewModel, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Workout settings") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Reps in reserve")
+                        Text("Show RIR when logging sets", color = OF.muted, fontSize = 12.sp)
+                    }
+                    Switch(p.showRir, { checked -> vm.settings { it.copy(showRir = checked) } })
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Exercise Auto-Next")
+                        Text("Move to unfinished exercises after the last set", color = OF.muted, fontSize = 12.sp)
+                    }
+                    Switch(p.exerciseAutoNext, { checked -> vm.settings { it.copy(exerciseAutoNext = checked) } })
+                }
+            }
+        },
+        confirmButton = { TextButton(onDismiss) { Text("Done") } },
+    )
 }
 
 @Composable

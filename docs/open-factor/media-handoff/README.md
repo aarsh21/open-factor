@@ -2,6 +2,12 @@
 
 Continue from repository `aarsh21/open-factor`, branch `cmp-rewrite`. This task is original exercise-media acquisition only. The Open Factor app and full reproduction goal remain unfinished.
 
+## Return received on 22 October 2026
+
+The private return contains all 1,831 expected original videos for 619 exercises, the original photos and the exercise metadata. Linux archive and file-hash verification passed. See [the return receipt](RECEIPT.md) for import results and unresolved coverage. Full catalog media coverage remains unverified.
+
+The instructions and known state below describe the original handoff before acquisition. Keep `input-summary.json` and `exercise-targets.jsonl` unchanged as the input snapshot. Do not restart acquisition or interpret their zero-video counts as the current result.
+
 ## Copy-paste prompt
 
 ```text

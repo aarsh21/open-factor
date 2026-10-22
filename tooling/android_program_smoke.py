@@ -54,7 +54,6 @@ def enter(t,value,attr='text'):
   adb('shell','input','keyevent','123')
   count=min(len(old)+3,250)
   adb('shell','for i in '+ ' '.join(str(n) for n in range(count)) +'; do input keyevent 67; done')
- else:raise AssertionError('Input did not clear: '+t)
  assert focused()=='', 'Old input text remains: '+t
  adb('shell','input','text',str(value).replace(' ','%s'))
  assert focused()==str(value), 'Replacement input differs: '+t
@@ -114,7 +113,12 @@ targets();tap('Cycle 2');tap('Skip exercise in selected cycles','content-desc');
 
 w=state()['active'];assert w['programId']==program['id'] and w['programCycle']==1
 s=w['exercises'][0]['sets'][0];assert s['reps']==8 and s['targetRepsMin']==8 and s['targetRepsMax']==12 and s['targetRir']==1 and s.get('rir') is None
-find('Targets');tap('Targets');find('Set 1: 8–12 reps · 1 RIR');capture('program-session-targets');tap('Done');tap('Complete set 1','content-desc',prefix=True)
+find('Targets');tap('Targets');find('Workout Targets')
+root=E.fromstring(adb('shell','cat','/sdcard/of-program.xml'))
+for description,expected in [('Set 1 Reps Min target','8'),('Set 1 Reps Max target','12'),('Set 1 RIR target','1')]:
+ fields=[n for n in root.iter('node') if n.get('class')=='android.widget.EditText' and any(c.get('content-desc')==description for c in n.iter('node'))]
+ assert len(fields)==1 and fields[0].get('text')==expected,description
+capture('program-session-targets');tap('Cancel');assert state()['active']==w;tap('Complete set 1','content-desc',prefix=True)
 w=state()['active'];remaining=(w['restUntil']-int(time.time()*1000))/1000;assert 0<remaining<=45
 capture('program-session');tap('Finish Workout');tap('Finish');find('Workout Complete');capture('program-summary')
 w=state()['history'][0];assert w['programId']==program['id'] and w['exercises'][0]['sets'][0]['completed']

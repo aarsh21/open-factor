@@ -10,6 +10,17 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class TrainingFlowTest {
     @Test
+    fun installedAppCannotAccessTheInternet() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val permissions =
+            context.packageManager.getPackageInfo(
+                context.packageName,
+                android.content.pm.PackageManager.GET_PERMISSIONS,
+            ).requestedPermissions.orEmpty()
+        assertFalse("android.permission.INTERNET" in permissions)
+    }
+
+    @Test
     fun workoutStorageSurvivesNewStoreInstance() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val store = WorkoutStore(context)

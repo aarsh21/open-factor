@@ -5,6 +5,77 @@ import org.junit.Test
 
 class WorkoutDataTest {
     @Test
+    fun sessionTargetsPreserveActualsOtherExerciseHistoryAndProgramAcrossBackup() {
+        val first = LoggedSet(id = "a", weightKg = 72.5, reps = 11, rir = 4, completed = true)
+        val second = LoggedSet(id = "b", weightKg = 61.0, reps = 7, rir = 1)
+        val warmup = LoggedSet(id = "warm", reps = 3, warmup = true)
+        val exercise = SessionExercise(id = "exercise", exerciseId = "dip", sets = listOf(warmup, first, second))
+        val other = SessionExercise(exerciseId = "press", restSeconds = 83)
+        val workout = Workout(name = "Training", exercises = listOf(exercise, other), restUntil = 12345)
+        val program = TrainingProgram(name = "Plan", days = listOf(ProgramDay(exercises = listOf(
+            PlannedExercise(exerciseId = "dip", cycles = listOf(CycleTarget(sets = listOf(SetTarget(repsMin = 5, repsMax = 9, rir = 3))))),
+        ))), cycleCount = 1)
+        val source = AppData(active = workout, history = listOf(workout.copy(id = "past", finishedAt = 99)), programs = listOf(program), programDraft = program)
+        val targets = mapOf("a" to WorkingSetTarget(6, 10, 2), "b" to WorkingSetTarget(12, 17, 0), "warm" to WorkingSetTarget(8, 8, 1))
+        val changed = source.copy(active = source.active!!.withExerciseTargets(exercise.id, targets, 137))
+        val restored = DataCodec.decode(DataCodec.encode(changed))
+        assertEquals(changed, restored)
+        assertEquals(source.history, restored.history)
+        assertEquals(source.programs, restored.programs)
+        assertEquals(source.programDraft, restored.programDraft)
+        val active = restored.active!!
+        assertEquals(other, active.exercises[1])
+        assertEquals(workout.restUntil, active.restUntil)
+        assertEquals(137, active.exercises[0].restSeconds)
+        assertEquals(listOf(warmup, first.copy(targetRepsMin = 6, targetRepsMax = 10, targetRir = 2), second.copy(targetRepsMin = 12, targetRepsMax = 17, targetRir = 0)), active.exercises[0].sets)
+        val cleared = active.withExerciseTargets(exercise.id, mapOf("a" to WorkingSetTarget()), null)
+        assertEquals(first, cleared.exercises[0].sets[1])
+        assertNull(cleared.exercises[0].restSeconds)
+    }
+
+    @Test
+    fun invalidTargetsAndRestAreRejectedAndOptionalBoundsAreAccepted() {
+        val exercise = SessionExercise(exerciseId = "dip")
+        val workout = Workout(name = "Training", exercises = listOf(exercise))
+        for (target in listOf(WorkingSetTarget(0), WorkingSetTarget(-1), WorkingSetTarget(9, 4), WorkingSetTarget(rir = -1), WorkingSetTarget(rir = 11))) {
+            assertTrue(runCatching { workout.withExerciseTargets(exercise.id, mapOf(exercise.sets[0].id to target), null) }.exceptionOrNull() is IllegalArgumentException)
+        }
+        for (rest in listOf(-1, 1801)) {
+            assertTrue(runCatching { workout.withExerciseTargets(exercise.id, emptyMap(), rest) }.exceptionOrNull() is IllegalArgumentException)
+        }
+        for (target in listOf(WorkingSetTarget(), WorkingSetTarget(repsMin = 2), WorkingSetTarget(repsMax = 5), WorkingSetTarget(1, 1, 10))) {
+            assertTrue(target.isValid())
+        }
+        for (rest in listOf(0, 1800)) {
+            assertEquals(rest, workout.withExerciseTargets(exercise.id, emptyMap(), rest).exercises[0].restSeconds)
+        }
+    }
+
+    @Test
+    fun emptyWarmupsInsertBeforeWorkingRowsWithoutChangingExistingSets() {
+        val warmup = LoggedSet(warmup = true, reps = 4)
+        val working = LoggedSet(weightKg = 50.0, reps = 9, completed = true, targetRepsMin = 6)
+        val exercise = SessionExercise(id = "exercise", exerciseId = "dip", sets = listOf(warmup, working))
+        val other = SessionExercise(exerciseId = "press")
+        val workout = Workout(name = "Training", exercises = listOf(exercise, other))
+        val changed = workout.withEmptyWarmupSet(exercise.id).withEmptyWarmupSet(exercise.id)
+        val sets = changed.exercises[0].sets
+        assertEquals(warmup, sets.first())
+        assertEquals(working, sets.last())
+        assertEquals(4, sets.map { it.id }.distinct().size)
+        sets.subList(1, 3).forEach {
+            assertTrue(it.warmup)
+            assertEquals(0, it.reps)
+            assertEquals(0.0, it.weightKg, 0.0)
+            assertFalse(it.completed)
+            assertNull(it.targetRepsMin)
+        }
+        assertEquals(other, changed.exercises[1])
+        assertEquals(changed, DataCodec.decode(DataCodec.encode(AppData(active = changed))).active)
+        assertEquals(1, Workout(name = "Empty", exercises = listOf(exercise.copy(sets = emptyList()))).withEmptyWarmupSet(exercise.id).exercises[0].sets.size)
+    }
+
+    @Test
     fun pauseAndSelectionSurviveBackupWithoutCountingPausedTime() {
         val workout =
             Workout(

@@ -52,7 +52,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
     var programDayId by rememberSaveable { mutableStateOf("") }
     var programExit by remember { mutableStateOf(false) }
     var shortcuts by rememberSaveable { mutableStateOf(false) }
-    var routineName by rememberSaveable { mutableStateOf(false) }
+    var workoutSettings by rememberSaveable { mutableStateOf(false) }
+    var gymsReturn by rememberSaveable { mutableStateOf("") }
     val exercises = vm.exercises(data)
     val snackbar = remember { SnackbarHostState() }
     fun openExercise(id: String) {
@@ -99,6 +100,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
             when (route) {
                 "exercise" -> previousRoute
                 "gym" -> "gyms"
+                "gyms" -> gymsReturn
                 "program-picker" -> "program-editor"
                 "program-editor",
                 "program-setup" -> {
@@ -206,7 +208,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                             equipmentCatalog = vm.equipmentCatalog,
                         )
                     "gyms" ->
-                        GymProfilesScreen(data, vm, { route = "" }) {
+                        GymProfilesScreen(data, vm, { route = gymsReturn }) {
                             detailId = it
                             route = "gym"
                         }
@@ -262,6 +264,11 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                             onBack = { route = "" },
                             onAdd = { route = "picker" },
                             onExercise = ::openExercise,
+                            onWorkoutSettings = { workoutSettings = true },
+                            onGymSettings = {
+                                gymsReturn = "session"
+                                route = "gyms"
+                            },
                             onFinished = {
                                 detailId = it
                                 route = "history-detail"
@@ -342,7 +349,10 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                     snackbar,
                                     onExercises = { tab = 2 },
                                     onHistory = { route = "history" },
-                                    onGyms = { route = "gyms" },
+                                    onGyms = {
+                                        gymsReturn = ""
+                                        route = "gyms"
+                                    },
                                 )
                         }
                 }
@@ -351,7 +361,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                 NuvioWorkoutNavigation(
                     tab,
                     scrollEnergy,
-                    Modifier.align(Alignment.BottomCenter)
+                    onAdd = { shortcuts = true },
+                    modifier = Modifier.align(Alignment.BottomCenter)
                         .padding(bottom = padding.calculateBottomPadding()),
                 ) {
                     tab = it
@@ -385,12 +396,19 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                 }
             },
         )
+    if (workoutSettings)
+        WorkoutSettings(data.preferences, vm) { workoutSettings = false }
     if (shortcuts)
         ModalBottomSheet(onDismissRequest = { shortcuts = false }, containerColor = OF.top) {
             Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
-                Text("Shortcuts", style = MaterialTheme.typography.headlineSmall)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton({ shortcuts = false }) {
+                        Icon(Icons.Rounded.Close, "Close shortcuts")
+                    }
+                    Text("Shortcuts", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
+                }
                 ListItem(
-                    headlineContent = { Text("Workout History") },
+                    headlineContent = { Text("History") },
                     leadingContent = { Icon(Icons.Rounded.History, null) },
                     modifier =
                         Modifier.clickableCompat {
@@ -399,21 +417,43 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                         },
                     colors = ListItemDefaults.colors(containerColor = OF.top),
                 )
-                PrimaryAction(
-                    if (data.active != null) "Resume Workout" else "Empty Workout",
-                    {
-                        shortcuts = false
-                        vm.start()
-                        route = "session"
-                    },
-                    icon = Icons.Rounded.FitnessCenter,
+                ListItem(
+                    headlineContent = { Text(if (data.active != null) "Resume Workout" else "Empty Workout") },
+                    leadingContent = { Icon(Icons.Rounded.FitnessCenter, null) },
+                    trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
+                    modifier = Modifier.clickable {
+                            shortcuts = false
+                            vm.start()
+                            route = "session"
+                        },
+                    colors = ListItemDefaults.colors(containerColor = OF.top),
                 )
-                TextButton({
-                    shortcuts = false
-                    route = "routine"
-                }) {
-                    Text("New Workout")
-                }
+                HorizontalDivider()
+                ListItem(
+                    headlineContent = { Text("New Program") },
+                    leadingContent = { Icon(Icons.Rounded.EventNote, null) },
+                    trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
+                    modifier = Modifier.clickable {
+                        shortcuts = false
+                        if (data.programDraft != null) route = "program-editor"
+                        else {
+                            vm.beginProgram(TrainingProgram(name = "My Program"))
+                            route = "program-setup"
+                        }
+                    },
+                    colors = ListItemDefaults.colors(containerColor = OF.top),
+                )
+                HorizontalDivider()
+                ListItem(
+                    headlineContent = { Text("New Workout") },
+                    leadingContent = { Icon(Icons.Rounded.Add, null) },
+                    trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
+                    modifier = Modifier.clickable {
+                        shortcuts = false
+                        route = "routine"
+                    },
+                    colors = ListItemDefaults.colors(containerColor = OF.top),
+                )
             }
         }
 }

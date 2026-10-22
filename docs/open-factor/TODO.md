@@ -2,18 +2,17 @@
 
 Full source parity remains in progress. Completed checkpoints and independent findings are recorded in INVESTIGATION.md and reviews/.
 
-## Original exercise-video acquisition: Mac handoff
+## Original exercise media: expected-path recovery complete
 
-The user reactivated media recovery on 22 October 2026 and then paused the phone pass to arrange MacBook access. Continue original-file acquisition from the [Mac agent handoff and target map](media-handoff/README.md). The phone is unrooted; its private cache could not be read through ADB. The user explicitly rejected per-video recordings. No Mac original-file acquisition has yet been verified.
+The private Mac return contains all **1,831 expected original videos and 1,831 matched photos for 619 exercises**, plus one unmatched photo. Archive and per-file verification passed on Linux, and the videos are imported into the ignored local app pack. See the [return receipt](media-handoff/RECEIPT.md). The original [handoff and target map](media-handoff/README.md) remain as acquisition inputs, not current coverage reports.
 
-- Reuse the existing static mapping: 1,831 candidate video paths for 619/1,345 exercises. A candidate path is not a working URL.
-- Preserve the Firebase 401/App Check failures for metadata and the actual media GET, plus the known object's public Cloud Storage 403. REA traced separate Auth/App Check inputs and the Android app's Play Integrity selection. Use supported authenticated access; do not bypass integrity checks or copy account tokens into the new app.
-- Establish which exercises and camera angles actually have demonstrations, rather than assuming all 1,345 do.
-- Validate acquired videos by exercise identity, content type, full decode, duration and SHA-256; retain per-file provenance and an explicit missing-media list.
-- Keep source media private until its redistribution terms are established separately from the GPL code. The indexed walkthrough and captured demos are reference evidence, not recovered original media.
-- Import verified files with the existing exact-filename asset importer and retest actual playback, camera selection, lifecycle pause and offline availability on the emulator.
+- Preserve unresolved scope: 712 other exercises exposed no demo selectors during recorded visits, and 14 catalog entries were not located. Neither observation proves absent server media.
+- Preserve instruction gaps: 1,212 exercises have nonempty current Markdown, one has only older database text, and 132 have neither. Older text is retained separately, not silently substituted in the app.
+- Keep the unmatched photo unmapped. Do not infer a missing exercise ID or guess extra video suffixes.
+- Keep source media private until its redistribution terms are established separately from the GPL code. No recordings, synthetic media or account tokens belong in the imported pack.
+- Check original HEVC compatibility on physical Android hardware before claiming broad playback support. The byte-preserving full video payload is 2.73 GB; distribution size remains a separate decision.
 
-Current original-file coverage: **0/1,345 verified**. The bounded public/local search found no downloadable original exercise demo files in the artifacts and official pages checked. Do not retry the same failed route or count promotional animations/synthetic player fixtures as demonstrations.
+Expected-path recovery is complete. Full catalog media coverage and full app parity remain incomplete. The published alpha.4 APK predates this video import.
 
 ## Active implementation backlog
 

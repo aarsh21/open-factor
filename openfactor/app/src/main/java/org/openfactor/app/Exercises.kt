@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -416,6 +418,7 @@ fun ExerciseDetail(
     onAdd: () -> Unit,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    var collapsedSections by rememberSaveable(e.id) { mutableStateOf(emptyList<Int>()) }
     val context = LocalContext.current
     val instructions =
         remember(e.id) {
@@ -447,22 +450,34 @@ fun ExerciseDetail(
         }
         LazyColumn(
             Modifier.weight(1f),
-            contentPadding = PaddingValues(18.dp),
+            contentPadding = if (tab == 0) PaddingValues(bottom = 18.dp) else PaddingValues(18.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (tab == 0) {
                 item { ExerciseMedia(e) }
                 if (instructions.isNotBlank())
-                    markdownItems(instructions).forEach { (heading, text) ->
+                    markdownItems(instructions).forEachIndexed { index, (heading, text) ->
                         item {
-                            if (heading != null)
-                                Text(heading, style = MaterialTheme.typography.titleLarge)
-                            else
-                                Text(
-                                    text,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = OF.muted,
-                                )
+                            Column(
+                                Modifier.padding(horizontal = 18.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                if (heading != null)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(heading, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                                        val collapsed = index in collapsedSections
+                                        TextButton(
+                                            onClick = {
+                                                collapsedSections = if (collapsed) collapsedSections - index else collapsedSections + index
+                                            },
+                                            modifier = Modifier.semantics {
+                                                contentDescription = "${if (collapsed) "Expand" else "Collapse"} $heading"
+                                            },
+                                        ) { Text(if (collapsed) "Expand" else "Collapse") }
+                                    }
+                                if (index !in collapsedSections)
+                                    Text(text, style = MaterialTheme.typography.bodyLarge, color = OF.muted)
+                            }
                         }
                     }
             } else if (tab == 1) {
@@ -582,13 +597,9 @@ private fun markdownItems(text: String): List<Pair<String?, String>> =
         .map { part ->
             val lines = part.trim().lines()
             if (lines.firstOrNull()?.startsWith("#") == true)
-                listOf(
-                    lines.first().trimStart('#', ' ') to "",
-                    null to cleanMarkdown(lines.drop(1).joinToString("\n")).trim(),
-                )
-            else listOf(null to cleanMarkdown(part))
+                lines.first().trimStart('#', ' ') to cleanMarkdown(lines.drop(1).joinToString("\n")).trim()
+            else null to cleanMarkdown(part)
         }
-        .flatten()
         .filter { it.first != null || it.second.isNotBlank() }
 
 @Composable
