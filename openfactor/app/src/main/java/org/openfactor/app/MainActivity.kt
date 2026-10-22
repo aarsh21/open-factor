@@ -501,6 +501,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                     },
                                     onNewRoutine = { route = "routine" },
                                     onDeleteRoutine = vm::deleteRoutine,
+                                    onReorderRoutines = vm::reorderRoutines,
                                     onPrograms = { route = "programs" },
                                     onHistory = { route = "history" },
                                 )

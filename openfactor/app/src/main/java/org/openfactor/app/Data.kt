@@ -901,6 +901,12 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         )
     }
 
+    fun reorderRoutines(ids: List<String>) = update { data ->
+        val byId = data.routines.associateBy { it.id }
+        if (ids.size != data.routines.size || ids.toSet() != byId.keys) data
+        else data.copy(routines = ids.map { byId.getValue(it) })
+    }
+
     fun deleteRoutine(id: String) = update {
         it.copy(routines = it.routines.filterNot { r -> r.id == id })
     }

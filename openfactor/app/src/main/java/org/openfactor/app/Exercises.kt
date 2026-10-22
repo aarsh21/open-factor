@@ -707,8 +707,13 @@ fun RoutineBuilder(
     var name by rememberSaveable { mutableStateOf("") }
     var query by rememberSaveable { mutableStateOf("") }
     var selected by rememberSaveable { mutableStateOf(listOf<String>()) }
-    Column(Modifier.fillMaxSize()) {
-        PageHeading("Create Workout", onBack)
+    var leaving by remember { mutableStateOf(false) }
+    fun back() {
+        if (name.isNotBlank() || selected.isNotEmpty()) leaving = true else onBack()
+    }
+    androidx.activity.compose.BackHandler(onBack = ::back)
+    Column(Modifier.fillMaxSize().imePadding()) {
+        PageHeading("Create Workout", ::back)
         OutlinedTextField(
             name,
             { name = it },
@@ -726,6 +731,35 @@ fun RoutineBuilder(
         )
         Text("${selected.size} selected", Modifier.padding(18.dp), color = OF.muted)
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 18.dp)) {
+            items(selected, key = { "selected-$it" }) { id ->
+                val exercise = exercises.find { it.id == id }
+                val index = selected.indexOf(id)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("${index + 1}. ${exercise?.title ?: "Exercise"}", Modifier.weight(1f))
+                    listOf(-1 to Icons.Rounded.ArrowUpward, 1 to Icons.Rounded.ArrowDownward)
+                        .forEach { (delta, icon) ->
+                            IconButton(
+                                onClick = {
+                                    selected =
+                                        selected.toMutableList().apply {
+                                            java.util.Collections.swap(this, index, index + delta)
+                                        }
+                                },
+                                enabled = index + delta in selected.indices,
+                            ) {
+                                Icon(
+                                    icon,
+                                    "Move ${exercise?.title ?: "exercise"} ${if (delta < 0) "up" else "down"}",
+                                )
+                            }
+                        }
+                    IconButton({ selected = selected - id }) {
+                        Icon(Icons.Rounded.Close, "Remove ${exercise?.title ?: "exercise"}")
+                    }
+                }
+            }
+            if (selected.isNotEmpty())
+                item { HorizontalDivider(Modifier.padding(vertical = 12.dp), color = OF.line) }
             items(
                 exercises.filter { it.name.contains(query, true) }.sortedBy { it.name },
                 key = { it.id },
@@ -759,4 +793,15 @@ fun RoutineBuilder(
             )
         }
     }
+    if (leaving)
+        ConfirmDialog(
+            "Discard unsaved workout?",
+            "This workout has not been saved to your library.",
+            "Discard",
+            { leaving = false },
+            {
+                leaving = false
+                onBack()
+            },
+        )
 }

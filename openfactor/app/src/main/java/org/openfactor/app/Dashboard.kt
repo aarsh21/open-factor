@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -352,53 +353,36 @@ fun WorkoutScreen(
     onDeleteRoutine: (String) -> Unit,
     onHistory: () -> Unit,
     onPrograms: () -> Unit,
+    onReorderRoutines: (List<String>) -> Unit,
 ) {
-    var selectedDay by remember { mutableStateOf(LocalDate.now()) }
+    var selectedEpoch by rememberSaveable { mutableLongStateOf(LocalDate.now().toEpochDay()) }
+    val selectedDay = LocalDate.ofEpochDay(selectedEpoch)
+    var calendarExpanded by rememberSaveable { mutableStateOf(false) }
+    var programExpanded by rememberSaveable { mutableStateOf(true) }
+    var libraryExpanded by rememberSaveable { mutableStateOf(true) }
     var delete by remember { mutableStateOf<Routine?>(null) }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 108.dp)) {
         item {
             PageHeading(
                 "Workout",
                 actions = {
+                    RoundAction(
+                        Icons.Rounded.CalendarMonth,
+                        if (calendarExpanded) "Collapse calendar" else "Expand calendar",
+                        { calendarExpanded = !calendarExpanded },
+                    )
                     RoundAction(Icons.Rounded.History, "Workout history", onHistory)
                     RoundAction(Icons.Rounded.Add, "New workout", onStart)
                 },
             )
         }
         item {
-            Row(
-                Modifier.fillMaxWidth()
-                    .background(OF.top)
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 18.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            WorkoutCalendar(
+                selectedDay,
+                calendarExpanded,
+                data.history.map { it.localDate() }.toSet(),
             ) {
-                val monday =
-                    LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                (0..6).forEach { i ->
-                    val day = monday.plusDays(i.toLong())
-                    Column(
-                        Modifier.width(44.dp)
-                            .height(70.dp)
-                            .clip(RoundedCornerShape(50))
-                            .border(
-                                if (day == selectedDay) 2.dp else 1.dp,
-                                if (day == selectedDay) Color.White else OF.line,
-                                RoundedCornerShape(50),
-                            )
-                            .clickable { selectedDay = day },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Text(day.dayOfMonth.toString())
-                        Text(
-                            day.format(DateTimeFormatter.ofPattern("EE")),
-                            color = OF.muted,
-                            fontSize = 12.sp,
-                        )
-                        if (day == LocalDate.now()) Text("•", fontSize = 10.sp)
-                    }
-                }
+                selectedEpoch = it.toEpochDay()
             }
         }
         item {
@@ -410,17 +394,68 @@ fun WorkoutScreen(
                 SectionTitle("Active Program", "Programs", onPrograms)
                 val program = data.programs.find { it.id == data.activeProgramId }
                 if (program != null) {
-                    Text(program.name, style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "${program.days.size} days · ${program.cycleCount} cycles",
-                        color = OF.muted,
+                    ListItem(
+                        headlineContent = { Text(program.name) },
+                        supportingContent = {
+                            Text(
+                                "${program.days.count { it.exercises.isNotEmpty() }} workouts · ${program.cycleCount} ${program.cycleUnit.plural.lowercase()}"
+                            )
+                        },
+                        leadingContent = {
+                            Icon(programIcon(program.icon), null, tint = Color(program.color))
+                        },
+                        trailingContent = {
+                            Icon(
+                                if (programExpanded) Icons.Rounded.ExpandLess
+                                else Icons.Rounded.ExpandMore,
+                                null,
+                            )
+                        },
+                        modifier =
+                            Modifier.clickable { programExpanded = !programExpanded }
+                                .semantics {
+                                    contentDescription =
+                                        "${if (programExpanded) "Collapse" else "Expand"} ${program.name}"
+                                },
+                        colors = ListItemDefaults.colors(containerColor = OF.card),
                     )
-                    PrimaryAction("Open Program", onPrograms)
+                    if (programExpanded)
+                        program.days.forEach { day ->
+                            ListItem(
+                                headlineContent = {
+                                    Text(if (day.exercises.isEmpty()) "Rest Day" else day.name)
+                                },
+                                supportingContent =
+                                    if (day.exercises.isEmpty()) null
+                                    else
+                                        ({
+                                            Text(
+                                                day.exercises
+                                                    .mapNotNull { p ->
+                                                        exercises
+                                                            .find { it.id == p.exerciseId }
+                                                            ?.title
+                                                    }
+                                                    .joinToString(", "),
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }),
+                                modifier = Modifier.clickable(onClick = onPrograms),
+                                colors = ListItemDefaults.colors(containerColor = OF.background),
+                            )
+                        }
+                    TextButton(onPrograms) { Text("Open Program") }
                 } else Text("No active program", color = OF.muted)
-                SectionTitle("Workout Library", "New Workout", onNewRoutine)
+                SectionTitle(
+                    "Workout Library",
+                    if (libraryExpanded) "Collapse" else "Expand",
+                    { libraryExpanded = !libraryExpanded },
+                )
+                if (libraryExpanded) TextButton(onNewRoutine) { Text("New Workout") }
             }
         }
-        if (data.routines.isEmpty())
+        if (libraryExpanded && data.routines.isEmpty())
             item {
                 Column(Modifier.padding(horizontal = 18.dp)) {
                     EmptyContent(
@@ -433,7 +468,8 @@ fun WorkoutScreen(
                     PrimaryAction("Start Empty Workout", onStart)
                 }
             }
-        items(data.routines, key = { it.id }) { r ->
+        items(if (libraryExpanded) data.routines else emptyList(), key = { it.id }) { r ->
+            var menu by remember { mutableStateOf(false) }
             Surface(
                 Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp),
                 shape = OF.shape,
@@ -445,8 +481,33 @@ fun WorkoutScreen(
                             Text(r.name, style = MaterialTheme.typography.titleLarge)
                             Text("${r.exerciseIds.size} exercises", color = OF.muted)
                         }
-                        IconButton({ delete = r }) {
-                            Icon(Icons.Rounded.MoreVert, "Manage ${r.name}")
+                        Box {
+                            IconButton({ menu = true }) {
+                                Icon(Icons.Rounded.MoreVert, "Manage ${r.name}")
+                            }
+                            DropdownMenu(menu, { menu = false }) {
+                                val index = data.routines.indexOfFirst { it.id == r.id }
+                                listOf(-1 to "Move Up", 1 to "Move Down").forEach { (delta, label)
+                                    ->
+                                    DropdownMenuItem(
+                                        text = { Text(label) },
+                                        enabled = index + delta in data.routines.indices,
+                                        onClick = {
+                                            val ids = data.routines.map { it.id }.toMutableList()
+                                            java.util.Collections.swap(ids, index, index + delta)
+                                            onReorderRoutines(ids)
+                                            menu = false
+                                        },
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text("Delete Workout") },
+                                    onClick = {
+                                        menu = false
+                                        delete = r
+                                    },
+                                )
+                            }
                         }
                     }
                     Text(
@@ -494,5 +555,92 @@ fun WorkoutScreen(
                 delete = null
             },
         )
+    }
+}
+
+@Composable
+private fun WorkoutCalendar(
+    selected: LocalDate,
+    expanded: Boolean,
+    recorded: Set<LocalDate>,
+    onSelect: (LocalDate) -> Unit,
+) {
+    var anchorEpoch by rememberSaveable { mutableLongStateOf(LocalDate.now().toEpochDay()) }
+    val anchor = LocalDate.ofEpochDay(anchorEpoch)
+    val first = anchor.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+    Column(
+        Modifier.fillMaxWidth().background(OF.top).padding(horizontal = 18.dp, vertical = 8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton({ anchorEpoch = anchor.minusWeeks(1).toEpochDay() }) {
+                Icon(Icons.Rounded.ChevronLeft, "Previous week")
+            }
+            Text(
+                anchor.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+                Modifier.weight(1f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            IconButton({ anchorEpoch = anchor.plusWeeks(1).toEpochDay() }) {
+                Icon(Icons.Rounded.ChevronRight, "Next week")
+            }
+        }
+        // The source expands into consecutive weeks, crossing month boundaries.
+        // Eight visible weeks and arrow navigation are a bounded local browsing policy.
+        repeat(if (expanded) 8 else 1) { week ->
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                repeat(7) { index ->
+                    val day = first.plusDays((week * 7 + index).toLong())
+                    Column(
+                        Modifier.weight(1f)
+                            .heightIn(min = 64.dp)
+                            .clip(RoundedCornerShape(50))
+                            .border(
+                                if (day == selected) 2.dp else 1.dp,
+                                if (day == selected) Color.White else OF.line,
+                                RoundedCornerShape(50),
+                            )
+                            .clickable { onSelect(day) }
+                            .semantics {
+                                contentDescription =
+                                    "${day.format(DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy"))}${if (day in recorded) ", workout recorded" else ""}"
+                                this.selected = day == selected
+                            },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        if (expanded && day.dayOfMonth == 1)
+                            Text(
+                                day.format(DateTimeFormatter.ofPattern("MMM")),
+                                color = OF.muted,
+                                fontSize = 10.sp,
+                            )
+                        Text(day.dayOfMonth.toString())
+                        Text(
+                            day.format(DateTimeFormatter.ofPattern("EE")),
+                            color = OF.muted,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                        )
+                        Text(
+                            if (day in recorded) "•" else if (day == LocalDate.now()) "·" else "",
+                            fontSize = 10.sp,
+                        )
+                    }
+                }
+            }
+        }
+        if (selected != LocalDate.now() || anchor != LocalDate.now())
+            TextButton(
+                {
+                    anchorEpoch = LocalDate.now().toEpochDay()
+                    onSelect(LocalDate.now())
+                },
+                Modifier.align(Alignment.End),
+            ) {
+                Text("Today")
+            }
     }
 }
