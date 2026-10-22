@@ -230,6 +230,7 @@ fun ProgressPhotoEditor(
                         ) {
                             Text(position.label, style = MaterialTheme.typography.titleSmall)
                             Spacer(Modifier.height(8.dp))
+                            val emptyOutline = OF.muted
                             Box(
                                 Modifier.fillMaxWidth()
                                     .aspectRatio(1f)
@@ -238,7 +239,7 @@ fun ProgressPhotoEditor(
                                     .drawBehind {
                                         if (reference.isEmpty())
                                             drawRoundRect(
-                                                color = OF.muted,
+                                                color = emptyOutline,
                                                 cornerRadius = CornerRadius(10.dp.toPx()),
                                                 style =
                                                     Stroke(

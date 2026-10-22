@@ -36,11 +36,11 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 
 object OF {
-    val background = Color(0xFF131313)
-    val top = Color(0xFF202020)
-    val card = Color(0xFF202020)
-    val elevated = Color(0xFF353535)
-    val muted = Color(0xFFB8B8BC)
+    val background: Color @Composable get() = MaterialTheme.colorScheme.background
+    val top: Color @Composable get() = MaterialTheme.colorScheme.surfaceContainerLow
+    val card: Color @Composable get() = MaterialTheme.colorScheme.surface
+    val elevated: Color @Composable get() = MaterialTheme.colorScheme.surfaceVariant
+    val muted: Color @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
     val line = Color(0xFF414141)
     val blue = Color(0xFF3982FF)
     val green = Color(0xFF91D8AD)
@@ -49,13 +49,18 @@ object OF {
 }
 
 @Composable
-fun OpenFactorTheme(content: @Composable () -> Unit) {
+fun OpenFactorTheme(theme: AppTheme = AppTheme.DARK, content: @Composable () -> Unit) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
-    val darkConfiguration = remember(configuration) {
+    val dark = when (theme) {
+        AppTheme.SYSTEM -> isSystemInDarkTheme()
+        AppTheme.LIGHT -> false
+        AppTheme.DARK -> true
+    }
+    val appConfiguration = remember(configuration, dark) {
         Configuration(configuration).apply {
             uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
-                Configuration.UI_MODE_NIGHT_YES
+                if (dark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
         }
     }
     fun importedFamily(path: String, weight: Int): FontFamily =
@@ -76,28 +81,40 @@ fun OpenFactorTheme(content: @Composable () -> Unit) {
 
     MaterialTheme(
         colorScheme =
-            darkColorScheme(
+            if (dark) darkColorScheme(
                 primary = Color.White,
                 onPrimary = Color.Black,
-                background = OF.background,
+                background = Color(0xFF131313),
                 onBackground = Color.White,
-                surface = OF.card,
-                surfaceVariant = OF.elevated,
+                surface = Color(0xFF202020),
+                surfaceVariant = Color(0xFF353535),
                 onSurface = Color.White,
-                onSurfaceVariant = OF.muted,
+                onSurfaceVariant = Color(0xFFB8B8BC),
                 outline = OF.line,
                 secondary = OF.blue,
                 secondaryContainer = Color.White,
                 onSecondaryContainer = Color.Black,
-                primaryContainer = OF.elevated,
+                primaryContainer = Color(0xFF353535),
                 onPrimaryContainer = Color.White,
                 surfaceTint = Color.Transparent,
-                surfaceContainerLowest = OF.background,
-                surfaceContainerLow = OF.top,
-                surfaceContainer = OF.card,
-                surfaceContainerHigh = OF.top,
-                surfaceContainerHighest = OF.elevated,
+                surfaceContainerLowest = Color(0xFF131313),
+                surfaceContainerLow = Color(0xFF202020),
+                surfaceContainer = Color(0xFF202020),
+                surfaceContainerHigh = Color(0xFF202020),
+                surfaceContainerHighest = Color(0xFF353535),
                 error = Color(0xFFFF9696),
+            ) else lightColorScheme(
+                primary = Color(0xFF202020), onPrimary = Color.White,
+                background = Color(0xFFF5F5F5), onBackground = Color(0xFF202020),
+                surface = Color.White, onSurface = Color(0xFF202020),
+                surfaceVariant = Color(0xFFE5E5E7), onSurfaceVariant = Color(0xFF55555B),
+                outline = OF.line, secondary = OF.blue,
+                secondaryContainer = Color(0xFF202020), onSecondaryContainer = Color.White,
+                primaryContainer = Color(0xFFE5E5E7), onPrimaryContainer = Color(0xFF202020),
+                surfaceContainerLowest = Color(0xFFF5F5F5), surfaceContainerLow = Color.White,
+                surfaceContainer = Color.White, surfaceContainerHigh = Color.White,
+                surfaceContainerHighest = Color(0xFFE5E5E7), surfaceTint = Color.Transparent,
+                error = Color(0xFFB3261E),
             ),
         typography =
             Typography().let { t ->
@@ -117,7 +134,7 @@ fun OpenFactorTheme(content: @Composable () -> Unit) {
                 )
             },
         content = {
-            CompositionLocalProvider(LocalConfiguration provides darkConfiguration, content = content)
+            CompositionLocalProvider(LocalConfiguration provides appConfiguration, content = content)
         },
     )
 }

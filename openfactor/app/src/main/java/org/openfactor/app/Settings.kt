@@ -1,20 +1,26 @@
 package org.openfactor.app
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,10 +39,11 @@ fun SettingsScreen(
     onHistory: () -> Unit,
     onGyms: () -> Unit,
     onBodyData: () -> Unit,
+    integrationSettings: @Composable ColumnScope.() -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var dialog by remember { mutableStateOf("") }
+    var dialog by rememberSaveable { mutableStateOf("") }
     var restoreBackup by remember { mutableStateOf<PreparedPhotoBackup?>(null) }
     var backupBusy by remember { mutableStateOf(false) }
     DisposableEffect(restoreBackup) {
@@ -88,10 +95,21 @@ fun SettingsScreen(
                 }
             }
         }
+    if (dialog == "shortcuts") {
+        ShortcutEditor(p.shortcuts, { dialog = "" }) { changed ->
+            vm.settings { it.copy(shortcuts = changed) }
+            dialog = ""
+        }
+        return
+    }
+    if (dialog == "units") {
+        UnitsSettings(p, vm) { dialog = "" }
+        return
+    }
     Column(
         Modifier.fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .background(Color(0xFF0D0D0D))
+            .background(if (isSystemInDarkTheme()) Color(0xFF0D0D0D) else OF.background)
             .padding(horizontal = 18.dp)
             .padding(top = 42.dp, bottom = 112.dp)
     ) {
@@ -111,7 +129,9 @@ fun SettingsScreen(
             ) {
                 vm.restartOnboarding()
             }
-            SettingsRow(Icons.Rounded.AccountCircle, "Profile", p.displayName) {
+            val height = vm.data.value.onboarding.heightCm.toDoubleOrNull()
+            SettingsRow(Icons.Rounded.AccountCircle, "Profile",
+                p.displayName + (height?.let { " · ${p.heightLabel(it)}" } ?: "")) {
                 dialog = "profile"
             }
         }
@@ -132,6 +152,14 @@ fun SettingsScreen(
             }
             SettingsRow(Icons.Rounded.FitnessCenter, "Workout", "Set logging and reps in reserve") {
                 dialog = "workout"
+            }
+            integrationSettings()
+            SettingsRow(Icons.Rounded.AddCircle, "Shortcuts", "Order, colors and Up Next banner") {
+                dialog = "shortcuts"
+            }
+            SettingsRow(Icons.Rounded.Contrast, "Theme", p.theme.label) { dialog = "theme" }
+            SettingsRow(Icons.Rounded.Language, "Language", "English · other translations unavailable") {
+                dialog = "language"
             }
             SettingsRow(
                 Icons.Rounded.Search,
@@ -214,44 +242,32 @@ fun SettingsScreen(
                     dialog = ""
                 },
             )
-        "units" ->
+        "theme" ->
             AlertDialog(
                 onDismissRequest = { dialog = "" },
-                title = { Text("Weight Units") },
+                title = { Text("Theme") },
                 text = {
-                    Column {
-                        listOf(false to "Kilograms (kg)", true to "Pounds (lb)").forEach {
-                            (pounds, label) ->
-                            Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    vm.settings { it.copy(pounds = pounds) }
-                                    dialog = ""
-                                },
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                RadioButton(
-                                    p.pounds == pounds,
-                                    {
-                                        vm.settings { it.copy(pounds = pounds) }
-                                        dialog = ""
-                                    },
-                                )
-                                Text(label)
+                    Column(Modifier.selectableGroup()) {
+                        AppTheme.entries.forEach { theme ->
+                            PreferenceChoice(theme.label, p.theme == theme) {
+                                vm.settings { it.copy(theme = theme) }
                             }
                         }
                     }
                 },
                 confirmButton = { TextButton({ dialog = "" }) { Text("Done") } },
             )
+        "language" -> InfoDialog("Language",
+            "Open Factor currently provides English interface text. The source app's language picker includes Japanese, but that translation has not been recovered for this app. Device language still controls supported date formatting.") { dialog = "" }
         "rest" -> {
-            var seconds by remember { mutableStateOf(p.restSeconds.toString()) }
-            var automatic by remember { mutableStateOf(p.autoRest) }
+            var seconds by rememberSaveable { mutableStateOf(p.restSeconds.toString()) }
+            var automatic by rememberSaveable { mutableStateOf(p.autoRest) }
             val validSeconds = seconds.toIntOrNull()?.let { it in 0..1800 } == true
             AlertDialog(
                 onDismissRequest = { dialog = "" },
                 title = { Text("Rest Timer") },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             seconds,
                             { seconds = it },
@@ -263,10 +279,7 @@ fun SettingsScreen(
                                         androidx.compose.ui.text.input.KeyboardType.Number
                                 ),
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Start after completing a set", Modifier.weight(1f))
-                            Switch(automatic, { automatic = it })
-                        }
+                        PreferenceSwitch("Start after completing a set", "", automatic) { automatic = it }
                     }
                 },
                 confirmButton = {
@@ -331,20 +344,21 @@ fun WorkoutSettings(p: Preferences, vm: WorkoutViewModel, onDismiss: () -> Unit)
         onDismissRequest = onDismiss,
         title = { Text("Workout settings") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Reps in reserve")
-                        Text("Show RIR when logging sets", color = OF.muted, fontSize = 12.sp)
-                    }
-                    Switch(p.showRir, { checked -> vm.settings { it.copy(showRir = checked) } })
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                PreferenceSwitch("Reps in reserve", "Show the optional RIR field; does not populate RIR automatically", p.showRir) { checked ->
+                    vm.settings { it.copy(showRir = checked) }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Exercise Auto-Next")
-                        Text("Move to unfinished exercises after the last set", color = OF.muted, fontSize = 12.sp)
-                    }
-                    Switch(p.exerciseAutoNext, { checked -> vm.settings { it.copy(exerciseAutoNext = checked) } })
+                PreferenceSwitch("Exercise Auto-Next", "Move to unfinished exercises after the last set", p.exerciseAutoNext) { checked ->
+                    vm.settings { it.copy(exerciseAutoNext = checked) }
+                }
+                PreferenceSwitch("Keep Alive", "Keep the screen on while the workout logger is visible", p.keepAlive) { checked ->
+                    vm.settings { it.copy(keepAlive = checked) }
+                }
+                PreferenceSwitch("Workout Timer", "Show elapsed time during workout sessions", p.showWorkoutTimer) { checked ->
+                    vm.settings { it.copy(showWorkoutTimer = checked) }
+                }
+                PreferenceSwitch("Bodyweight Contribution", "Display scale weight and bodyweight contribution during workout sessions", p.showBodyweightContribution) { checked ->
+                    vm.settings { it.copy(showBodyweightContribution = checked) }
                 }
             }
         },
@@ -360,42 +374,44 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
         fontSize = 13.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = 0.6.sp,
-        color = Color(0xFF96999F),
+        color = if (isSystemInDarkTheme()) Color(0xFF96999F) else OF.muted,
     )
     Column(
         Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(Color(0xFF1A1A1A))
-            .border(0.5.dp, Color(0xFF272727), RoundedCornerShape(14.dp)),
+            .background(if (isSystemInDarkTheme()) Color(0xFF1A1A1A) else OF.card)
+            .border(0.5.dp, if (isSystemInDarkTheme()) Color(0xFF272727) else OF.elevated, RoundedCornerShape(14.dp)),
         content = content,
     )
 }
 
 @Composable
-private fun SettingsRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+internal fun SettingsRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
     Column {
         Row(
             Modifier.fillMaxWidth()
-                .clickable(onClick = onClick)
+                .clickable(role = Role.Button, onClick = onClick)
                 .padding(horizontal = 16.dp, vertical = 15.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(15.dp),
         ) {
             Box(
-                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF343434)),
+                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
+                    .background(if (isSystemInDarkTheme()) Color(0xFF343434) else OF.elevated),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(icon, null, Modifier.size(25.dp))
             }
             Column(Modifier.weight(1f)) {
                 Text(title, fontSize = 17.sp)
-                Text(subtitle, fontSize = 14.sp, lineHeight = 21.sp, color = Color(0xFF96999F))
+                Text(subtitle, fontSize = 14.sp, lineHeight = 21.sp,
+                    color = if (isSystemInDarkTheme()) Color(0xFF96999F) else OF.muted)
             }
         }
         HorizontalDivider(
             Modifier.padding(start = 71.dp),
             thickness = 0.5.dp,
-            color = Color(0xFF252525),
+            color = if (isSystemInDarkTheme()) Color(0xFF252525) else OF.elevated,
         )
     }
 }
@@ -408,3 +424,67 @@ internal fun InfoDialog(title: String, text: String, onDismiss: () -> Unit) =
         text = { Text(text) },
         confirmButton = { TextButton(onDismiss) { Text("Done") } },
     )
+
+@Composable
+internal fun PreferenceSwitch(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
+        .toggleable(checked, role = Role.Switch, onValueChange = onChange),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(title)
+            if (subtitle.isNotEmpty()) Text(subtitle, color = OF.muted, style = MaterialTheme.typography.bodySmall)
+        }
+        Switch(checked, null)
+    }
+}
+
+@Composable
+private fun PreferenceChoice(label: String, selected: Boolean, onSelect: () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
+        .selectable(selected, role = Role.RadioButton, onClick = onSelect).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        RadioButton(selected, null)
+        Text(label)
+    }
+}
+
+@Composable
+private fun UnitsSettings(p: Preferences, vm: WorkoutViewModel, onClose: () -> Unit) {
+    BackHandler(onBack = onClose)
+    Column(Modifier.fillMaxSize().background(OF.background)) {
+        PageHeading("Units", onClose)
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 112.dp)) {
+            SettingsSection("WEIGHT UNITS") {
+                Column(Modifier.selectableGroup()) {
+                    PreferenceChoice("Kilograms (kg)", !p.pounds) { vm.settings { it.copy(pounds = false) } }
+                    PreferenceChoice("Pounds (lb)", p.pounds) { vm.settings { it.copy(pounds = true) } }
+                }
+            }
+            SettingsSection("HEIGHT UNITS") {
+                Column(Modifier.selectableGroup()) {
+                    PreferenceChoice("Centimeters", !p.heightInFeet) { vm.settings { it.copy(heightInFeet = false) } }
+                    PreferenceChoice("Feet and Inches", p.heightInFeet) { vm.settings { it.copy(heightInFeet = true) } }
+                }
+                Text("Applies to profile height. Body circumferences remain in centimeters.",
+                    Modifier.padding(16.dp), color = OF.muted)
+            }
+            SettingsSection("CLOCK UNITS") {
+                Column(Modifier.selectableGroup()) {
+                    PreferenceChoice("12 Hour", !p.clock24Hour) { vm.settings { it.copy(clock24Hour = false) } }
+                    PreferenceChoice("24 Hour", p.clock24Hour) { vm.settings { it.copy(clock24Hour = true) } }
+                }
+                Text("Workout start times use this format.", Modifier.padding(16.dp), color = OF.muted)
+            }
+            SettingsSection("DISTANCE") {
+                Column(Modifier.selectableGroup()) {
+                    PreferenceChoice("Kilometers and Meters", !p.distanceImperial) { vm.settings { it.copy(distanceImperial = false) } }
+                    PreferenceChoice("Miles and Yards", p.distanceImperial) { vm.settings { it.copy(distanceImperial = true) } }
+                }
+            }
+            SettingsSection("ENERGY UNITS") {
+                Text("Energy logging is not available. No calorie estimate or energy-unit setting is applied to your workouts.",
+                    Modifier.padding(16.dp), color = OF.muted)
+            }
+        }
+    }
+}

@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.verticalScroll
@@ -22,8 +23,12 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -40,7 +45,20 @@ class MainActivity : ComponentActivity() {
                 .components { add(coil3.svg.SvgDecoder.Factory()) }
                 .build()
         }
-        setContent { OpenFactorTheme { OpenFactorApp() } }
+        setContent {
+            val vm: WorkoutViewModel = viewModel()
+            val data by vm.data.collectAsState()
+            OpenFactorTheme(data.preferences.theme) {
+                val dark = isSystemInDarkTheme()
+                SideEffect {
+                    androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+                        isAppearanceLightStatusBars = !dark
+                        isAppearanceLightNavigationBars = !dark
+                    }
+                }
+                OpenFactorApp(vm)
+            }
+        }
     }
 }
 
@@ -58,6 +76,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
     var programDayId by rememberSaveable { mutableStateOf("") }
     var programExit by remember { mutableStateOf(false) }
     var shortcuts by rememberSaveable { mutableStateOf(false) }
+    var configureShortcuts by rememberSaveable { mutableStateOf(false) }
     var workoutSettings by rememberSaveable { mutableStateOf(false) }
     var gymsReturn by rememberSaveable { mutableStateOf("") }
     var bodyDataTab by rememberSaveable { mutableIntStateOf(0) }
@@ -70,6 +89,22 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
     val snackbar = remember { SnackbarHostState() }
     val routeState = rememberSaveableStateHolder()
     val context = LocalContext.current
+    val view = LocalView.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val keepAlive = data.preferences.keepAlive && route == "session" && data.active != null &&
+        (data.onboarding.completed || data.onboarding.deferred)
+    DisposableEffect(view, lifecycleOwner, keepAlive) {
+        if (!keepAlive) return@DisposableEffect onDispose { }
+        val original = view.keepScreenOn
+        fun update() { view.keepScreenOn = lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) }
+        val observer = LifecycleEventObserver { _, _ -> update() }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        update()
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            view.keepScreenOn = original
+        }
+    }
     fun openExercise(id: String) {
         previousRoute = route
         detailId = id
@@ -545,104 +580,38 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
         )
     if (workoutSettings)
         WorkoutSettings(data.preferences, vm) { workoutSettings = false }
+    if (configureShortcuts)
+        ModalBottomSheet(onDismissRequest = { configureShortcuts = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = OF.background) {
+            ShortcutEditor(data.preferences.shortcuts, { configureShortcuts = false }) { changed ->
+                vm.settings { it.copy(shortcuts = changed) }
+                configureShortcuts = false
+            }
+        }
     if (shortcuts)
-        ModalBottomSheet(onDismissRequest = { shortcuts = false }, containerColor = OF.top) {
-            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())
-                .padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton({ shortcuts = false }) {
-                        Icon(Icons.Rounded.Close, "Close shortcuts")
-                    }
-                    Text("Shortcuts", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
+        ShortcutSheet(data.preferences, data.active, { shortcuts = false }, {
+            shortcuts = false
+            configureShortcuts = true
+        }) { shortcut ->
+            shortcuts = false
+            when (shortcut) {
+                WorkoutShortcut.WEIGHT -> { detailId = ""; bodyDataTab = 0; route = "weight-entry" }
+                WorkoutShortcut.MEASUREMENTS -> {
+                    detailId = ""; bodyDataTab = 1; bodyEntryReturn = route; route = "measurement-entry"
                 }
-                ListItem(
-                    headlineContent = { Text("Log Weight") },
-                    leadingContent = { Icon(Icons.Rounded.MonitorWeight, null) },
-                    modifier = Modifier.clickable {
-                        shortcuts = false
-                        detailId = ""
-                        bodyDataTab = 0
-                        route = "weight-entry"
-                    },
-                    colors = ListItemDefaults.colors(containerColor = OF.top),
-                )
-                ListItem(
-                    headlineContent = { Text("Log Measurements") },
-                    leadingContent = { Icon(Icons.Rounded.Straighten, null) },
-                    modifier = Modifier.clickable {
-                        shortcuts = false
-                        detailId = ""
-                        bodyDataTab = 1
-                        bodyEntryReturn = route
-                        route = "measurement-entry"
-                    },
-                    colors = ListItemDefaults.colors(containerColor = OF.top),
-                )
-                ListItem(
-                    headlineContent = { Text("Log Photos") },
-                    leadingContent = { Icon(Icons.Rounded.PhotoLibrary, null) },
-                    modifier = Modifier.clickable {
-                        shortcuts = false
-                        detailId = ""
-                        bodyDataTab = 2
-                        bodyEntryReturn = route
-                        route = "photo-entry"
-                    },
-                    colors = ListItemDefaults.colors(containerColor = OF.top),
-                )
-                ListItem(
-                    headlineContent = { Text("History") },
-                    leadingContent = { Icon(Icons.Rounded.History, null) },
-                    modifier =
-                        Modifier.clickableCompat {
-                            shortcuts = false
-                            route = "history"
-                        },
-                    colors = ListItemDefaults.colors(containerColor = OF.top),
-                )
-                ListItem(
-                    headlineContent = { Text(if (data.active != null) "Resume Workout" else "Empty Workout") },
-                    leadingContent = { Icon(Icons.Rounded.FitnessCenter, null) },
-                    trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
-                    modifier = Modifier.clickable {
-                            shortcuts = false
-                            if (data.active != null) route = "session"
-                            else {
-                                vm.prepareWorkout()
-                                route = "workout-draft"
-                            }
-                        },
-                    colors = ListItemDefaults.colors(containerColor = OF.top),
-                )
-                HorizontalDivider()
-                ListItem(
-                    headlineContent = { Text("New Program") },
-                    leadingContent = { Icon(Icons.Rounded.EventNote, null) },
-                    trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
-                    modifier = Modifier.clickable {
-                        shortcuts = false
-                        if (data.programDraft != null) route = "program-editor"
-                        else {
-                            vm.beginProgram(TrainingProgram(name = "My Program"))
-                            route = "program-setup"
-                        }
-                    },
-                    colors = ListItemDefaults.colors(containerColor = OF.top),
-                )
-                HorizontalDivider()
-                ListItem(
-                    headlineContent = { Text("New Workout") },
-                    leadingContent = { Icon(Icons.Rounded.Add, null) },
-                    trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
-                    modifier = Modifier.clickable {
-                        shortcuts = false
-                        route = "routine"
-                    },
-                    colors = ListItemDefaults.colors(containerColor = OF.top),
-                )
+                WorkoutShortcut.PHOTOS -> {
+                    detailId = ""; bodyDataTab = 2; bodyEntryReturn = route; route = "photo-entry"
+                }
+                WorkoutShortcut.HISTORY -> route = "history"
+                WorkoutShortcut.EMPTY_WORKOUT -> {
+                    if (data.active != null) route = "session"
+                    else { vm.prepareWorkout(); route = "workout-draft" }
+                }
+                WorkoutShortcut.NEW_PROGRAM -> {
+                    if (data.programDraft != null) route = "program-editor"
+                    else { vm.beginProgram(TrainingProgram(name = "My Program")); route = "program-setup" }
+                }
+                WorkoutShortcut.NEW_WORKOUT -> route = "routine"
             }
         }
 }
-
-private fun Modifier.clickableCompat(action: () -> Unit) =
-    this.then(Modifier.clickable(onClick = action))
