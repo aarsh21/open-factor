@@ -12,9 +12,11 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import struct
 import subprocess
 import time
 import xml.etree.ElementTree as ET
+import zlib
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--serial', required=True)
@@ -130,10 +132,18 @@ def open_chart():
     settings(); tap('Body Data'); tap('View Charts')
 
 
+def photo_fixture(color):
+    def chunk(kind, payload):
+        return struct.pack('>I', len(payload))+kind+payload+struct.pack('>I', zlib.crc32(kind+payload))
+    rows = (b'\0'+bytes(color)*31)*47
+    return (b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR', struct.pack('>IIBBBBB', 31, 47, 8, 2, 0, 0, 0))
+            +chunk(b'IDAT', zlib.compress(rows))+chunk(b'IEND', b''))
+
+
 def unchanged_records(expected):
     actual = state()
     assert {k: v for k, v in actual.items() if k != 'preferences'} == {k: v for k, v in expected.items() if k != 'preferences'}
-    for reference, payload in original_photos.items():
+    for reference, payload in fixture_photos.items():
         assert adb('exec-out', 'run-as', package, 'cat', 'no_backup/progress-photos/'+reference, raw=True) == payload
 
 
@@ -167,6 +177,14 @@ fixture['scaleWeights'] = [{'id': 'weight-'+str(offset), 'date': str(today+timed
                            'bodyFatPercent': 0.0 if offset == 0 else None}
                           for offset, weight in [(-7, 71.125), (-6, 82.25), (0, 93.375), (1, 104.5)]]
 fixture['bodyMeasurements'] = [{'id': 'measurement', 'date': str(today), 'centimeters': {'waist': 81.125, 'hips': 94.75}, 'visualBodyFatPercent': 0.0}]
+fixture_photos = dict(original_photos)
+positions = {}
+for position, color in [('front', (139, 49, 49)), ('side', (43, 112, 86)), ('back', (55, 93, 155))]:
+    image = photo_fixture(color)
+    reference = hashlib.sha256(image).hexdigest()
+    fixture_photos[reference] = image
+    positions[position] = reference
+fixture.setdefault('progressPhotos', []).append({'id': 'synthetic-portability-photos', 'date': str(today), 'photos': positions})
 fixture['history'] = [{'id': 'workout-'+str(offset), 'name': 'Synthetic '+str(offset),
                        'startedAt': int(adb('shell', 'date -d "'+str(today+timedelta(days=offset))+' 12:00:00" +%s').strip())*1000,
                        'finishedAt': None, 'exercises': [], 'notes': 'Synthetic notes '+str(offset)} for offset in [-7, -6, 0, 1]]
@@ -178,6 +196,8 @@ try:
     adb('shell', 'settings', 'put', 'system', 'font_scale', '1.0')
     adb('shell', 'svc', 'wifi', 'disable'); adb('shell', 'svc', 'data', 'disable')
     write_state(fixture)
+    for reference, image in fixture_photos.items():
+        adb('exec-in', 'run-as', package, 'tee', 'no_backup/progress-photos/'+reference, data=image)
     # Normalize the fixture once through the public preference writer before
     # checking that visibility and tutorials leave canonical records unchanged.
     settings(); tap('Units'); tap('Kilograms (kg)'); tap('Back', 'content-desc')
@@ -205,7 +225,9 @@ try:
     assert set(granular['data']) == {'scaleWeight'}
     assert [(r['id'], r['weightKg']) for r in granular['data']['scaleWeight']] == [('weight--6', 82.25), ('weight-0', 93.375)]
     assert granular['data']['scaleWeight'][1]['bodyFatPercent'] == 0.0 and state() == before
-    settings(); tap('Restore Backup'); choose(name); target('Restore Backup'); assert state() == before
+    settings(); tap('Restore Backup'); choose(name)
+    target('Could not read backup: Unsupported backup version'); capture('scoped-restore-rejected')
+    assert state() == before
     settings(); tap('Data Visibility'); capture('visibility-normal'); tap('Body Metrics Visibility'); capture('body-visibility-normal')
     tap('Scale Weight'); target('Default Metric'); capture('default-metric-normal'); tap('Done')
     tap('Side Photo'); tap('Waist'); unchanged_records(before)
@@ -237,14 +259,14 @@ try:
     name = tag+'-complete.json'; downloads.append(name); save_as(name); target('Export Backup')
     complete = json.loads(adb('shell', 'cat', '/sdcard/Download/'+name))
     assert complete['preferences'] == final['preferences']
-    assert {ref: base64.b64decode(value) for ref, value in complete['photoAssets'].items()} == original_photos
+    assert {ref: base64.b64decode(value) for ref, value in complete['photoAssets'].items()} == fixture_photos
     empty = {'schemaVersion': 1, 'onboarding': {'completed': True}}
     empty_name = tag+'-empty.json'; downloads.append(empty_name)
     empty_path = args.output / empty_name; empty_path.write_text(json.dumps(empty))
     adb('push', str(empty_path), '/sdcard/Download/'+empty_name)
     tap('Restore Backup'); choose(empty_name); target('Restore Backup?'); tap('Restore'); target('Restore Backup')
     assert not state()['progressPhotos'] and not state()['preferences']['dismissedTutorials']
-    assert not set(original_photos).intersection(adb('shell', 'run-as', package, 'ls', 'no_backup/progress-photos').split())
+    assert not set(fixture_photos).intersection(adb('shell', 'run-as', package, 'ls', 'no_backup/progress-photos').split())
     tap('Restore Backup'); choose(name); target('Restore Backup?'); tap('Restore'); target('Restore Backup')
     launch(); assert state() == final
     open_chart(); target('Recorded values · kg'); unchanged_records(final)
@@ -281,6 +303,9 @@ finally:
     for reference, payload in original_files.items():
         adb('exec-in', 'run-as', package, 'tee', 'no_backup/progress-photos/'+reference, data=payload)
         assert adb('exec-out', 'run-as', package, 'cat', 'no_backup/progress-photos/'+reference, raw=True) == payload
+    for reference in set(fixture_photos) - set(original_files):
+        adb('shell', 'run-as', package, 'rm', '-f', 'no_backup/progress-photos/'+reference)
+    assert set(adb('shell', 'run-as', package, 'ls', 'no_backup/progress-photos').split()) == set(original_files)
     assert adb('exec-out', 'run-as', package, 'cat', 'shared_prefs/open_factor.xml', raw=True) == original_xml
     adb('shell', 'settings', 'put', 'system', 'font_scale', font)
     adb('shell', 'svc', 'wifi', 'enable' if wifi == '1' else 'disable')

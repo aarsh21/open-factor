@@ -118,6 +118,13 @@ covered. The existing Android photo-storage regression now restores onto an
 empty store and checks hidden preferences, dismissal, restart, and original
 attachment bytes.
 
-Build, native Save/Cancel/Back, tutorial reset, and inspected normal/1.3x UI
-results are pending the coordinated integration and allocated emulator slot.
-The implementation is local and unpushed.
+The guarded combined build passed 57 JVM tests, lint, app assembly, and Android
+test APK assembly in 1 minute 20 seconds. It includes the real Settings route
+and Body visibility/tutorial consumers. The app APK SHA-256 is
+`fd0ae993d7156d56a8c76dd6ff5bcd313b11834266f763234c50c36945f99f37`.
+Build logs, eight test reports, and lint results remain in the locally excluded
+`.amp/in/artifacts/` directory.
+
+Device tests, native Save/Cancel/Back, tutorial reset, and inspected normal/1.3x
+UI results are pending the allocated emulator slot. The implementation is
+locally committed and unpushed.
