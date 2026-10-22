@@ -79,7 +79,7 @@ fun ExerciseMedia(e: Exercise) {
                                         "exercise-videos/$installTime/${clip.substringAfterLast('/')}",
                                     )
                                 output.parentFile?.mkdirs()
-                                if (!output.exists()) {
+                                if (output.length() == 0L) {
                                     val pending = File(output.parentFile, output.name + ".partial")
                                     context.assets.open(clip).use { input ->
                                         pending.outputStream().use { input.copyTo(it) }

@@ -185,6 +185,30 @@ if a.media:
   tap('Play exercise video','content-desc');find('android.widget.VideoView','class')
   adb('shell','input','keyevent','4')
   tap('Chin-Up');assert_autoplay();capture('media-autoplay-reopened');adb('shell','input','keyevent','4')
+  # Damage only disposable playback caches, never the bundled original clips.
+  catalog=json.loads(Path('openfactor/app/src/main/assets/catalog.json').read_text())
+  chin_id=next(exercise['id'] for exercise in catalog if exercise['name'].casefold()=='chin-up')
+  cached=adb('shell','run-as','org.openfactor.app','find','cache/exercise-videos','-type','f').splitlines()
+  cached=[path for path in cached if re.fullmatch(r'cache/exercise-videos/\d+/[0-9a-f]{32}_[a-z]\.mp4',path)]
+  cached=[path for path in cached if Path(path).name.startswith(chin_id+'_')]
+  current=max(int(path.split('/')[2]) for path in cached)
+  cached=[path for path in cached if int(path.split('/')[2])==current]
+  expected={path:adb('shell','run-as','org.openfactor.app','sha256sum',path).split()[0] for path in cached}
+  assert len(expected)==3, 'Expected the three exercised camera caches'
+  try:
+   for path in cached:adb('shell','run-as','org.openfactor.app','truncate','-s','0',path)
+   tap('Chin-Up')
+   for view in range(1,4):
+    tap(f'Camera view {view}','content-desc');assert_autoplay()
+   actual={path:adb('shell','run-as','org.openfactor.app','sha256sum',path).split()[0] for path in cached}
+   assert actual==expected, 'Empty playback caches were not restored byte-for-byte'
+   capture('media-recovered-empty-cache')
+   (a.output/'cache-recovery.json').write_text(json.dumps({'status':'passed','original_cache_sha256':expected,'recovered_cache_sha256':actual},indent=2)+'\n')
+  finally:
+   for path in cached:
+    if adb('shell','run-as','org.openfactor.app','stat','-c','%s',path).strip()=='0':
+     adb('shell','run-as','org.openfactor.app','rm',path)
+  adb('shell','input','keyevent','4')
  finally:
   if wifi in ('0','1'):adb('shell','svc','wifi','enable' if wifi=='1' else 'disable')
   if mobile in ('0','1'):adb('shell','svc','data','enable' if mobile=='1' else 'disable')
