@@ -9,7 +9,7 @@ Manual programs are a local development feature. Smart generation, automatic pro
 3. Choose a gym, rename the workout day, and use the horizontal day actions to reorder it. An exercise's overflow menu removes or reorders that exercise.
 4. Open its **7 Cycles** target card. Set optional minimum/maximum reps, target RIR, skip and rest overrides. Choose a cycle to edit only that cycle; an intentional edit in the all-cycle scope applies to all seven cycles.
 5. **Save to Library** stores the plan. **Activate Program** also selects it as the active plan. Leaving the editor offers to keep or discard the draft; saved plans remain unchanged until saved.
-6. In the library, choose a cycle and start a workout day. Planned targets are available through **Targets** in the logger; logged RIR remains separate. A current workout is protected from replacement.
+6. In the library, choose a cycle and start a workout day. Planned targets are available through **Targets** in the logger. Performed values start blank, separate from targets. Enter the exercise's required metrics before completing a set. A current workout is protected from replacement.
 
 Opening targets, changing the viewing scope or saving without edits preserves existing cycle-specific targets. Differentiated targets open on the first cycle rather than showing the first cycle's values as if they applied to all cycles. The all-cycle view warns before edits would replace differing targets.
 

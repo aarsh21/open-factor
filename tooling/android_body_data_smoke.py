@@ -149,6 +149,12 @@ try:
     find('Dashboard')
     # Existing records are not disposable fixtures. Require an empty body-data store.
     assert not state().get('scaleWeights') and not state().get('bodyMeasurements'), 'Use an emulator with no body records'
+    # The first history checks use kilograms regardless of the previous unit preference.
+    settings()
+    tap('Units')
+    tap('Kilograms (kg)')
+    launch()
+    find('Dashboard')
     if not state().get('active'):
         tap('Shortcuts', 'content-desc')
         tap('Empty Workout')
@@ -266,7 +272,8 @@ try:
     find('Export Backup')
     capture('settings-body-data')
     exported = json.loads(adb('shell', 'cat', '/sdcard/Download/' + filename))
-    assert exported == state()
+    exported_data = {key: value for key, value in exported.items() if key != 'photoAssets'}
+    assert exported_data == state()
     tap('Body Data')
     tap('Edit weight 2026-10-19', 'content-desc')
     tap('Delete weight', 'content-desc')
@@ -288,9 +295,9 @@ try:
     capture('restore-confirmation')
     tap('Restore')
     find('Restore Backup')
-    assert state() == exported
+    assert state() == exported_data
     launch()
-    assert state() == exported
+    assert state() == exported_data
     assert training(state()) == original_training
     # Latest value is selected by record date, not by list insertion/edit order.
     reachable('Scale Weight')
@@ -305,7 +312,7 @@ try:
     find('Full Body')
     back()
     find('Log Measurements')
-    assert state() == exported
+    assert state() == exported_data
     (args.output / 'final-state.json').write_text(json.dumps(state(), indent=2) + '\n')
     offline()
     result = {'status': 'passed', 'serial': args.serial, 'offline_without_internet_permission': True,

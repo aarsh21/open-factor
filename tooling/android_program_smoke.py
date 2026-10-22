@@ -112,15 +112,19 @@ targets();tap('Save');assert cycle_data()==before
 targets();tap('Cycle 2');tap('Skip exercise in selected cycles','content-desc');enter('Rest timer override (seconds)','45');tap('Save');tap('Save to Library');capture('program-library');tap('Cycle 2');tap('Start Upper')
 
 w=state()['active'];assert w['programId']==program['id'] and w['programCycle']==1
-s=w['exercises'][0]['sets'][0];assert s['reps']==8 and s['targetRepsMin']==8 and s['targetRepsMax']==12 and s['targetRir']==1 and s.get('rir') is None
+s=w['exercises'][0]['sets'][0];assert s['reps'] is None and s['weightKg'] is None and s['targetRepsMin']==8 and s['targetRepsMax']==12 and s['targetRir']==1 and s.get('rir') is None
 find('Targets');tap('Targets');find('Workout Targets')
 root=E.fromstring(adb('shell','cat','/sdcard/of-program.xml'))
 for description,expected in [('Set 1 Reps Min target','8'),('Set 1 Reps Max target','12'),('Set 1 RIR target','1')]:
  fields=[n for n in root.iter('node') if n.get('class')=='android.widget.EditText' and any(c.get('content-desc')==description for c in n.iter('node'))]
  assert len(fields)==1 and fields[0].get('text')==expected,description
-capture('program-session-targets');tap('Cancel');assert state()['active']==w;tap('Complete set 1','content-desc',prefix=True)
+capture('program-session-targets');tap('Cancel');assert state()['active']==w
+exercise_name=find('Complete set 1 for ','content-desc',prefix=True)[0].get('content-desc').split(' for ',1)[1]
+enter(f'{exercise_name} set 1 reps (Reps)','9','content-desc')
+assert state()['active']['exercises'][0]['sets'][0]['reps']==9
+tap('Complete set 1','content-desc',prefix=True)
 w=state()['active'];remaining=(w['restUntil']-int(time.time()*1000))/1000;assert 0<remaining<=45
-capture('program-session');tap('Finish Workout');tap('Finish');find('Workout Complete');capture('program-summary')
+capture('program-session');tap('Workout options','content-desc');tap('Finish Workout');tap('Finish');find('Workout Complete');capture('program-summary')
 w=state()['history'][0];assert w['programId']==program['id'] and w['exercises'][0]['sets'][0]['completed']
 launch();library();find(name);assert state().get('active') is None
 (a.output/'result.json').write_text(json.dumps({'status':'passed','serial':a.serial,'synthetic_program':name,'draft_targets_seven_cycles':True,'cycle_switch_preserves_edits':True,'saved_target_reentry_preserved':True,'unchanged_save_preserved':True,'all_scope_navigation_preserved':True,'differentiated_skip_rest_preserved':True,'library_activation_restart':True,'planned_targets_to_session':True,'exercise_rest_override':True,'completed_program_history':True},indent=2)+'\n');print((a.output/'result.json').read_text())

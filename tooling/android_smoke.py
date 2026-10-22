@@ -83,7 +83,11 @@ else:
 tap('Add Exercise');tap('Search exercises');adb('shell','input','text','barbell% sbench% spress'.replace('% s','%s'))
 adb('shell','input','keyevent','4')  # Expose results on short API-26 emulator viewports.
 tap('Add ','content-desc',prefix=True);find('Complete set','content-desc',prefix=True)
+exercise_name=find('Complete set 1 for ','content-desc',prefix=True)[0].get('content-desc').split(' for ',1)[1]
+initial=persisted()['active']['exercises'][0]['sets']
+assert len(initial)==1 and initial[0]['reps'] is None and initial[0]['weightKg'] is None, 'New exercise actuals are not blank'
 if a.parity_actions:
+ tap('Add Set','content-desc');tap('Add Set','content-desc')
  before=persisted();exercise=before['active']['exercises'][0]
  tap('Targets');find('Workout Targets');enter('Set 1 Reps Min target','12','content-desc');enter('Set 1 Reps Max target','7','content-desc')
  tap('Save');find('Workout Targets');assert persisted()==before, 'Invalid target edit changed saved data';capture('targets-invalid');tap('Cancel')
@@ -97,11 +101,16 @@ if a.parity_actions:
   assert all(old.get(k)==new.get(k) for k in ['id','weightKg','reps','rir','completed','warmup']), 'Target edit altered actuals'
  assert all(before.get(k)==edited.get(k) for k in ['history','programs','programDraft'])
  tap('Targets');find('6');capture('targets-reopened');tap('Cancel')
- tap('Warm Up');tap('Add empty warm-up set');warmed=persisted()['active']['exercises'][0]['sets'];assert warmed[0]['warmup'] and warmed[0]['reps']==0 and warmed[1:]==saved['sets'];capture('warmup-added')
+ tap('Warm Up');tap('Add empty warm-up set');warmed=persisted()['active']['exercises'][0]['sets'];assert warmed[0]['warmup'] and warmed[0]['reps'] is None and warmed[0]['weightKg'] is None and warmed[1:]==saved['sets'];capture('warmup-added')
  tap('Set 1 options','content-desc',prefix=True);tap('Remove Set');assert persisted()['active']['exercises'][0]['sets']==saved['sets']
  tap('Workout options','content-desc');tap('Workout settings');find('Exercise Auto-Next');capture('live-workout-settings');tap('Done')
  tap('Workout options','content-desc');tap('Gym settings');find('Gym Profiles');capture('live-gym-settings');tap('Back','content-desc');find('Targets')
  assert persisted()['active']==edited['active'], 'Settings navigation changed active workout'
+pounds=persisted()['preferences'].get('pounds',False)
+enter(f'{exercise_name} set 1 weight ({"lb" if pounds else "kg"})','47.5','content-desc')
+enter(f'{exercise_name} set 1 reps (Reps)','9','content-desc')
+entered=persisted()['active']['exercises'][0]['sets'][0]
+assert entered['reps']==9 and abs(entered['weightKg']-(47.5/2.2046226218 if pounds else 47.5))<1e-8
 tap('Complete set','content-desc',prefix=True);find('Mark set incomplete','content-desc',prefix=True);capture('phone-session')
 tap('Workout options','content-desc');tap('Pause Workout');find('Paused')
 paused=persisted()['active']
@@ -115,7 +124,7 @@ assert persisted()['active']['pausedAt']==paused['pausedAt'], 'Pause did not sur
 tap('Workout options','content-desc');tap('Resume Workout')
 assert persisted()['active']['pausedDurationMs']>0, 'Resume did not account for paused time'
 assert any(n.get('text','').strip().startswith('Rest ') for n in nodes()), 'Rest timer did not survive restart'
-tap('Finish Workout');tap('Finish');find('Workout Complete');capture('phone-summary')
+tap('Workout options','content-desc');tap('Finish Workout');tap('Finish');find('Workout Complete');capture('phone-summary')
 state=persisted()
 assert state.get('active') is None
 assert len(state['history'])>=1

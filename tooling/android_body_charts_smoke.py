@@ -59,7 +59,7 @@ def target(label, attr='text', scroll=True, last=False):
         scrolls = [n for n in tree if n.get('scrollable') == 'true']
         if scroll and scrolls:
             left, top, right, bottom = bounds(scrolls[-1])
-            adb('shell', 'input', 'swipe', str((left+right)//2), str(top+(bottom-top)*4//5), str((left+right)//2), str(top+(bottom-top)//5), '250')
+            adb('shell', 'input', 'swipe', str((left+right)//2), str(top+(bottom-top)*3//5), str((left+right)//2), str(top+(bottom-top)*2//5), '600')
         else:
             time.sleep(.2)
     capture('failure')
@@ -161,6 +161,9 @@ try:
     (args.output / 'connectivity.txt').write_text(connectivity)
     apk = adb('shell', 'pm', 'path', 'org.openfactor.app').strip().removeprefix('package:')
     (args.output / 'apk-sha256.txt').write_text(adb('shell', 'sha256sum', apk))
+    # Let the installed codec serialize legacy defaults before comparing stored shapes.
+    units(baseline['preferences']['pounds'])
+    baseline = state()
     photos_before = photo_integrity(baseline)
     today = date.fromisoformat(adb('shell', 'date', '+%F').strip())
     monday = today-timedelta(days=today.weekday())

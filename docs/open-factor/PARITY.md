@@ -64,7 +64,8 @@ unrecovered. It must not be equated with a seven-day week or a whole training
 block in every context.
 
 Our fixed seven-cycle manual editor is a limitation, not a verified source
-restriction. Copying minimum reps into a new session is not Smart Progression.
+restriction. Program sessions keep performed values blank, separate from
+prescriptions. Static prescriptions are not Smart Progression.
 The recovered periodization tables do not recover the complete generator,
 history-dependent strength profile, calendar placement or deload transformation.
 See [manual programs](PROGRAMS.md) and the private `program-recovery/REPORT.md`.
@@ -82,15 +83,15 @@ below is not an acceptance pass.
 | Workout/calendar | Empty Workout now opens a persisted pre-start composition with name, gym, target-muscle summary, exercises and ordering; only Start Workout creates the timed session. Offline restart and draft-to-session checks passed without changing body records | Source calendar expansion/placement, full day/program composition, drag/drop library and program controls are not equivalent. A nonempty source time-estimate policy is unrecovered. |
 | Manual programs | Drafts, days, targets, local save/activation and backup exist | Variable count editing, contextual Week/Cycle terminology, icons, circular target controls, exact saving scopes, advanced sets and calendar placement remain open. Source save/activation outcomes were not captured. |
 | Smart programs | Wizard inputs and some static tables were recovered | No complete offline generator, progression or deload engine. Never substitute an invented formula and call it source parity. |
-| Logger | Local pause, restart, auto-next, completion and history foundation; editable session targets and explicit warm-up insertion added | Source custom keypad, metric-specific/blank initial inputs, bodyweight contribution, advanced set types, supersets, target plan-update flow and exact layout remain different. Empty warm-up insertion does not implement source schemes. |
+| Logger | Local default is one blank metric-specific row. Required actuals, optional rep-based RIR, assistance, seconds and meters persist through restart, finish, history and backup. All 18 catalog metric combinations passed the offline UI flow. The bodyweight badge uses a dated prior weight and the catalog contribution coefficient. Notes use Save/Cancel dialogs; Finish is in Workout options. Converted loads remain readable beside RIR at normal and 1.3× text size | Source custom keypad, independent side sequencing, persistent-per-side behavior, advanced set types, supersets, target plan-update flow and exact layout remain different or unaccepted. Per-side labels do not establish side sequencing. The contribution badge does not establish source volume/progression arithmetic. Empty warm-up insertion does not implement source schemes. |
 | Rest | Deadline persists; automatic rest and per-exercise overrides exist | Source last-warm-up, between-exercise and left/right policies and rest sheets are not recovered equivalents. |
 | Live settings | Workout and gym settings entry points return to the session | Complete source settings are absent. Showing RIR is not equivalent to source auto-population under RIR Tracking. |
 | History/summary | Local completion, repeat, deletion and stored sets exist | Populated source history, summary, record handling, incomplete-set rules and bodyweight-volume calculations are unobserved. Existing local arithmetic is not a source oracle. |
-| Exercise library | Bundled catalog, gym/type/laterality filters, grouped browse, name/alias search and favorites exist | Source All/Performed/Deprioritized/Modified/Archived scopes, literal resistance selector, selected-muscle ordering and exact ranking need work. Archived was confirmed by horizontally scrolling the live source tab row; the fifth scope is not Custom. Full filter combinations remain unobserved. |
+| Exercise library | Bundled catalog, gym/type/laterality filters, grouped browse, name/alias search and favorites exist. Changed queries/filters reset list position; unchanged-query detail return preserves it. The searchable Resistance sheet filters actual equipment entities across resistance alternatives, excluding support-only equipment. See the [library review](reviews/library-search-01.md) | Source All/Performed/Deprioritized/Modified/Archived scopes, selected-muscle ordering and exact ranking need work. The reproduced hidden-first-result defect is fixed locally. Single-entity selection and immediate dismissal are local policies; source selection combinations and persistence remain unobserved. Archived was confirmed by horizontally scrolling the live source tab row; the fifth scope is not Custom. |
 | Exercise detail | Imported properties, instructions, media and local history exist. Detail Add preserves draft/program/live-session context; offline program-picker checks confirmed it changes the intended program day without changing an active session. Offline emulator checks passed for Chin-Up autoplay on opening, all three cameras and reopening, instruction collapse and expansion, native 1X/2.5X/5X playback, explicit pause and background reset. Clip loading resets for each selected clip instead of temporarily reopening the previous camera. Rendered full-width center-cropped media has no seek bar. Empty-cache fault injection first reproduced a blank unprepared player; all three camera caches now rebuild byte-for-byte from bundled originals and autoplay offline | Source modal presentation and history analytics still differ. Physical-device compatibility is not certified. Source autoplay and camera-switch continuity remain unobserved. Nonempty corrupt-cache, decoder and storage failures remain unaccepted. |
-| Custom exercises | Basic local name/muscle/equipment/instructions form exists. Program-picker Custom is wired; Create, Cancel and detail Back return to the originating draft/program/live picker with its search state in the verified flows | Source staged required metrics, structured muscles/equipment alternatives/support, ROM/stability, final details/review and durable rich metadata are missing. |
+| Custom exercises | Five-step creation supports explicit metrics, primary/secondary muscles, resistance/support alternatives, ROM/stability, contribution, aliases and review. Wizard edits remain separate until Create. Rich metadata participates in backup and gym availability; caller context is preserved. See the [custom-exercise review](reviews/custom-exercises-01.md) | Source Create was not executed. Muscle-tap cycling, metric-family restrictions and complete choice menus are local policies or unobserved. Modified/archived/deprioritized states, lifecycle actions, independent side logging and exact source controls remain unaccepted. |
 | Gyms | Local presets, equipment, weights and gym selection exist | Category bulk selection, default-weight summaries, quantity/enabled states, local unit editor and source presentation differ. Everything/Warehouse/Home counts differ between retained runtime and bundled catalog; resolve snapshot identity before deleting entities. |
-| Body data/photos | Local dated scale-weight records support kg/lb input, unit-aware history, optional manual body fat, editing and confirmed deletion. Full Body records support the 18 observed circumference fields in cm. Front/Side/Back photo records support local attachment, private original-byte copies, full-view reopen, date/slot edits, Back discard, confirmed deletion and complete JSON backup/restore. Combined offline UI/SAF checks preserved training, weights and measurements; final normal/large-text states were inspected | Weight Trend, the Visual Body Fat reference/input, measurement charts and source form/history layout remain absent or different. Photo entry uses a page rather than the observed compact sheet. Source save, same-day record policy, photo outcomes and populated trend calculations are unobserved. No smoothing or visual-fat algorithm is inferred. |
+| Body data/photos | Local dated scale-weight records support kg/lb input, unit-aware history, optional manual body fat, editing and confirmed deletion. Full Body records support the 18 observed circumference fields in cm. Front/Side/Back photo records support local attachment, private original-byte copies, full-view reopen, date/slot edits, Back discard, confirmed deletion and complete JSON backup/restore. Raw charts expose weight, manual fat and all 18 circumferences with six ranges and dated selection. Their [calendar-window policy](BODY-CHARTS.md) is local. Combined body UI/SAF checks preserved training and private photo bytes | Weight Trend smoothing, source aggregation, the Visual Body Fat reference/input and source form/history layout remain absent or different. Photo entry uses a page rather than the observed compact sheet. Source save, same-day record policy, photo outcomes and populated trend calculations are unobserved. No smoothing or visual-fat algorithm is inferred. |
 | Levels | Front/back map, period selection and contribution foundation exist | Source row order/sheet differ. Populated weighting, averaging, map colors and drilldown rules remain unobserved. |
 | Onboarding | Local defer/resume, validation and gym/program handoff exist | Source post-login forms were not captured sufficiently for parity. Onboarding body values are not dated body-data records. Account/login gates are intentionally omitted. |
 | Settings | Grouped Nuvio appearance, weight units, rest and backup exist | Energy/height/clock units, language, theme, full workout controls, shortcut configuration, visibility and tutorials/help remain incomplete. |
@@ -125,6 +126,53 @@ Combined parent checks passed with both workout composition and photos present:
 attachment, editing, restart, JSON export and restore. The complete workout and
 media regression also passed with photos present, preserving body records and
 private photo bytes. These checks do not accept every parity unit.
+
+The metric foundation adds three JVM tests, for 43 passing tests, and retains
+five passing Android tests. Its complete UI flow covers all 18 catalog metric
+combinations, invalid and cleared inputs, dated bodyweight, optional RIR,
+unit changes, notes, restart and history. A subsequent width-only fix preserves
+the full displayed load at both tested font sizes.
+
+The later workout/media and manual-program flows passed on that same APK.
+Onboarding initially failed because its search result was above a retained
+scroll offset. The corrected harness scrolls its fixture to the top; the
+onboarding rerun passed on the same installed APK. Body entry, enlarged type,
+deletion and native document export/restore also passed with existing photos.
+That run preserved the photo records and original bytes, then restored the
+prior synthetic app fixture byte-for-byte.
+
+Artifacts retain failed harness attempts, including binary/ADB fixture transport,
+an assumed kg preference and the offscreen search result. No uninterrupted
+aggregate-suite pass is asserted. These local passes do not close the source
+parity gaps above.
+
+The chart/custom/library baseline passes build, lint and 47 JVM tests. Two codec
+regressions failed before the correction: preserving the catalog's empty-muscle
+fallback without assigning it to custom exercises, and rejecting custom body
+contributions above the form's 100% limit during restore. Library acceptance
+separately reproduces the old hidden-first-result failure, then checks changed
+queries, unchanged-query detail return, resistance alternatives, empty/clear,
+process recreation and unchanged persisted data. This is not source-ranking
+acceptance. The temporary onboarding scroll workaround is no longer needed.
+
+The parent chart run initially stopped after enlarged-text recreation because
+its fast lookup swipe flung past the entire Body Data title. A focused trace
+reproduced the skipped title from the top of Settings. A shorter, slower lookup
+drag passes that same restart/navigation case at 1.3× font; the failed run and
+trace are retained rather than reported as an aggregate pass.
+
+The subsequent parent chart/custom/library sequence passed on one combined
+installed APK, followed by exact restoration of the original synthetic fixture
+and photo bytes. It includes all six chart ranges, zero versus missing values,
+point/row selection, kg/lb/cm, enlarged text and restart; five-step custom
+creation, background recreation, contextual Add and metric logging; five native
+storage/catalog tests with rich custom data; and the complete library flow.
+The first combined attempt rejected an old custom record's expanded serialized
+shape. A focused comparison confirmed only additive defaults, with every prior
+field unchanged. The chart fixture now lets the installed codec serialize those
+defaults before taking its strict comparison snapshot. Both attempts remain in
+`.amp/in/artifacts/library-integrated/`; only the later complete sequence is a
+pass. The broader workout/media/program/onboarding suite is separate evidence.
 
 ## Media compression decision
 
