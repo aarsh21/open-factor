@@ -71,13 +71,32 @@ def target(label, scroll=True):
         scrolls = [n for n in root.iter('node') if n.get('scrollable') == 'true']
         if scroll and scrolls:
             left, top, right, bottom = bounds(scrolls[-1])
-            adb('shell', 'input', 'swipe', str((left+right)//2),
-                str(top+(bottom-top)*4//5), str((left+right)//2),
+            # Drag in the empty edge padding, never over a transfer button.
+            adb('shell', 'input', 'swipe', str(right-8),
+                str(top+(bottom-top)*4//5), str(right-8),
                 str(top+(bottom-top)//4), '450')
         else:
             time.sleep(.2)
     capture('failure')
     raise AssertionError(f'Cannot find {label}')
+
+
+def scroll_to_end():
+    previous = None
+    for _ in range(8):
+        root = nodes()
+        signature = ET.tostring(root)
+        if signature == previous:
+            return
+        previous = signature
+        scrolls = [n for n in root.iter('node') if n.get('scrollable') == 'true']
+        if not scrolls:
+            return
+        left, top, right, bottom = bounds(scrolls[-1])
+        adb('shell', 'input', 'swipe', str(right-8),
+            str(top+(bottom-top)*4//5), str(right-8),
+            str(top+(bottom-top)//4), '450')
+    raise AssertionError('Scroll content did not reach its end')
 
 
 def tap(label):
@@ -144,6 +163,8 @@ def inspect_panel(name):
         assert node.get('enabled') == str(args.expect_provider == 'available').lower(), label
     target('No transfer has run.')
     capture(name + '-actions')
+    scroll_to_end()
+    capture(name + '-footer')
     adb('shell', 'input', 'keyevent', '4')
 
 
@@ -195,6 +216,7 @@ try:
         target('Health Connect privacy', scroll=False)
         capture(f'{name}-rationale-top')
         target("You can deny or revoke any grant in Android's Health Connect settings. Revoking access does not erase saved body records or prior exports. Open Factor never schedules health transfers and does not delete Health Connect records.")
+        scroll_to_end()
         capture(f'{name}-rationale-bottom')
 finally:
     try:

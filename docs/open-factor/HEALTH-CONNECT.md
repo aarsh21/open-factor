@@ -161,10 +161,27 @@ wiring, provenance, and corrected scoped exports. The merged manifest has
 exactly the six health permissions and no Internet permission. The public APK
 contains only the three factual JSON assets, with no private source originals.
 
-Native renders, Android permission denial, provider transfers, persistence
-across a real process restart, and provider idempotence remain unverified.
-No health grant or health-store operation has been executed. The private
-counter's synchronous commit is intentional despite lint's KTX suggestion.
+Native UI-only checks pass on an explicitly leased offline emulator at normal
+and 1.3 text scales. Settings and onboarding open the panel and return to their
+callers without a transfer. Onboarding stays on the same step. The direct
+privacy rationale opens, and real scrolling exposes the complete final
+paragraph. Inspected final captures show readable controls, complete footer
+text, and no caller content behind the gesture bar. The first render exposed
+that last defect. The corrected full-screen dialog draws behind system bars
+while `safeDrawingPadding` keeps its content clear of them.
+
+The final public APK SHA-256 is
+`189a0948553cf7ffdf696b75a53389fbbef59e0b279772b2dec3bc900c389b2f`.
+Its final build repeats the 88-test, zero-lint-error, 11-warning result and both
+APK assemblies. The incoming APK, test APK, exact preference bytes, private
+user-file hashes, empty profile marker, font, rotation, and offline settings
+are restored after verification. The crash buffer is empty.
+
+Android permission denial, unavailable-provider renders, provider transfers,
+persistence across a real process restart, and provider idempotence remain
+unverified. No health grant or health-store operation has been executed.
+The private counter's synchronous commit is intentional despite lint's KTX
+suggestion.
 
 `tooling/android_health_connect_smoke.py` prepares Settings, onboarding, and
 rationale checks at normal and 1.3 text scales on an explicitly leased offline
@@ -174,5 +191,7 @@ restores preferences byte-for-byte, and compares private-file hashes. Its
 forcing an unavailable provider. It never taps transfer or permission controls.
 The driver therefore does not claim native grant-denial coverage. That boundary
 is tested by the no-store fake until a synthetic health environment is allocated.
-The driver has not run yet. Runtime artifacts and backups belong under the
-excluded `.amp/in/artifacts/` directory, never in public application assets.
+Scroll gestures use empty edge padding rather than transfer buttons. Footer
+captures wait for real scrolling to stop, not the first visible piece of a
+paragraph. Runtime artifacts and complete backups remain under the excluded
+`.amp/in/artifacts/` directory, never in public application assets.

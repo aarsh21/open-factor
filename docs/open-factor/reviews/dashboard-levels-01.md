@@ -1,8 +1,10 @@
 # Dashboard choices and Levels
 
 The Dashboard now consumes ordered, persisted focus and tile selections. This is
-partial source parity, not a recovered analytics engine. Public assembly, lint,
-and 54 JVM tests pass. Native validation awaits its allocated emulator.
+partial source parity, not a recovered analytics engine. The bounded native
+functional checks pass on the parent's combined public build, including
+customization, chart tutorial persistence, and Levels return state. The caption
+correction also passes the separate final-artifact render check.
 
 ## Observed controls have local consumers
 
@@ -87,11 +89,73 @@ public APK contains 1,345 catalog records, three catalog assets, and no private
 reference entries. Its SHA-256 is
 `b56209ea21514898da2c486974f4b14828072af80a1cd43989fb9f203e680677`.
 
-Native normal and 1.3× renders are not yet claimed. The pending native cases
-cover Save, Cancel, reset confirmation and cancellation, restart, process
-recreation, active-program versus all-workouts scope, raw charts, contribution
-drilldowns, and both exercise-settings Back controls. Private observations and
-local validation output stay under excluded `.amp/in/`, not in application
-assets. Build and asset counts are in
-`.amp/in/artifacts/dashboard-levels/build-validation.json`, with the command
-output in `build-public.log` alongside it.
+The parent combined public artifact has source HEAD
+`96f69fe6bd3f7125879a68e2b65ec1500e877c91` and APK SHA-256
+`18202bbcf6f7007030b6ab6f01defe175c36183e433d7e02f828302adeced569`.
+It includes the normal Settings, program, lifecycle, body, export, gym and logger
+units as well as this work. Its XML reports contain 82 JVM tests, including two
+temporary evidence tests, with zero failures or errors. Lint reports zero errors
+and nine warnings. Both APK assemblies passed. The APK contains exactly the
+three factual catalog JSON assets, with no private reference originals.
+
+The offline emulator-5584 run passed these local checks on that exact artifact:
+
+- Active-program versus all-workouts rings show 3 versus 8 working sets from
+  asymmetric saved and current workouts. The scoped saved-workout list excludes
+  the current session.
+- Focus, section and tile order, every selector, exercise search and Steps have
+  persisted consumers. Hidden Waist remains saved while absent from the body
+  selector and Dashboard. Customization changes no non-preference data.
+- Save, restart, unsaved draft process recreation, Back, reset cancellation,
+  reset-draft Back and confirmed reset Save preserve their intended boundaries.
+- Dashboard chart entry shows help once. Dismissal persists `bodyCharts` without
+  changing other preferences or records; immediate and restarted reentry omit
+  it, and explicit Help remains available.
+- Raw chart, muscle contribution, exercise-tile history and Steps disclosure
+  entry/return work. The one-month Chest sheet shows 1.6 and 0.5 sets/week from
+  primary and secondary contributions under the documented local eligibility.
+- Levels keeps the period, selected contribution sheet and exact Chest text
+  bounds through local history, settings header Back and system Back. Duplicate
+  cancellation and Create → detail → Back → settings Back return to Levels
+  rather than looping. Create adds only the explicitly requested copy.
+
+Two transient UIAutomator null-root messages occurred in the complete run. A
+separate follow-up accepted only fresh successful hierarchy dumps and repeated
+editor-draft and open-period-sheet process recreation successfully. Its full
+state comparison also retained the incoming global exercise note.
+
+Normal and 1.3× editor, period and contribution renders were inspected. The raw
+chart and grouped upper-body rows were inspected at normal size. The enlarged
+Dashboard exposed an incumbent `Exercises` caption wrapping as `Exercise` / `s`.
+The small-ring base caption was changed from 18sp to 16sp, retaining system
+scaling and ring geometry.
+
+That correction was verified separately on parent product HEAD
+`41cfff2b38e2d65c98a21eee2e1e86aaa1374586`, APK SHA-256
+`189a0948553cf7ffdf696b75a53389fbbef59e0b279772b2dec3bc900c389b2f`.
+This newer combined artifact also contains the approved Health dialog inset
+correction. Its 88 maintained JVM tests pass with zero failures or errors;
+lint reports zero errors and 11 warnings, and both APK assemblies pass. Only
+the narrow Dashboard caption and Levels row checks ran here on this artifact;
+the complete functional acceptance above remains pinned to the earlier build.
+
+The final normal and 1.3× Dashboard and 1.3× grouped Levels rows were captured
+and inspected. Both side captions measure 80 pixels high at 1.3× and display on
+one line; the planned-count labels align. A subsequent customization Save keeps
+the incoming pinned exercise note and all non-preference data unchanged.
+
+The exact incoming 28,869-byte preferences XML, installed APK, zero-byte
+`profileInstalled`, font, rotation and network state were restored. The incoming
+photo directory was empty; this run does not establish nonempty photo-byte
+preservation. The codec contract covers a retained photo reference. The crash
+buffer was empty, the app was force-stopped, and the native lease was explicitly
+released for the next worker.
+
+Private observations and local validation stay under excluded `.amp/in/`, not
+in application assets. `artifacts/dashboard-levels/` contains the isolated and
+combined build manifests, `native-96f69fe6-attempt1/` complete run,
+`native-fresh-recreation/` follow-up, `native-caption-final/` final render check,
+inspected captures and restoration records. `source-recovery/` retains the
+private read-only recovery evidence. These are Dashboard/Levels checks, not
+combined acceptance of every other unit in the parent artifact. Nothing was
+pushed or published.
