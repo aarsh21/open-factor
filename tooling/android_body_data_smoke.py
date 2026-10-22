@@ -112,7 +112,7 @@ def back():
 
 
 def training(data):
-    return {k: data.get(k) for k in ('active', 'history', 'routines', 'programs', 'activeProgramId', 'programDraft', 'gyms')}
+    return {k: data.get(k) for k in ('active', 'history', 'routines', 'programs', 'activeProgramId', 'programDraft', 'workoutDraft', 'gyms')}
 
 
 def settings():
@@ -152,6 +152,9 @@ try:
     if not state().get('active'):
         tap('Shortcuts', 'content-desc')
         tap('Empty Workout')
+        find('Start Workout')
+        assert state().get('active') is None, 'Opening composition started workout timing'
+        tap('Start Workout')
         find('Workout options', 'content-desc')
         tap('Workout options', 'content-desc')
         tap('Minimize Workout')

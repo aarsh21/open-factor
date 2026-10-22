@@ -50,8 +50,8 @@ def persisted():
  return json.loads(next(n.text for n in xml if n.get('name')=='data'))
 # Clear only a leftover active Open Factor smoke workout, through its UI.
 adb('shell','am','force-stop','org.openfactor.app');launch();find('Dashboard')
-if any(n.get('text') == 'Resume Workout' for n in nodes()):
- tap('Resume Workout');tap('Workout options','content-desc');tap('Discard Workout');tap('Discard')
+if persisted().get('active') is not None:
+ tap('Shortcuts','content-desc');tap('Resume Workout');tap('Workout options','content-desc');tap('Discard Workout');tap('Discard')
  adb('shell','am','force-stop','org.openfactor.app');launch();find('Dashboard')
 capture('phone-dashboard')
 if a.parity_actions:
@@ -73,11 +73,13 @@ if a.parity_actions:
  tap('Shortcuts','content-desc');tap('New Program');find('Create Program');capture('shortcut-new-program');tap('Back','content-desc');find('Leave program draft?')
  tap('Keep Draft' if shortcuts_before.get('programDraft') else 'Discard Draft');find('Programs');tap('Back','content-desc')
  assert persisted()==shortcuts_before, 'Opening and closing program shortcut changed prior training data'
- tap('Shortcuts','content-desc');tap('Empty Workout');find('Build your workout');capture('shortcut-empty-workout')
+ tap('Shortcuts','content-desc');tap('Empty Workout');find('Start Workout');capture('shortcut-empty-workout')
+ assert persisted().get('active') is None and persisted().get('workoutDraft') is not None, 'Composition started a live workout'
+ tap('Start Workout');find('Build your workout')
  active_id=persisted()['active']['id'];adb('shell','input','keyevent','4');tap('Shortcuts','content-desc');tap('Resume Workout');find('Build your workout')
  assert persisted()['active']['id']==active_id, 'Resume shortcut replaced the active workout'
 else:
- tap('Workout',last=True);tap('New workout','content-desc');tap('Empty Workout')
+ tap('Workout',last=True);tap('New workout','content-desc');tap('Empty Workout');tap('Start Workout')
 tap('Add Exercise');tap('Search exercises');adb('shell','input','text','barbell% sbench% spress'.replace('% s','%s'))
 adb('shell','input','keyevent','4')  # Expose results on short API-26 emulator viewports.
 tap('Add ','content-desc',prefix=True);find('Complete set','content-desc',prefix=True)
@@ -106,7 +108,7 @@ paused=persisted()['active']
 assert paused['pausedAt']>0
 assert paused['selectedExerciseId'] in [e['id'] for e in paused['exercises']]
 # Persist the active session across a genuine process restart.
-adb('shell','am','force-stop','org.openfactor.app');launch();find('Resume Workout');capture('phone-dashboard-active');tap('Resume Workout')
+adb('shell','am','force-stop','org.openfactor.app');launch();tap('Shortcuts','content-desc');find('Resume Workout');capture('phone-dashboard-active');tap('Resume Workout')
 find('Mark set incomplete','content-desc',prefix=True)
 find('Paused')
 assert persisted()['active']['pausedAt']==paused['pausedAt'], 'Pause did not survive restart'
