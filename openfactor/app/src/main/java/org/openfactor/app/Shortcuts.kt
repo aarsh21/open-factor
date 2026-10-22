@@ -84,7 +84,10 @@ internal fun ShortcutEditor(initial: ShortcutPreferences, onCancel: () -> Unit, 
                                 }, enabled = index >= 0 && index < draft.order.lastIndex, modifier = Modifier.size(48.dp)) {
                                     Icon(Icons.Rounded.ArrowDownward, "Move ${shortcut.label} down")
                                 }
-                            } else TextButton({ colorKey = shortcut.name }) {
+                            } else TextButton({ colorKey = shortcut.name }, Modifier.semantics {
+                                contentDescription = "${shortcut.label} color"
+                                stateDescription = draft.colors[shortcut]?.label ?: "Default"
+                            }) {
                                 Text(draft.colors[shortcut]?.label ?: "Default")
                             }
                         }
