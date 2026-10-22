@@ -13,10 +13,10 @@ enter('Name','Synthetic Setup');enter('Height (cm) · optional','0');tap('Next')
 tap('Set up later');find('Finish setup later?');tap('Set up later',last=True);launch();find('Dashboard');assert state()['onboarding']['step']==3 and state()['onboarding']['deferred'];tap('Settings');tap('Set up Open Factor');find('Your training profile');assert state()['onboarding']['name']=='Synthetic Setup';tap('Next');find('Go to Gym & Equipment');capture('gym-overview');tap('Go to Gym & Equipment');find('Choose your equipment');capture('gym');tap('Next');find('Go to Program');tap('Go to Program');find('Create from scratch');capture('program');tap('Set up program later');find('Dashboard')
 d=state();assert d['onboarding']['completed'];assert d['preferences']['displayName']=='Synthetic Setup';assert d['onboarding']['heightCm']=='180';assert d['onboarding']['weightKg']=='75.5';assert d['history']==before['history'] and d['programs']==before['programs'] and d.get('programDraft')==before.get('programDraft');launch();find('Dashboard');capture('dashboard')
 # Fixed navigation hit areas, content clearance, and a short reusable motion clip.
-def nav_targets():
+def nav_targets(expected=None):
  nodes()
  root=E.fromstring(adb('shell','cat','/sdcard/of-program.xml'));parents={c:p for p in root.iter() for c in p}
- found={}
+ found={};selected=[]
  for n in root.iter('node'):
   label=n.get('text')
   if label not in ['Dashboard','Workout','Exercises','Settings']:continue
@@ -24,15 +24,19 @@ def nav_targets():
   while target in parents and not (target.get('clickable')=='true' or target.get('selected')=='true'):
    target=parents[target]
   if target.get('clickable')=='true' or target.get('selected')=='true':found[label]=bounds(target)
+  if target.get('selected')=='true':selected.append(label)
  assert len(found)==4,found
+ if expected is not None:assert selected==[expected],(expected,selected)
  return found
 nav=nav_targets()
-# Capture a compact scripted interaction without UI-tree delays inside the recording.
+# Shell swipe's synchronous DOWN can consume its entire duration during initial
+# composition. Wait for the selected destination before injecting movement, and
+# reject a scroll that navigates rather than tapping subsequent stale coordinates.
 def click_xy(label):
- x,y,r,b=nav[label];adb('shell','input','tap',str((x+r)//2),str((y+b)//2));time.sleep(.45)
-record=subprocess.Popen(['adb','-s',serial,'shell','screenrecord','--time-limit','12','/sdcard/of-nav-motion.mp4'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+ x,y,r,b=nav[label];adb('shell','input','tap',str((x+r)//2),str((y+b)//2));assert nav==nav_targets(label)
+record=subprocess.Popen(['adb','-s',serial,'shell','screenrecord','--time-limit','20','/sdcard/of-nav-motion.mp4'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
 time.sleep(.8)
-click_xy('Settings');adb('shell','input','swipe','540','1400','540','450','450');time.sleep(.4);click_xy('Exercises');adb('shell','input','swipe','540','1400','540','700','400');time.sleep(.4);click_xy('Dashboard');click_xy('Workout');record.wait(timeout=20)
+click_xy('Settings');adb('shell','input','swipe','540','1400','540','450','450');assert nav==nav_targets('Settings');click_xy('Exercises');adb('shell','input','swipe','540','1400','540','700','400');assert nav==nav_targets('Exercises');click_xy('Dashboard');click_xy('Workout');record.wait(timeout=30)
 adb('pull','/sdcard/of-nav-motion.mp4',str(a.output/'navigation-motion.mp4'));nodes();capture('workout');tap('Settings');
 for _ in range(5):adb('shell','input','swipe','540','1400','540','400','300')
 find('Licenses & Attribution');capture('settings-bottom')

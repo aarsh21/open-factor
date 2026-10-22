@@ -53,7 +53,7 @@ def find(label, attr='text'):
 
 
 def reachable(label, attr='text', last=False):
-    for _ in range(12):
+    for _ in range(18):
         current = nodes()
         found = [n for n in current if n.get(attr, '').strip().casefold() == label.casefold() and bounds(n)[3] - bounds(n)[1] >= 40]
         if found:
@@ -63,7 +63,7 @@ def reachable(label, attr='text', last=False):
             break
         left, top, right, bottom = bounds(max(scrolls, key=lambda n: bounds(n)[3] - bounds(n)[1]))
         x = (left + right) // 2
-        adb('shell', 'input', 'swipe', str(x), str(top + (bottom - top) * 4 // 5), str(x), str(top + (bottom - top) // 5), '300')
+        adb('shell', 'input', 'swipe', str(x), str(top + (bottom - top) * 3 // 5), str(x), str(top + (bottom - top) * 2 // 5), '600')
     find(label, attr)
     raise AssertionError('Control not reachable: ' + label)
 
@@ -223,7 +223,9 @@ try:
     tap('Log Measurements')
     tap('Save')
     find('Enter at least one measurement')
+    tap('Change measurement date', 'content-desc')
     enter('Date (YYYY-MM-DD)', '2026-10-17')
+    tap('Apply date')
     enter('Neck', '39.25')
     capture('measurements-upper')
     enter('Waist', '86.5')
