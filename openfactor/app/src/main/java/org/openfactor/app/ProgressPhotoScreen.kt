@@ -133,6 +133,8 @@ fun ProgressPhotoEditor(
     var choosingDate by rememberSaveable { mutableStateOf(false) }
     var proposedDate by rememberSaveable { mutableStateOf(date) }
     val scope = rememberCoroutineScope()
+    val visibility = vm.data.collectAsState().value.preferences.dataVisibility
+    val visiblePositions = PhotoPosition.entries.filter { visibility.isVisible(it.key + "Photo") }
     fun leave() {
         vm.cleanPhotos()
         onBack()
@@ -214,7 +216,9 @@ fun ProgressPhotoEditor(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PhotoPosition.entries.forEachIndexed { index, position ->
+                    visiblePositions.forEach { position ->
+                        // Keep the full draft indexed by pose, not by visible slot order.
+                        val index = position.ordinal
                         val reference = references[index]
                         fun attach() {
                             selected = index
@@ -297,7 +301,19 @@ fun ProgressPhotoEditor(
                                 }
                         }
                     }
+                    if (visiblePositions.isNotEmpty())
+                        repeat(PhotoPosition.entries.size - visiblePositions.size) {
+                            Spacer(Modifier.weight(1f))
+                        }
                 }
+                if (visiblePositions.size < PhotoPosition.entries.size)
+                    Text(
+                        if (visiblePositions.isEmpty())
+                            "All photo slots are hidden in Data Visibility. Existing photos stay saved."
+                        else "Hidden photo slots stay saved. Change their visibility in Settings.",
+                        color = OF.muted,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 if (busy)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),

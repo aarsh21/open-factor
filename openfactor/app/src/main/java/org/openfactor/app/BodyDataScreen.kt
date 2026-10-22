@@ -286,6 +286,7 @@ fun BodyMeasurementEditor(
     onBack: () -> Unit,
     onSave: (BodyMeasurementRecord) -> Unit,
     onDelete: () -> Unit,
+    visibility: DataVisibility = DataVisibility(),
 ) {
     val id = rememberSaveable { record?.id ?: newId() }
     var date by rememberSaveable { mutableStateOf((record?.date ?: LocalDate.now()).toString()) }
@@ -303,6 +304,7 @@ fun BodyMeasurementEditor(
     var choosingDate by rememberSaveable { mutableStateOf(false) }
     var proposedDate by rememberSaveable { mutableStateOf(date) }
     val fatValid = visualFat.isBlank() || visualFat.bodyDecimal()?.let { it in 0.0..100.0 } == true
+    val visibleFields = BodyMeasurement.entries.filter { visibility.isVisible(it.key) }
     ModalBottomSheet(
         onDismissRequest = onBack,
         // Keep a reachable outside-dismissal strip below status bars and display cutouts.
@@ -379,10 +381,12 @@ fun BodyMeasurementEditor(
                         },
                     )
                 }
-                BodyMeasurement.entries.forEachIndexed { index, field ->
-                    if (index == 0 || BodyMeasurement.entries[index - 1].group != field.group)
+                visibleFields.forEachIndexed { visibleIndex, field ->
+                    if (visibleIndex == 0 || visibleFields[visibleIndex - 1].group != field.group)
                         item { SectionTitle(field.group) }
                     item(key = field.key) {
+                        // The draft retains every field, including hidden saved values.
+                        val index = field.ordinal
                         val text = values[index]
                         val valid =
                             text.isBlank() ||
@@ -403,6 +407,14 @@ fun BodyMeasurementEditor(
                         )
                     }
                 }
+                if (visibleFields.size < BodyMeasurement.entries.size)
+                    item {
+                        Text(
+                            "Hidden measurements stay saved. Change their visibility in Settings.",
+                            color = OF.muted,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 item {
                     Text(
                         "Enter at least one value. Circumferences are stored in cm. Visual body fat is your manually entered percentage; no estimate is calculated.",

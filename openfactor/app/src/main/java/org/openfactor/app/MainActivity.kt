@@ -200,6 +200,9 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                     "body-charts" -> BodyChartScreen(
                         data, bodyChartMetric, bodyChartRange,
                         { bodyChartMetric = it }, { bodyChartRange = it }, { route = "body-data" },
+                        onDismissTutorial = {
+                            vm.settings { it.copy(dismissedTutorials = it.dismissedTutorials + "bodyCharts") }
+                        },
                     )
                     "weight-entry" -> key(detailId) {
                         ScaleWeightEditor(
@@ -506,6 +509,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
             { route = bodyEntryReturn },
             { vm.saveBodyMeasurements(it); bodyDataTab = 1; route = "body-data" },
             { vm.deleteBodyMeasurements(detailId); bodyDataTab = 1; route = "body-data" },
+            visibility = data.preferences.dataVisibility,
         )
     }
     if (route == "photo-entry") key(detailId) {

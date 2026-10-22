@@ -99,6 +99,7 @@ data class Preferences(
     val heightInFeet: Boolean = false,
     val clock24Hour: Boolean = false,
     val dataVisibility: DataVisibility = DataVisibility(),
+    val dismissedTutorials: Set<String> = emptySet(),
 )
 
 data class AppData(
@@ -360,7 +361,8 @@ object DataCodec {
                     .put("distanceImperial", d.preferences.distanceImperial)
                     .put("heightInFeet", d.preferences.heightInFeet)
                     .put("clock24Hour", d.preferences.clock24Hour)
-                    .put("dataVisibility", DataVisibilityCodec.encode(d.preferences.dataVisibility)),
+                    .put("dataVisibility", DataVisibilityCodec.encode(d.preferences.dataVisibility))
+                    .put("dismissedTutorials", JSONArray(d.preferences.dismissedTutorials.sorted())),
             )
             .toString(2)
 
@@ -452,6 +454,8 @@ object DataCodec {
                 clock24Hour = p.optBoolean("clock24Hour", false),
                 dataVisibility = if (p.has("dataVisibility"))
                     DataVisibilityCodec.decode(p.getJSONObject("dataVisibility")) else DataVisibility(),
+                dismissedTutorials = if (p.has("dismissedTutorials"))
+                    p.getJSONArray("dismissedTutorials").strings().toSet() else emptySet(),
             ),
             j.optString("activeProgramId").takeIf { it.isNotBlank() && it != "null" },
             j.array("gyms").objects().map { GymCodec.decode(it) },

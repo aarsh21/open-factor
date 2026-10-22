@@ -34,6 +34,7 @@ fun BodyChartScreen(
     onMetric: (String) -> Unit,
     onRange: (BodyChartRange) -> Unit,
     onBack: () -> Unit,
+    onDismissTutorial: () -> Unit = {},
 ) {
     val series = data.bodyChartSeries()
     val metric = series.first { it.key == metricKey }
@@ -43,7 +44,13 @@ fun BodyChartScreen(
     var selection by rememberSaveable(metricKey, range) { mutableStateOf<String?>(null) }
     val chosen = points.find { it.recordId == selection }
     var choosingMetric by remember { mutableStateOf(false) }
-    var help by remember { mutableStateOf(false) }
+    var help by rememberSaveable {
+        mutableStateOf("bodyCharts" !in data.preferences.dismissedTutorials)
+    }
+    val dismissHelp = {
+        help = false
+        onDismissTutorial()
+    }
     Column(Modifier.fillMaxSize()) {
         PageHeading(
             "Body Charts",
@@ -185,7 +192,7 @@ fun BodyChartScreen(
     }
     if (help)
         AlertDialog(
-            onDismissRequest = { help = false },
+            onDismissRequest = dismissHelp,
             title = { Text("About body charts") },
             text = {
                 Text(
@@ -195,7 +202,7 @@ fun BodyChartScreen(
                     Modifier.verticalScroll(rememberScrollState()),
                 )
             },
-            confirmButton = { TextButton({ help = false }) { Text("Got it") } },
+            confirmButton = { TextButton(dismissHelp) { Text("Got it") } },
         )
 }
 

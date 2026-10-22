@@ -26,6 +26,13 @@ full-image viewing, and confirmed record deletion. Save applies edits. Close,
 Back, an outside tap, or a downward sheet drag discards unsaved changes.
 Cancelling the Android document picker does not change a slot.
 
+Data Visibility hides individual editor slots, not saved photos. Hidden slots
+keep their hashes when another slot or the date changes. History and complete
+backups still include every saved pose and its original bytes. Visible slots keep
+their three-column size. If all slots are hidden, the editor explains the setting
+and still permits a date-only edit of an existing record. These responsive
+layouts are local adaptations; the hidden-slot source layout is unobserved.
+
 The Android document picker selects existing images. Camera capture, editing or
 cropping the image itself, comparison tools, charts, and trend or visual-fat
 calculations are not implemented.

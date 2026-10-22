@@ -51,6 +51,13 @@ An unchanged edit preserves the stored precision despite rounded display.
 Close, Back, or sheet dismissal discards unsaved changes. Delete requires
 confirmation. These local outcomes do not claim unobserved source equivalence.
 
+Data Visibility hides circumference inputs without removing their draft or saved
+values. Saving a different visible field preserves hidden values at their stored
+precision. Visual Body Fat and the scale-weight fields remain visible because
+they are source Default metrics. History, raw charts, and complete backups do
+not apply the visibility filter. Circumferences remain in cm; the separate height
+unit preference does not establish a circumference conversion rule.
+
 Complete JSON backup includes the optional `visualBodyFatPercent` key in each
 body-measurement record. Older records without it remain readable. Invalid
 percentages reject the whole restore before saved training, measurements, or

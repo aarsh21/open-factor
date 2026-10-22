@@ -303,6 +303,53 @@ try:
     tap('Close photos', 'content-desc'); target('Body Data'); target('Photos')
     assert state() == final and photo_bytes(state()) == assets
     assert {k:v for k,v in final.items() if k != 'progressPhotos'} == {k:v for k,v in baseline.items() if k != 'progressPhotos'}
+    # Restore a public backup with an asymmetric hidden middle field/pose. A
+    # filtered-index implementation would overwrite Side or the next measurement.
+    hidden = json.loads(json.dumps(exported))
+    hidden['preferences']['dataVisibility']['hiddenBodyMetrics'] = ['bodyFat', 'neck', 'sidePhoto', 'visualBodyFat', 'waist', 'weight']
+    hidden_record = next(r for r in hidden['progressPhotos'] if r['id'] == record['id'])
+    side_hash = hashlib.sha256(fixtures['side']).hexdigest()
+    hidden_record['photos']['side'] = side_hash
+    hidden['photoAssets'][side_hash] = base64.b64encode(fixtures['side']).decode()
+    measurement = dict(id=tag+'-measurements', date=day1,
+                       centimeters=dict(neck=31.12345678, waist=83.98765432, leftBicep=27.1111, rightBicep=30.2222),
+                       visualBodyFatPercent=13.5)
+    hidden['bodyMeasurements'].insert(0, measurement)
+    hidden_name = tag+'-visibility.json'; downloads.append(hidden_name)
+    path = args.output/hidden_name; path.write_text(json.dumps(hidden)); adb('push', str(path), '/sdcard/Download/'+hidden_name)
+    settings(); tap('Restore Backup'); choose(hidden_name); target('Restore Backup?'); tap('Restore'); target('Restore Backup')
+    hidden_state = state(); hidden_bytes = photo_bytes(hidden_state)
+    tap('Body Data'); tap('Measurements'); tap('Edit measurements '+day1, 'content-desc')
+    target('Visual Body Fat'); target('Shoulders')
+    assert not any(n.get('content-desc') == 'Neck (cm)' for n in nodes())
+    capture('measurements-hidden-neck-waist')
+    enter('Right Bicep', '29.3333'); tap('Save'); target('Body Data')
+    measured = next(r for r in state()['bodyMeasurements'] if r['id'] == measurement['id'])
+    assert measured == {**measurement, 'centimeters': {**measurement['centimeters'], 'rightBicep':29.3333}}
+    tap('Photos'); tap('Edit photos '+day2, 'content-desc')
+    assert not any(n.get('content-desc') in ('View Side photo', 'Add Side photo') for n in nodes())
+    target('View Front photo', 'content-desc'); target('View Back photo', 'content-desc')
+    capture('photo-hidden-side')
+    adb('shell', 'settings', 'put', 'system', 'font_scale', '1.3'); target('View Back photo', 'content-desc'); capture('photo-hidden-side-130')
+    # Date-only Save must retain every hidden hash and all original image bytes.
+    tap('Save'); target('Body Data')
+    assert next(r for r in state()['progressPhotos'] if r['id'] == record['id']) == hidden_record
+    assert photo_bytes(state()) == hidden_bytes
+    tap('Edit photos '+day2, 'content-desc'); tap('Remove Back photo', 'content-desc'); tap('Save'); target('Body Data')
+    assert next(r for r in state()['progressPhotos'] if r['id'] == record['id']) == {
+        **hidden_record, 'photos': {p:ref for p,ref in hidden_record['photos'].items() if p != 'back'}}
+    assert private(side_hash) == fixtures['side']
+    adb('shell', 'settings', 'put', 'system', 'font_scale', font)
+    hidden['preferences']['dataVisibility']['hiddenBodyMetrics'] = ['backPhoto', 'frontPhoto', 'sidePhoto']
+    path.write_text(json.dumps(hidden)); adb('push', str(path), '/sdcard/Download/'+hidden_name)
+    settings(); tap('Restore Backup'); choose(hidden_name); target('Restore Backup?'); tap('Restore'); target('Restore Backup')
+    all_hidden = state(); history(); tap('Edit photos '+day2, 'content-desc')
+    target('All photo slots are hidden in Data Visibility. Existing photos stay saved.')
+    assert not any(n.get('content-desc', '').startswith(('Add Front', 'Add Side', 'Add Back', 'View Front', 'View Side', 'View Back')) for n in nodes())
+    capture('photo-all-hidden'); tap('Save'); target('Body Data')
+    assert state() == all_hidden and photo_bytes(state()) == hidden_bytes
+    settings(); tap('Restore Backup'); choose(filename); target('Restore Backup?'); tap('Restore'); target('Restore Backup')
+    assert state() == final and photo_bytes(state()) == assets
     assert 'Active default network: none' in adb('shell', 'dumpsys', 'connectivity')
     result = {'status':'passed', 'serial':args.serial, 'offline':True, 'square_slots_and_compact_sheet':True,
               'dated_input_validation':True, 'picker_cancel_and_three_private_originals':True,
@@ -311,6 +358,7 @@ try:
               'complete_native_export_restore_cancel_restart':True, 'invalid_restore_atomic':True,
               'quick_photo_and_measurement_caller_context':True, 'history_edit_return':True,
               'full_body_close_back_scrim_drag_discard':True, 'full_body_reachable_scrim_normal_and_130':True,
+              'hidden_measurement_precision_and_pose_hashes_preserved':True, 'all_photo_slots_hidden_save_preserves_records':True,
               'existing_training_body_and_photos_preserved':True, 'source_save_semantics_claimed':False}
     (args.output/'result.json').write_text(json.dumps(result, indent=2)+'\n')
     print(json.dumps(result, indent=2), flush=True)

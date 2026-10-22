@@ -44,6 +44,13 @@ resets to 1W after a force-stop. Weight and measurement entry points select
 Scale Weight and Neck respectively. Existing records remain durable and covered
 by the existing complete JSON backup; there is no new persisted chart model.
 
+The first chart entry opens the existing About body charts dialog. Got it,
+outside dismissal, and Back record the `bodyCharts` tutorial dismissal in
+preferences. Later entries do not reopen the dialog, but the help icon remains
+available. Reset Tutorials clears that dismissal. This is a local raw-chart
+adaptation of the observed tutorial entry, not recovered source tutorial copy
+or sequencing. Data Visibility does not hide historical chart series.
+
 ## Remaining source parity
 
 Weight Trend smoothing, source aggregation, average/difference policy, daily
@@ -64,8 +71,9 @@ python tooling/android_body_charts_smoke.py --serial emulator-5582 \
   --output .amp/in/artifacts/body-charts/ui
 ```
 
-The smoke creates synthetic records through the real forms. It checks six
-ranges against their displayed dates and independent record counts, same-day
+The smoke requires an undismissed body-chart tutorial. It exercises first entry,
+dismissal, and reentry, then checks synthetic records created through the real
+forms. It checks six ranges against their dates and independent record counts, same-day
 readings, missing versus zero, kg/lb and cm, dot and row selection, large text,
 Back/reopen, and restart. It verifies that preferences, photos, workouts,
 composition drafts, programs, and all other unrelated app data remain unchanged.

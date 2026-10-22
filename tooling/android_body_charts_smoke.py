@@ -32,9 +32,11 @@ def adb(*command, raw=False):
 def nodes():
     for attempt in range(8):
         try:
-            adb('shell', 'uiautomator', 'dump', '/sdcard/of-chart-ui.xml')
+            dumped = adb('shell', 'uiautomator', 'dump', '/sdcard/of-chart-ui.xml')
+            if 'dumped to:' not in dumped:
+                raise RuntimeError('UI hierarchy unavailable; do not read a stale dump')
             return list(ET.fromstring(adb('shell', 'cat', '/sdcard/of-chart-ui.xml')).iter('node'))
-        except (ET.ParseError, subprocess.CalledProcessError):
+        except (ET.ParseError, subprocess.CalledProcessError, RuntimeError):
             if attempt == 7:
                 raise
             time.sleep(.3)
@@ -164,6 +166,7 @@ try:
     # Let the installed codec serialize legacy defaults before comparing stored shapes.
     units(baseline['preferences']['pounds'])
     baseline = state()
+    assert 'bodyCharts' not in baseline['preferences'].get('dismissedTutorials', []), 'Reset the body chart tutorial before this first-entry check'
     photos_before = photo_integrity(baseline)
     today = date.fromisoformat(adb('shell', 'date', '+%F').strip())
     monday = today-timedelta(days=today.weekday())
@@ -193,6 +196,16 @@ try:
     for key in set(baseline)-{'scaleWeights', 'bodyMeasurements', 'preferences'}:
         assert saved[key] == baseline[key], key
     tap('Scale Weight'); tap('View Charts')
+    target('About body charts'); capture('chart-first-entry'); tap('Got it')
+    expected_tutorials = sorted(set(baseline['preferences'].get('dismissedTutorials', [])) | {'bodyCharts'})
+    saved['preferences']['dismissedTutorials'] = expected_tutorials
+    assert state() == saved
+    baseline['preferences']['dismissedTutorials'] = expected_tutorials
+    adb('shell', 'input', 'keyevent', '4'); target('Body Data'); tap('View Charts')
+    assert not any(n.get('text') == 'Got it' for n in nodes()), 'Dismissed tutorial must not reopen on entry'
+    tap('About body charts', 'content-desc'); target('Got it')
+    adb('shell', 'input', 'keyevent', '4'); target('Body Charts')
+    assert state() == saved
     for label, months in [('1W', None), ('1M', 1), ('3M', 3), ('6M', 6), ('1Y', 12), ('All', 0)]:
         tap(label)
         check_range_checked(label)
@@ -263,6 +276,7 @@ try:
     assert photo_integrity(final) == photos_before
     (args.output / 'final-state.json').write_text(json.dumps(final, indent=2))
     result = dict(status='passed', serial=args.serial, offline=True, all_six_ranges=True,
+                  first_entry_tutorial_dismissal_and_reentry=True, manual_help_back=True,
                   same_day_readings=True, missing_vs_zero=True, kg_lb_and_cm=True,
                   point_and_row_selection=True, font_recreation=True, range_reopen=True,
                   process_restart=True, unrelated_data_unchanged=True, photo_bytes_unchanged=True,
