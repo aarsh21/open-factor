@@ -1,6 +1,6 @@
 # Recovered deload contract and progression limits
 
-`Deload.kt` implements the recovered standard-set target transform. It does not implement history-based load progression or expose a complete Smart Progression feature.
+`Deload.kt` implements the recovered target transform. Programs persist deload placement and explicit target overrides, and program sessions resolve derived targets from the current normal cycle. This does not implement history-based load progression or a complete Smart Progression feature.
 
 ## Deload target functions
 
@@ -16,7 +16,7 @@ The retained ARM64 specimen has SHA-256 `870dbb392efa8658b565303f8a83ffff470115c
 | `0xb78408` | Transform each retained set. Convert the `failure` set kind to `standard`, and retain the other set kinds and extra logs. |
 | `0xb78530`, `0xb7874c` | Round each present minimum and maximum full-rep target after multiplying by `0.8`. Preserve null bounds. For exercises with a reps metric, set RIR to `(rir ?? 0) + 3`. For other exercises, retain RIR unchanged. |
 
-The serialization body at `0x7a6794` confirms `ExerciseTargetLog` field offsets `0xf = minFullReps`, `0x13 = maxFullReps`, and `0x17 = rir`. The transform retains its rest timer, duration, and distance fields. The local target model represents only the rep bounds, RIR, and a common rest override.
+The serialization body at `0x7a6794` confirms `ExerciseTargetLog` field offsets `0xf = minFullReps`, `0x13 = maxFullReps`, and `0x17 = rir`. The transform retains its rest timer, duration, and distance fields. The local target model represents rep bounds, RIR, set kind, and a common rest override. It does not represent source target duration, distance, or extra logs. Copying `MYO` into a session does not invent component prescriptions or establish source component initialization.
 
 The set-count dispatch resolves to `0x1154dc4`, whose `fcvtms` instruction rounds toward negative infinity. Rep targets use a different operation. Their native call loads Thread offset `0x780`, calls the function, and converts its result with `fcvtzs`.
 
@@ -42,13 +42,23 @@ Set IDs and rest overrides, including zero, remain unchanged in the local transf
 
 `ProgramDeload.FIRST.sourceCycle` is `-1`, and `LAST.sourceCycle` is `999`. `cycleKeys(normalCount)` returns the source's ordered period keys without changing the normal target list.
 
-`CycleTarget.deloadTarget(isReps)` transforms a standard target. `List<CycleTarget>.targetForDeload(placement, isReps, overrideTarget)` resolves an override or transforms the adjacent normal target. The caller supplies the recovered reps-metric fact. The helper does not infer this fact from an exercise's name or equipment.
+`CycleTarget.deloadTarget(isReps)` transforms a target. `List<CycleTarget>.targetForDeload(placement, isReps, overrideTarget)` resolves an override or transforms the adjacent normal target. The caller supplies the recovered reps-metric fact. The helper does not infer this fact from an exercise's name or equipment.
 
-Current `PlannedExercise.cycles` contains only normal cycles. `ProgramCodec` requires its size to equal `TrainingProgram.cycleCount`, and `toWorkout` accepts only normal indexes. No deload sentinel is inserted into that list or silently mapped to an eighth normal period.
+`PlannedExercise.cycles` contains only normal cycles. `ProgramCodec` requires its size to equal `TrainingProgram.cycleCount`. `toWorkout` accepts normal indexes and the configured deload sentinel only. No deload sentinel enters the normal-cycle list or silently maps to a normal period.
 
-The coordinated integration proposal appends a nullable `TrainingProgram.deloadPlacement` and a separate `PlannedExercise.deloadTargets: Map<ProgramDeload, CycleTarget>` for explicit overrides only. Normal cycle count remains unchanged. A future `toWorkout` caller must supply catalog metric facts to compute the default from the current adjacent normal target. Computed defaults must not be stored as explicit overrides, because later normal-target edits must still affect them. This proposal is not implemented here. Separate deload persistence, restart behavior, calendar placement, and logger navigation remain unverified.
+The additive schema has nullable `TrainingProgram.deloadPlacement` and separate `PlannedExercise.deloadTargets: Map<ProgramDeload, CycleTarget>`. Old backups omit both fields and retain their previous behavior. Only explicit overrides enter the map. Derived targets are never serialized, so later normal-target edits affect the next derived session.
 
-`SetTarget` has no set-kind field, so source failure-to-standard normalization is unsupported. The local codec also limits target RIR to 10. The arithmetic helper preserves the recovered result rather than silently clamping it. Persisting transformed inputs above RIR 7 needs a separate model and validation decision.
+`PlannedExercise.targetForDeload` resolves explicit overrides before consulting the catalog. Derivation requires an actual `Metrics` property. Missing metadata does not use the logger's legacy Weight/Reps fallback. `startProgramDay` supplies the effective exercise catalog, and unresolved metric facts reject the whole session rather than silently dropping an exercise.
+
+`SetTarget.kind` defaults to `STANDARD` for older data. Unknown kinds reject import. Derived `FAILURE` targets become `STANDARD`, while explicit overrides keep their kinds. Ordinary target RIR remains limited to 0–10. Explicit deload targets permit 0–13, including the recovered result from ordinary RIR 10. Deload override numbers and skip flags use strict JSON types. Empty or skipped overrides remain authoritative, and explicit rest zero is preserved.
+
+## Local program UI
+
+Program Settings offers None, First Cycle, and Last Cycle, or Week labels for weekly plans. The retained chapter 02 reference shows None, First Week, Last Week, and a close control. Applying these choices through the existing local draft Save/Cancel transaction is an adaptation, not a recovered source save policy.
+
+The library displays a separate Deload period before or after normal periods. Start passes `-1` or `999` unchanged. Missing metric facts disable Start with an explanation. The normal target editor's `-1` means all normal cycles only; it is not a deload key.
+
+The exercise's Deload button opens derived or custom targets. Saving without changes stores no override. Editing stores only that placement's override. Use Derived Targets removes it. These routes do not implement calendar scheduling, automatic period advancement, or a history-based load suggestion.
 
 ## History-based progression remains unresolved
 
@@ -65,9 +75,13 @@ The native metadata identifies an analysis pipeline, not a fixed load increment:
 
 The analyzed-set record contains `bestCurve`, `expectationDifference`, `oneRm`, `plus5Rm`, `repRatio`, and `set`. `XRmCurve` and `FixableAutoTarget` are separate native types. The bounded progression body includes powers, an exponential, optional previous-curve state, and numeric comparisons. Neither these names nor the captured target tables define a below, within, or above-range load policy.
 
+Further bounded traces recover curve evaluation at `0xa5ad40` as `(A × B^reps + C) × (1 + progress)` and inverse evaluation at `0xa5cfd8` as `log((weight − C) / A) / log(B)`, with null for NaN. The constructor at `0xa5a3a0` sets `C = A × B × 0.25`. The analytics recovery resolves that constant from snapshot double reference 77392. These expressions do not establish the fit inputs or a complete progression policy.
+
+`getAutoTargetTotalRepsAndWeight` enumerates candidate reps and loads and compares weighted distance costs near `0xa5db24`. It is not evidence for a fixed load increment. The complete candidate constraints, tie-breaking, and history-to-target contract remain unresolved.
+
 The following missing contracts block a coherent history-based progression port:
 
-- Which completed sets and prior workouts enter the curve fit, and how edits, plan changes, set kinds, and dates affect selection.
+- How eligible logs and prior workouts reach the next-target curve, and how edits, plan changes, set kinds, and dates affect selection. The source filters non-skipped, nonempty logs rather than a local completed flag.
 - How `expectationDifference`, `repRatio`, performed reps, and RIR map to below, within, and above-target outcomes, including equality boundaries.
 - The complete `XRmCurve` fit, default curve, prior-curve update, and conversion back to a requested rep range and load.
 - Conversion of added load, assistance, and bodyweight into `Weight`, including sign, bodyweight fraction, and unit behavior.
@@ -80,6 +94,12 @@ No guessed load increase, plateau rule, rep-range rule, or generic one-rep-max e
 
 The recovery reads retained metadata and bounded ARM64 disassembly. It does not execute source instructions or mutate a source phone, account, or emulator. The retained REA Dart result remains unsupported. No successful Dart decompilation is claimed.
 
-Private source binaries, indexed chapters 02, 06, and 08, contact sheets, and disassembly remain unpublished. Local traces and build logs are excluded under `.amp/in/artifacts/progression-recovery/`.
+Private source binaries, indexed chapters 02, 06, and 08, contact sheets, and disassembly remain unpublished. Current local traces and build logs are excluded under `.amp/in/artifacts/progression/`. Earlier transform traces remain under the recovery worktree's `.amp/in/artifacts/progression-recovery/`.
 
-The targeted JVM check is `:app:testDebugUnitTest --tests org.openfactor.app.DeloadTest`, run from `openfactor/` under the allocated shared Gradle lock. The helper has no UI appearance changes. It needs no emulator, and this worker performs no device operations.
+The combined validation copy contains these changes and the coordinated logger `SetKind` dependency. Under the shared Gradle lock, `:app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest` passes, including 93 JVM tests with no failures or skips. Tests cover asymmetric endpoints, current-anchor edits, explicit precedence, wrong sentinels, missing metrics, old backups, RIR 13, kinds, skipped and empty overrides, rest zero, and unrelated data preservation.
+
+All six `TrainingFlowTest` native tests pass on the worker validation APK, including `deloadPlacementAndOverridesSurviveStoreRestartAndStartThroughViewModel`. That test verifies FIRST-derived and LAST-explicit sessions, real store restart, unchanged unrelated history and body data, and backup round-trip.
+
+The synthetic native UI flow passes ordinary, None, FIRST, LAST, no-edit Save, custom edit, reset, Cancel, system Back, process restart, missing Metrics, and 1.3× font cases. Inspected renders show the expected period order, two FIRST sets at 6–7 reps with RIR 13/12, four LAST sets at 2–6 with RIR 9/8/7/6, blank actuals, and the missing-metadata explanation. Longer sheet content remains scrollable above fixed actions. Artifacts are local under `.amp/in/artifacts/deload-native/`.
+
+The assembled app hash is `ee00ce70e89f341893153ed254a8119dccf670488fae07a8a48ffe418eebc9cd`. The installed validation copy, signed with the emulator's existing debug key, has hash `f79b63c9ff5f31bcb862fa1565e6a80090224c08c78cc6181b40340f8e4a5440`. These are worker checks with the logger kind dependency, not parent combined-APK acceptance. Static source traces and local synthetic outcomes are not an executed source-parity comparison.

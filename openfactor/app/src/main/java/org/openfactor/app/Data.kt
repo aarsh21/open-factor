@@ -820,7 +820,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         val workout =
             d.programs
                 .find { it.id == programId }
-                ?.toWorkout(dayId, cycle, System.currentTimeMillis(), d.exerciseDefaults) ?: return false
+                ?.toWorkout(dayId, cycle, System.currentTimeMillis(), d.exerciseDefaults, exercises()) ?: return false
         update { it.copy(active = workout) }
         return true
     }

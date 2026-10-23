@@ -48,6 +48,55 @@ class TrainingFlowTest {
     }
 
     @Test
+    fun deloadPlacementAndOverridesSurviveStoreRestartAndStartThroughViewModel() {
+        val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as android.app.Application
+        var vm = WorkoutViewModel(app)
+        val backup = vm.export()
+        val before = vm.data.value
+        try {
+            vm.discard()
+            val exercise = vm.catalog.first { it.properties["Metrics"] != null && it.loggingMetrics().any { metric -> metric.isReps } }
+            val first = CycleTarget(List(3) { SetTarget("s-$it", 7, 9, 10 - it, SetKind.FAILURE) }, restSeconds = 0)
+            val last = CycleTarget(List(6) { SetTarget("l-$it", 3, 8, it) }, restSeconds = 65)
+            val entry = PlannedExercise("entry", exercise.id, listOf(first, last))
+            val day = ProgramDay("deload-day", "Deload storage", exercises = listOf(entry))
+            val program = TrainingProgram("deload-plan", "Deload storage", days = listOf(day), cycleCount = 2, deloadPlacement = ProgramDeload.FIRST)
+            vm.beginProgram(program)
+            vm.saveProgram(false)
+            vm = WorkoutViewModel(app)
+            assertEquals(program, vm.data.value.programs.single { it.id == program.id })
+            assertFalse(vm.startProgramDay(program.id, day.id, 999))
+            assertTrue(vm.startProgramDay(program.id, day.id, -1))
+            val active = vm.data.value.active!!
+            assertEquals(-1, active.programCycle)
+            assertEquals(listOf(13, 12), active.exercises.single().sets.map { it.targetRir })
+            assertEquals(listOf(6, 6), active.exercises.single().sets.map { it.targetRepsMin })
+            assertEquals(0, active.exercises.single().restSeconds)
+            assertTrue(active.exercises.single().sets.all { it.kind == SetKind.STANDARD && it.weightKg == null && it.reps == null })
+            assertEquals(active, WorkoutViewModel(app).data.value.active)
+            assertEquals(vm.data.value, DataCodec.decode(vm.export()))
+            vm.discard()
+            val explicit = CycleTarget(listOf(SetTarget("explicit", 17, 23, 13, SetKind.FAILURE)), restSeconds = 0)
+            val changed = program.copy(deloadPlacement = ProgramDeload.LAST, days = listOf(day.copy(exercises = listOf(entry.copy(deloadTargets = mapOf(ProgramDeload.LAST to explicit))))))
+            vm.beginProgram(changed)
+            vm.saveProgram(false)
+            vm = WorkoutViewModel(app)
+            assertFalse(vm.startProgramDay(program.id, day.id, -1))
+            assertTrue(vm.startProgramDay(program.id, day.id, 999))
+            val logged = vm.data.value.active!!.exercises.single().sets.single()
+            assertEquals(17, logged.targetRepsMin)
+            assertEquals(13, logged.targetRir)
+            assertEquals(SetKind.FAILURE, logged.kind)
+            assertEquals(before.history, vm.data.value.history)
+            assertEquals(before.scaleWeights, vm.data.value.scaleWeights)
+            assertEquals(before.progressPhotos, vm.data.value.progressPhotos)
+            assertEquals(vm.data.value, WorkoutStore(app).load())
+        } finally {
+            vm.restore(backup)
+        }
+    }
+
+    @Test
     fun exercisePinsStaySeparateFromWorkoutNotesAndDefaultsSurviveStorageAndBackup() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val vm = WorkoutViewModel(context.applicationContext as android.app.Application)

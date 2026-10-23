@@ -21,7 +21,7 @@ enum class ProgramDeload(val sourceCycle: Int) {
  * Source b78148 trims the end of the set list using floor, while b7874c rounds each rep bound.
  * Only RIR depends on the exercise's reps metric. Generated targets are not skipped.
  * Rest overrides and local set IDs are retained; the input target is never edited.
- * Source failure-to-standard normalization needs target set kinds, which SetTarget lacks.
+ * Failure sets become standard; other supported kinds are retained.
  */
 fun CycleTarget.deloadTarget(isReps: Boolean): CycleTarget =
     copy(
@@ -31,6 +31,7 @@ fun CycleTarget.deloadTarget(isReps: Boolean): CycleTarget =
                     repsMin = set.repsMin?.let { (it * 0.8).roundToInt() },
                     repsMax = set.repsMax?.let { (it * 0.8).roundToInt() },
                     rir = if (isReps) (set.rir ?: 0) + 3 else set.rir,
+                    kind = if (set.kind == SetKind.FAILURE) SetKind.STANDARD else set.kind,
                 )
             },
         skip = false,
@@ -50,3 +51,10 @@ fun List<CycleTarget>.targetForDeload(
         ?: (if (placement == ProgramDeload.FIRST) firstOrNull() else lastOrNull())
             ?.deloadTarget(isReps)
         ?: CycleTarget()
+
+/** Missing metric facts cannot be replaced by loggingMetrics' legacy Weight/Reps default. */
+fun PlannedExercise.targetForDeload(placement: ProgramDeload, exercise: Exercise?): CycleTarget? =
+    deloadTargets[placement] ?: run {
+        if (exercise?.properties?.get("Metrics") == null) return null
+        cycles.targetForDeload(placement, exercise.loggingMetrics().any { it.isReps })
+    }

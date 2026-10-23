@@ -9,6 +9,7 @@ data class SetTarget(
     val repsMin: Int? = null,
     val repsMax: Int? = null,
     val rir: Int? = null,
+    val kind: SetKind = SetKind.STANDARD,
 )
 
 data class CycleTarget(
@@ -21,6 +22,7 @@ data class PlannedExercise(
     val id: String = newId(),
     val exerciseId: String,
     val cycles: List<CycleTarget> = List(7) { CycleTarget() },
+    val deloadTargets: Map<ProgramDeload, CycleTarget> = emptyMap(),
 )
 
 data class ProgramDay(
@@ -44,6 +46,7 @@ data class TrainingProgram(
     val cycleCount: Int = 7,
     val icon: String = "rocket",
     val cycleUnit: ProgramCycleUnit = ProgramCycleUnit.CYCLE,
+    val deloadPlacement: ProgramDeload? = null,
 )
 
 /** Local resize policy: keep existing cycles; new cycles copy the final prescription. */
@@ -144,12 +147,17 @@ fun TrainingProgram.toWorkout(
     cycle: Int,
     now: Long,
     defaults: Map<String, ExerciseDefaults> = emptyMap(),
+    catalog: List<Exercise> = emptyList(),
 ): Workout? {
     val day = days.find { it.id == dayId } ?: return null
-    if (cycle !in 0 until cycleCount) return null
+    val deload = deloadPlacement?.takeIf { it.sourceCycle == cycle }
+    if (cycle !in 0 until cycleCount && deload == null) return null
     val session =
         day.exercises.mapNotNull { planned ->
-            val targets = planned.cycles.getOrNull(cycle) ?: return@mapNotNull null
+            val targets =
+                if (deload == null) planned.cycles.getOrNull(cycle) ?: return@mapNotNull null
+                // Reject the whole session rather than silently drop unknown exercises.
+                else planned.targetForDeload(deload, catalog.find { it.id == planned.exerciseId }) ?: return null
             if (targets.skip || targets.sets.isEmpty()) return@mapNotNull null
             newSessionExercise(
                 exerciseId = planned.exerciseId,
@@ -160,6 +168,7 @@ fun TrainingProgram.toWorkout(
                             targetRepsMin = it.repsMin,
                             targetRepsMax = it.repsMax,
                             targetRir = it.rir,
+                            kind = it.kind,
                         )
                     },
                 restSeconds = targets.restSeconds,
@@ -181,7 +190,42 @@ fun TrainingProgram.toWorkout(
 object ProgramCodec {
     private fun JSONArray.objects(): List<JSONObject> = (0 until length()).map { getJSONObject(it) }
 
-    private fun JSONObject.nullInt(key: String): Int? = if (isNull(key)) null else getInt(key)
+    private fun encodeTarget(c: CycleTarget): JSONObject =
+        JSONObject()
+            .put("skip", c.skip)
+            .put("restSeconds", c.restSeconds)
+            .put("sets", JSONArray(c.sets.map { s ->
+                JSONObject()
+                    .put("id", s.id)
+                    .put("repsMin", s.repsMin)
+                    .put("repsMax", s.repsMax)
+                    .put("rir", s.rir)
+                    .put("kind", s.kind.name)
+            }))
+
+    private fun decodeTarget(c: JSONObject, deload: Boolean = false): CycleTarget {
+        fun optionalInt(j: JSONObject, key: String): Int? {
+            if (j.isNull(key)) return null
+            if (deload) require(j.get(key) is Int) { "Invalid deload $key" }
+            return j.getInt(key)
+        }
+        val rest = optionalInt(c, "restSeconds")
+        require(rest == null || rest in 0..1800) { "Invalid program rest timer" }
+        val sets = c.getJSONArray("sets").objects().map { s ->
+            val min = optionalInt(s, "repsMin")
+            val max = optionalInt(s, "repsMax")
+            val rir = optionalInt(s, "rir")
+            require(min == null || min in 1..9999) { "Invalid minimum reps" }
+            require(max == null || max in 1..9999) { "Invalid maximum reps" }
+            require(min == null || max == null || min <= max) { "Minimum reps exceeds maximum" }
+            require(rir == null || rir in 0..(if (deload) 13 else 10)) { "Invalid target RIR" }
+            val kind = if (s.has("kind")) SetKind.valueOf(s.getString("kind")) else SetKind.STANDARD
+            SetTarget(s.getString("id"), min, max, rir, kind)
+        }
+        require(sets.map { it.id }.distinct().size == sets.size) { "Duplicate program set" }
+        if (deload && c.has("skip")) require(c.get("skip") is Boolean) { "Invalid deload skip" }
+        return CycleTarget(sets, c.optBoolean("skip"), rest)
+    }
 
     fun encode(p: TrainingProgram): JSONObject =
         JSONObject()
@@ -191,6 +235,7 @@ object ProgramCodec {
             .put("cycleCount", p.cycleCount)
             .put("icon", p.icon)
             .put("cycleUnit", p.cycleUnit.name)
+            .put("deloadPlacement", p.deloadPlacement?.name)
             .put(
                 "days",
                 JSONArray(
@@ -208,32 +253,18 @@ object ProgramCodec {
                                             .put("exerciseId", e.exerciseId)
                                             .put(
                                                 "cycles",
-                                                JSONArray(
-                                                    e.cycles.map { c ->
-                                                        JSONObject()
-                                                            .put("skip", c.skip)
-                                                            .put("restSeconds", c.restSeconds)
-                                                            .put(
-                                                                "sets",
-                                                                JSONArray(
-                                                                    c.sets.map { s ->
-                                                                        JSONObject()
-                                                                            .put("id", s.id)
-                                                                            .put(
-                                                                                "repsMin",
-                                                                                s.repsMin,
-                                                                            )
-                                                                            .put(
-                                                                                "repsMax",
-                                                                                s.repsMax,
-                                                                            )
-                                                                            .put("rir", s.rir)
-                                                                    }
-                                                                ),
-                                                            )
-                                                    }
-                                                ),
+                                                JSONArray(e.cycles.map(::encodeTarget)),
                                             )
+                                            .also { encoded ->
+                                                if (e.deloadTargets.isNotEmpty()) encoded.put(
+                                                    "deloadTargets",
+                                                    JSONObject().also { overrides ->
+                                                        e.deloadTargets.forEach { (placement, target) ->
+                                                            overrides.put(placement.name, encodeTarget(target))
+                                                        }
+                                                    },
+                                                )
+                                            }
                                     }
                                 ),
                             )
@@ -252,49 +283,22 @@ object ProgramCodec {
                     day.optString("gymId").takeIf { it.isNotBlank() && it != "null" },
                     day.getJSONArray("exercises").objects().map { e ->
                         val cycles =
-                            e.getJSONArray("cycles").objects().map { c ->
-                                val rest = c.nullInt("restSeconds")
-                                require(rest == null || rest in 0..1800) {
-                                    "Invalid program rest timer"
-                                }
-                                CycleTarget(
-                                    c.getJSONArray("sets").objects().map { s ->
-                                        val min = s.nullInt("repsMin")
-                                        val max = s.nullInt("repsMax")
-                                        val rir = s.nullInt("rir")
-                                        require(min == null || min in 1..9999) {
-                                            "Invalid minimum reps"
-                                        }
-                                        require(max == null || max in 1..9999) {
-                                            "Invalid maximum reps"
-                                        }
-                                        require(min == null || max == null || min <= max) {
-                                            "Minimum reps exceeds maximum"
-                                        }
-                                        require(rir == null || rir in 0..10) {
-                                            "Invalid target RIR"
-                                        }
-                                        SetTarget(s.getString("id"), min, max, rir)
-                                    },
-                                    c.optBoolean("skip"),
-                                    rest,
-                                )
-                            }
+                            e.getJSONArray("cycles").objects().map { decodeTarget(it) }
                         require(cycles.size == count) { "Program exercise cycle count differs" }
-                        PlannedExercise(e.getString("id"), e.getString("exerciseId"), cycles)
+                        val overrides = if (e.has("deloadTargets")) {
+                            val targets = e.getJSONObject("deloadTargets")
+                            targets.keys().asSequence().associate { key ->
+                                val placement = ProgramDeload.valueOf(key)
+                                placement to decodeTarget(targets.getJSONObject(key), deload = true)
+                            }
+                        } else emptyMap()
+                        PlannedExercise(e.getString("id"), e.getString("exerciseId"), cycles, overrides)
                     },
                 )
             }
         days.forEach { day ->
             require(day.exercises.map { it.id }.distinct().size == day.exercises.size) {
                 "Duplicate program exercise"
-            }
-            day.exercises.forEach { exercise ->
-                exercise.cycles.forEach { cycle ->
-                    require(cycle.sets.map { it.id }.distinct().size == cycle.sets.size) {
-                        "Duplicate program set"
-                    }
-                }
             }
         }
         require(days.isNotEmpty()) { "Program needs at least one day" }
@@ -310,6 +314,7 @@ object ProgramCodec {
                 require(value in ProgramCycleUnit.entries.map { it.name }) { "Invalid cycle unit" }
                 ProgramCycleUnit.valueOf(value)
             },
+            if (j.isNull("deloadPlacement")) null else ProgramDeload.valueOf(j.getString("deloadPlacement")),
         )
     }
 }

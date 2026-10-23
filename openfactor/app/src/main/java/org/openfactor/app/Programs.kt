@@ -86,7 +86,7 @@ fun ProgramLibrary(
 ) {
     var deleting by remember { mutableStateOf<TrainingProgram?>(null) }
     var replaceDraft by remember { mutableStateOf<TrainingProgram?>(null) }
-    var cycle by rememberSaveable { mutableIntStateOf(0) }
+    val catalog = vm.exercises()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
             PageHeading(
@@ -115,6 +115,9 @@ fun ProgramLibrary(
                 }
             }
         items(data.programs, key = { it.id }) { p ->
+            val periods = p.deloadPlacement?.cycleKeys(p.cycleCount) ?: (0 until p.cycleCount).toList()
+            var selectedPeriod by rememberSaveable(p.id) { mutableIntStateOf(periods.first()) }
+            val cycle = selectedPeriod.takeIf { it in periods } ?: periods.first()
             Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -153,15 +156,21 @@ fun ProgramLibrary(
                     Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    (0 until p.cycleCount).forEach { n ->
+                    periods.forEach { n ->
                         FilterChip(
                             cycle == n,
-                            { cycle = n },
-                            label = { Text("${p.cycleUnit.singular} ${n + 1}") },
+                            { selectedPeriod = n },
+                            label = { Text(if (n in 0 until p.cycleCount) "${p.cycleUnit.singular} ${n + 1}" else "Deload") },
                         )
                     }
                 }
                 p.days.forEach { day ->
+                    val deload = p.deloadPlacement?.takeIf { it.sourceCycle == cycle }
+                    val targets = day.exercises.map { planned ->
+                        if (deload == null) planned.cycles.getOrNull(cycle)
+                        else planned.targetForDeload(deload, catalog.find { it.id == planned.exerciseId })
+                    }
+                    val missingMetrics = deload != null && targets.any { it == null }
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -178,17 +187,17 @@ fun ProgramLibrary(
                         }
                         if (day.exercises.isNotEmpty())
                             TextButton(
-                                { onStart(p.id, day.id, cycle.coerceIn(0, p.cycleCount - 1)) },
-                                enabled =
-                                    day.exercises.any { e ->
-                                        e.cycles
-                                            .getOrNull(cycle.coerceIn(0, p.cycleCount - 1))
-                                            ?.let { !it.skip && it.sets.isNotEmpty() } == true
-                                    },
+                                { onStart(p.id, day.id, cycle) },
+                                enabled = !missingMetrics && targets.any { it != null && !it.skip && it.sets.isNotEmpty() },
                             ) {
                                 Text("Start ${day.name}")
                             }
                     }
+                    if (missingMetrics) Text(
+                        "Deload unavailable: exercise metric information is missing. Choose a normal ${p.cycleUnit.singular.lowercase()} or replace the exercise.",
+                        color = OF.muted,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
                 HorizontalDivider(color = OF.line)
             }
@@ -389,6 +398,7 @@ fun ProgramEditor(
     var options by remember { mutableStateOf(false) }
     var gymMenu by remember { mutableStateOf(false) }
     var targetId by rememberSaveable { mutableStateOf<String?>(null) }
+    var deloadTargetId by rememberSaveable { mutableStateOf<String?>(null) }
     fun editDay(block: (ProgramDay) -> ProgramDay) =
         vm.editProgramDraft { plan ->
             plan.copy(days = plan.days.map { if (it.id == day.id) block(it) else it })
@@ -723,6 +733,20 @@ fun ProgramEditor(
                                 )
                         }
                     }
+                    p.deloadPlacement?.let { placement ->
+                        val target = planned.targetForDeload(placement, e)
+                        TextButton(
+                            { deloadTargetId = planned.id },
+                            enabled = target != null,
+                        ) {
+                            Text("Deload · ${if (placement in planned.deloadTargets) "Custom targets" else "Derived targets"}")
+                        }
+                        if (target == null) Text(
+                            "Deload unavailable: exercise metric information is missing.",
+                            color = OF.muted,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
             }
         }
@@ -781,6 +805,33 @@ fun ProgramEditor(
                 targetId = null
             }
         }
+    p.deloadPlacement?.let { placement ->
+        day.exercises.find { it.id == deloadTargetId }?.let { planned ->
+            val exercise = exercises.find { it.id == planned.exerciseId }
+            planned.targetForDeload(placement, exercise)?.let { target ->
+                ProgramTargets(
+                    planned.copy(cycles = listOf(target)),
+                    exercise?.title ?: "Exercise",
+                    p.cycleUnit,
+                    { deloadTargetId = null },
+                    deload = placement,
+                    onReset = if (placement !in planned.deloadTargets) null else ({
+                        editDay { d -> d.copy(exercises = d.exercises.map {
+                            if (it.id == planned.id) it.copy(deloadTargets = it.deloadTargets - placement) else it
+                        }) }
+                        deloadTargetId = null
+                    }),
+                ) { changed, _ ->
+                    changed[0]?.let { override ->
+                        editDay { d -> d.copy(exercises = d.exercises.map {
+                            if (it.id == planned.id) it.copy(deloadTargets = it.deloadTargets + (placement to override)) else it
+                        }) }
+                    }
+                    deloadTargetId = null
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -815,8 +866,9 @@ private fun ProgramOptions(
     var color by remember { mutableLongStateOf(p.color) }
     var icon by remember { mutableStateOf(p.icon) }
     var count by remember { mutableIntStateOf(p.cycleCount) }
+    var deload by rememberSaveable { mutableStateOf(p.deloadPlacement) }
     var reducing by remember { mutableStateOf(false) }
-    fun save() = onSave(p.resizeCycles(count).copy(name = name.trim(), color = color, icon = icon))
+    fun save() = onSave(p.resizeCycles(count).copy(name = name.trim(), color = color, icon = icon, deloadPlacement = deload))
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -843,6 +895,28 @@ private fun ProgramOptions(
                     color = OF.muted,
                     style = MaterialTheme.typography.bodySmall,
                 )
+                Text("Deload", style = MaterialTheme.typography.titleMedium)
+                Column(Modifier.selectableGroup()) {
+                    listOf(null, ProgramDeload.FIRST, ProgramDeload.LAST).forEach { placement ->
+                        val label = when (placement) {
+                            null -> "None"
+                            ProgramDeload.FIRST -> "First ${p.cycleUnit.singular}"
+                            ProgramDeload.LAST -> "Last ${p.cycleUnit.singular}"
+                        }
+                        Row(
+                            Modifier.fillMaxWidth().selectable(
+                                selected = deload == placement,
+                                role = Role.RadioButton,
+                                onClick = { deload = placement },
+                            ).heightIn(min = 48.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = deload == placement, onClick = null)
+                            Text(label, Modifier.padding(start = 12.dp))
+                        }
+                    }
+                }
+                Text("Adds a separate deload without replacing normal ${p.cycleUnit.plural.lowercase()}. Changes apply to this draft when you save.", color = OF.muted, style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(
                     name,
                     { name = it },
@@ -879,13 +953,14 @@ private data class TargetInput(
     val min: String = "",
     val max: String = "",
     val rir: String = "",
+    val kind: SetKind = SetKind.STANDARD,
 ) {
-    fun valid() =
+    fun valid(maxRir: Int = 10) =
         listOf(min, max).all { it.isEmpty() || (it.toIntOrNull() ?: 0) in 1..9999 } &&
             (min.isEmpty() || max.isEmpty() || min.toInt() <= max.toInt()) &&
-            (rir.isEmpty() || (rir.toIntOrNull() ?: -1) in 0..10)
+            (rir.isEmpty() || (rir.toIntOrNull() ?: -1) in 0..maxRir)
 
-    fun target() = SetTarget(id, min.toIntOrNull(), max.toIntOrNull(), rir.toIntOrNull())
+    fun target() = SetTarget(id, min.toIntOrNull(), max.toIntOrNull(), rir.toIntOrNull(), kind)
 }
 
 private enum class TargetCycleScope {
@@ -901,15 +976,18 @@ private fun ProgramTargets(
     name: String,
     unit: ProgramCycleUnit,
     onDismiss: () -> Unit,
+    deload: ProgramDeload? = null,
+    onReset: (() -> Unit)? = null,
     onSave: (Map<Int, CycleTarget>, TargetSaveScope) -> Unit,
 ) {
+    val maxRir = if (deload == null) 10 else 13
     var pending by remember(e.id) { mutableStateOf(e.cycles) }
     var savingOptions by remember { mutableStateOf(false) }
     var saveScope by remember { mutableStateOf(TargetSaveScope.EXERCISE) }
     var cycleScope by remember { mutableStateOf(TargetCycleScope.SELECTED) }
     var cycle by
         rememberSaveable(e.id) {
-            mutableIntStateOf(if (e.cycles.haveEquivalentTargets()) -1 else 0)
+            mutableIntStateOf(if (deload == null && e.cycles.haveEquivalentTargets()) -1 else 0)
         }
     var edited by remember(cycle) { mutableStateOf(false) }
     var rows by
@@ -921,6 +999,7 @@ private fun ProgramTargets(
                         it.repsMin?.toString() ?: "",
                         it.repsMax?.toString() ?: "",
                         it.rir?.toString() ?: "",
+                        it.kind,
                     )
                 }
             )
@@ -932,7 +1011,7 @@ private fun ProgramTargets(
         }
     val valid =
         rows.isNotEmpty() &&
-            rows.all { it.valid() } &&
+            rows.all { it.valid(maxRir) } &&
             (rest.isEmpty() || (rest.toIntOrNull() ?: -1) in 0..1800)
     fun committed(): List<CycleTarget> {
         val changed = CycleTarget(rows.map { it.target() }, skip, rest.toIntOrNull())
@@ -983,13 +1062,14 @@ private fun ProgramTargets(
                 textAlign = TextAlign.Center,
             )
             Text(
-                if (cycle == -1) "${e.cycles.size} ${unit.plural}"
+                if (deload != null) "Deload"
+                else if (cycle == -1) "${e.cycles.size} ${unit.plural}"
                 else "${unit.singular} ${cycle + 1}",
                 Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 textAlign = TextAlign.Center,
                 color = OF.muted,
             )
-            Row(
+            if (deload == null) Row(
                 Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
@@ -1072,7 +1152,7 @@ private fun ProgramTargets(
                                         unfocusedIndicatorColor = Color.Transparent,
                                     ),
                                 singleLine = true,
-                                isError = !input.valid(),
+                                isError = !input.valid(maxRir),
                                 keyboardOptions =
                                     KeyboardOptions(keyboardType = KeyboardType.Number),
                             )
@@ -1092,7 +1172,7 @@ private fun ProgramTargets(
                                         unfocusedIndicatorColor = Color.Transparent,
                                     ),
                                 singleLine = true,
-                                isError = !input.valid(),
+                                isError = !input.valid(maxRir),
                                 keyboardOptions =
                                     KeyboardOptions(keyboardType = KeyboardType.Number),
                             )
@@ -1112,7 +1192,7 @@ private fun ProgramTargets(
                                     Text(input.rir.ifEmpty { "–" })
                                 }
                                 DropdownMenu(rirMenu, { rirMenu = false }) {
-                                    (listOf("") + (0..10).map { it.toString() }).forEach { value ->
+                                    (listOf("") + (0..maxRir).map { it.toString() }).forEach { value ->
                                         DropdownMenuItem(
                                             text = { Text(value.ifEmpty { "Not set" }) },
                                             onClick = {
@@ -1166,11 +1246,11 @@ private fun ProgramTargets(
                 )
                 if (!valid)
                     Text(
-                        "Use reps 1–9999 with minimum ≤ maximum, RIR 0–10, and rest 0–1800 seconds. Keep at least one set.",
+                        "Use reps 1–9999 with minimum ≤ maximum, RIR 0–$maxRir, and rest 0–1800 seconds. Keep at least one set.",
                         color = MaterialTheme.colorScheme.error,
                     )
             }
-            if (cycle >= 0)
+            if (cycle >= 0 && deload == null)
                 TextButton(
                     { save(TargetSaveScope.EXERCISE, TargetCycleScope.ALL) },
                     Modifier.fillMaxWidth(),
@@ -1184,9 +1264,8 @@ private fun ProgramTargets(
                 Modifier.padding(top = 16.dp).fillMaxWidth(),
                 enabled = valid,
             )
-            TextButton({ savingOptions = true }, Modifier.fillMaxWidth(), enabled = valid) {
-                Text("More Options")
-            }
+            if (deload == null) TextButton({ savingOptions = true }, Modifier.fillMaxWidth(), enabled = valid) { Text("More Options") }
+            if (onReset != null) TextButton(onReset, Modifier.fillMaxWidth()) { Text("Use Derived Targets") }
             TextButton(onDismiss, Modifier.fillMaxWidth()) { Text("Cancel") }
         }
     }
