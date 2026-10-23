@@ -66,15 +66,17 @@ The source scores duration differences after truncation to whole milliseconds. E
 
 ## Factual catalog projection
 
-`tooling/import_reference_apk.py --facts-only` preserves eight original fields under `generationFacts`, without source instructions or media. Six fields contain nullable numbers. Their names combine `strength` or `hypertrophy` with `PrimaryCompoundRecommendationLevel`, `SecondaryCompoundRecommendationLevel`, or `AccessoryRecommendationLevel`. The two list fields are `exerciseClassificationStrength` and `exerciseClassificationHypertrophy`; their values remain ordered source descriptor IDs.
+`tooling/import_reference_apk.py --facts-only` preserves nine original fields under `generationFacts`, without source instructions or media. Six fields contain nullable numbers. Their names combine `strength` or `hypertrophy` with `PrimaryCompoundRecommendationLevel`, `SecondaryCompoundRecommendationLevel`, or `AccessoryRecommendationLevel`. The three list fields are `exerciseClassificationStrength`, `exerciseClassificationHypertrophy`, and `exclusionGroupings`; their values remain ordered source IDs. Exclusion groupings remain separate from `exerciseGroup` and are not inferred from exercise names or equipment.
 
-`ExerciseGenerationFacts` distinguishes an absent map key, an explicit null value, and an empty descriptor list. The decoder accepts only the eight named fields and rejects invalid types and nonfinite numbers. A new custom exercise has no inferred generation facts. Explicit facts survive backup encoding.
+`ExerciseGenerationFacts` distinguishes an absent map key, an explicit null value, and an empty descriptor list. The decoder accepts only the nine named fields and rejects invalid types and nonfinite numbers. A new custom exercise has no inferred generation facts. Explicit facts survive backup encoding.
 
 `DataCodec.catalog(text, bundled)` enriches older imported records by exact ID. Bundled facts fill missing keys only. Imported nulls, empty lists, zero ranks, names, and media remain unchanged. The existing Region and Movement Patterns enrichment keeps the same precedence and does not copy other properties.
 
 The source serializer at `6c9f94` through `6ca0cc` maps import offsets `0x5f`, `0x63`, `0x67`, `0x6b`, `0x6f`, and `0x73` to the six recommendation fields. At `6ca100` and `6ca160`, offsets `0x77` and `0x7b` map to the classification lists. The Exercise constructor at `6d3180` through `6d3274` converts those lists into descriptor fields `0x47` and `0x4b`.
 
 The goal/descriptor accessor at `ed97e4` uses strength recommendations for strength and hypertrophy recommendations for hypertrophy. For both, it uses strength primary-compound recommendations but hypertrophy secondary-compound and accessory recommendations. Descriptor filtering at `edb26c` follows the same goal/role choice. This mapping does not establish the complete ranking policy.
+
+The serializer maps import slot `0x4b` to `exclusionGroupings`. Selector closure `edacf8` counts previous templates whose exercise exclusion IDs intersect the candidate's IDs (`edadac` through `ed9698`). The source has this list on all 1,345 records, including 179 explicit empty lists. Preserving it does not implement that selection policy.
 
 ## Unresolved upstream behavior
 
@@ -100,6 +102,6 @@ The progression unit owns recovered deload transforms. Persisted deload placemen
 
 An offline Unicorn probe executes the original candidate enumerators, cost routine, and minimum comparator. It supplies VM allocation, yield, collection, and arithmetic shims; it does not run a Dart VM or the source app. The matrix transcribes setup arithmetic separately. Neither check proves full-service or app-level equivalence. Reproduction scripts and outputs remain in the locally excluded `.amp/in/artifacts/smart-generation/` directory.
 
-`ExerciseGenerationFactsTest` checks decoding, backup round-trip, invalid types, and missing-key enrichment without replacing imported nulls or empty lists. The facts-only projection retains all 1,345 exercise IDs in order and every previous public catalog fact. The eight added fields match the retained APK records exactly. The shared private reference pack remains untouched.
+`ExerciseGenerationFactsTest` checks decoding, backup round-trip, invalid types, and missing-key enrichment without replacing imported nulls or empty lists. The facts-only projection retains all 1,345 exercise IDs in order and every previous public catalog fact. The nine added fields match the retained APK records exactly. The shared private reference pack remains untouched.
 
 These tests do not validate exercise selection under contrasting equipment, focus, duration, or experience. Those upstream contracts are unresolved. No source account or device mutation is part of this recovery.

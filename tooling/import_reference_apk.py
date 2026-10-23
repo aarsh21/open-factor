@@ -121,7 +121,7 @@ def build(apk: Path, dest: Path, video_directory: Path | None = None, public_dat
                 # Preserve original descriptor IDs, null ranks, empty lists, and absent fields.
                 # These are generator facts, not searchBoost or inferred exercise classifications.
                 'generationFacts':{field:record[field] for field in (
-                    'exerciseClassificationStrength','exerciseClassificationHypertrophy',
+                    'exerciseClassificationStrength','exerciseClassificationHypertrophy','exclusionGroupings',
                     'strengthPrimaryCompoundRecommendationLevel','strengthSecondaryCompoundRecommendationLevel',
                     'strengthAccessoryRecommendationLevel','hypertrophyPrimaryCompoundRecommendationLevel',
                     'hypertrophySecondaryCompoundRecommendationLevel','hypertrophyAccessoryRecommendationLevel') if field in record},

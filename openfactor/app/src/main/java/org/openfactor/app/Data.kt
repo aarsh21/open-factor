@@ -335,7 +335,7 @@ object DataCodec {
             .put("resistanceEquipment", JSONArray(resistanceEquipment.map { JSONArray(it.toList()) }))
             .put("supportEquipment", JSONArray(supportEquipment.map { JSONArray(it.toList()) }))
             .also {
-                if (generationFacts.classifications.isNotEmpty() || generationFacts.recommendationLevels.isNotEmpty()) {
+                if (generationFacts.descriptorLists.isNotEmpty() || generationFacts.recommendationLevels.isNotEmpty()) {
                     it.put("generationFacts", generationFacts.json())
                 }
             }
@@ -572,7 +572,7 @@ object DataCodec {
             if (facts == null) exercise else exercise.copy(
                 properties = facts.properties.filterKeys { it in listOf("Region", "Movement Patterns") } + exercise.properties,
                 generationFacts = ExerciseGenerationFacts(
-                    facts.generationFacts.classifications + exercise.generationFacts.classifications,
+                    facts.generationFacts.descriptorLists + exercise.generationFacts.descriptorLists,
                     facts.generationFacts.recommendationLevels + exercise.generationFacts.recommendationLevels,
                 ),
             )
