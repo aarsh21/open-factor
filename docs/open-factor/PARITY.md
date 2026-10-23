@@ -50,6 +50,23 @@ Use these evidence distinctions:
 An empty chart cannot establish a populated chart's calculation. A draft cannot
 establish save/reload behavior. A default value cannot establish an algorithm.
 
+### Derived analytics recovery
+
+The [derived analytics report](reviews/derived-analytics-01.md) records partial
+ARM64 recovery of persisted-set eligibility, side-volume arithmetic, strength
+curves and Weight Trend initialization. Twelve synthetic-memory checks execute
+the original scalar helper bytes. They distinguish skipped from empty logs and
+verify full plus one-third partial repetitions for volume. Source session
+isComplete and persisted isSkipped are different fields with an unresolved
+conversion; local completion must not be presented as that source policy.
+
+Ordinary paired volume sums both side workloads; strength uses a separate side
+mean. Persistent-per-side volume has another branch. The recovered curve and
+smoothing fragments do not establish their complete caller contracts. Weight
+Trend, records and estimated 1-RM remain unavailable, not accepted as equivalent
+to conventional substitute formulas. This is binary evidence, not a populated
+source UI comparison or a combined application acceptance pass.
+
 ## Cycles are real; the full program policy is not recovered
 
 The current source phone literally displays **Cycle 1**. Retained manual-program

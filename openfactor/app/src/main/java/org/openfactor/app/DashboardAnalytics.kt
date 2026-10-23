@@ -181,7 +181,7 @@ internal fun DashboardTiles(
                                 metrics.history
                                     .flatMap { it.exercises }
                                     .filter { it.exerciseId == id }
-                                    .sumOf { e -> e.sets.count { it.completed && !it.warmup } }
+                                    .sumOf { it.completedWorkingSets() }
                             DashboardRow(
                                 exercise?.title ?: "Unavailable exercise",
                                 "$sets saved working sets · 1-RM unavailable",
@@ -294,21 +294,35 @@ internal fun DashboardDetail(
                         if (key.startsWith("exercise:"))
                             workout.exercises
                                 .filter { it.exerciseId == key.removePrefix("exercise:") }
-                                .flatMap { it.sets }
-                                .filter { it.completed }
-                                .forEach { set ->
-                                    Text(
-                                        listOfNotNull(
-                                                set.weightKg?.let {
-                                                    "${it.displayWeight(data.preferences.pounds)} ${if (data.preferences.pounds) "lb" else "kg"}"
-                                                },
-                                                set.reps?.let { "$it reps" },
-                                                set.durationSeconds?.let { "${it.bodyNumber()} s" },
-                                                set.distanceMeters?.let { "${it.bodyNumber()} m" },
-                                                if (set.warmup) "Warm-up" else null,
-                                            )
-                                            .joinToString(" · ")
-                                    )
+                                .flatMap { it.logicalSets() }
+                                .forEachIndexed { index, logical ->
+                                    logical.components.forEachIndexed { componentIndex, logs ->
+                                        logs
+                                            .filter { it.completed }
+                                            .forEach { set ->
+                                                Text(
+                                                    listOfNotNull(
+                                                            "Set ${index + 1}",
+                                                            set.side?.label,
+                                                            if (componentIndex > 0)
+                                                                "Myo $componentIndex"
+                                                            else null,
+                                                            set.weightKg?.let {
+                                                                "${it.displayWeight(data.preferences.pounds)} ${if (data.preferences.pounds) "lb" else "kg"}"
+                                                            },
+                                                            set.reps?.let { "$it reps" },
+                                                            set.durationSeconds?.let {
+                                                                "${it.bodyNumber()} s"
+                                                            },
+                                                            set.distanceMeters?.let {
+                                                                "${it.bodyNumber()} m"
+                                                            },
+                                                            if (set.warmup) "Warm-up" else null,
+                                                        )
+                                                        .joinToString(" · ")
+                                                )
+                                            }
+                                    }
                                 }
                     }
                     HorizontalDivider(color = OF.line)

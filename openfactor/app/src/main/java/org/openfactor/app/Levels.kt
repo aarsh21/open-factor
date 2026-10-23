@@ -61,8 +61,7 @@ fun muscleContributions(
     return exercises
         .filter { muscle in it.muscles || muscle in it.secondary }
         .mapNotNull { e ->
-            val count =
-                sets[e.id].orEmpty().sumOf { se -> se.sets.count { it.completed && !it.warmup } }
+            val count = sets[e.id].orEmpty().sumOf { it.completedWorkingSets() }
             // Retained ARM64 helper 0xd881ac: primary feature group 1, secondary 0.5.
             val factor = if (muscle in e.muscles) 1.0 else 0.5
             if (count > 0) MuscleContribution(e, count, count * factor) else null

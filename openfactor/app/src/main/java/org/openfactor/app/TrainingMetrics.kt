@@ -9,9 +9,14 @@ fun averageWeeklySets(sets: Int, days: Int): Double {
     return sets * 7.0 / days
 }
 
-/** Dashboard/Levels count completed working sets; warm-ups remain in session history. */
-fun Workout.completedWorkingSets() =
-    exercises.sumOf { e -> e.sets.count { it.completed && !it.warmup } }
+/**
+ * Count logical working sets with any completed actual, not each side or extra segment. This
+ * preserves local completion eligibility; source persisted isSkipped is a separate contract.
+ */
+fun SessionExercise.completedWorkingSets() =
+    logicalSets().count { !it.root.warmup && it.logs.any { log -> log.completed } }
+
+fun Workout.completedWorkingSets() = exercises.sumOf { it.completedWorkingSets() }
 
 /** Prefer the live copy, so finishing/importing a session cannot count its identity twice. */
 fun AppData.trainingWorkouts(): List<Workout> =
@@ -20,7 +25,7 @@ fun AppData.trainingWorkouts(): List<Workout> =
 data class TrainingTotals(val sets: Int = 0, val exercises: Int = 0, val muscles: Int = 0)
 
 private fun List<SessionExercise>.totals(catalog: List<Exercise>): TrainingTotals {
-    val working = filter { e -> e.sets.any { it.completed && !it.warmup } }
+    val working = filter { it.completedWorkingSets() > 0 }
     val ids = working.map { it.exerciseId }.toSet()
     val muscles =
         catalog
@@ -28,11 +33,7 @@ private fun List<SessionExercise>.totals(catalog: List<Exercise>): TrainingTotal
             .flatMap { it.muscles + it.secondary }
             .filter { it.isNotBlank() }
             .toSet()
-    return TrainingTotals(
-        working.sumOf { e -> e.sets.count { it.completed && !it.warmup } },
-        ids.size,
-        muscles.size,
-    )
+    return TrainingTotals(working.sumOf { it.completedWorkingSets() }, ids.size, muscles.size)
 }
 
 data class DashboardMetrics(

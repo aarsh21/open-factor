@@ -92,6 +92,140 @@ class TrainingMetricsTest {
     }
 
     @Test
+    fun logicalCountsKeepCompletedSideWorkAndDoNotRequireEverySideOrSegment() {
+        val paired =
+            LoggedSet(
+                id = "left",
+                kind = SetKind.MYO,
+                side = SetSide.LEFT,
+                completed = true,
+                weightKg = 17.0,
+                reps = 7,
+            )
+        val extra =
+            LoggedSet(
+                id = "extra-left",
+                kind = SetKind.MYO,
+                segmentOf = paired.id,
+                side = SetSide.LEFT,
+                completed = true,
+                weightKg = 11.0,
+                reps = 3,
+            )
+        val partial = LoggedSet(id = "partial-left", side = SetSide.LEFT)
+        val extraOnly = LoggedSet(id = "extra-only-root", kind = SetKind.MYO)
+        val entry =
+            SessionExercise(
+                exerciseId = "chin",
+                sets =
+                    listOf(
+                        paired,
+                        paired.copy(
+                            id = "right",
+                            side = SetSide.RIGHT,
+                            pairId = paired.id,
+                            weightKg = 29.0,
+                            reps = 4,
+                        ),
+                        extra,
+                        extra.copy(
+                            id = "extra-right",
+                            side = SetSide.RIGHT,
+                            pairId = extra.id,
+                            weightKg = 13.0,
+                            reps = 2,
+                        ),
+                        partial,
+                        partial.copy(
+                            id = "partial-right",
+                            side = SetSide.RIGHT,
+                            pairId = partial.id,
+                            completed = true,
+                            weightKg = 31.0,
+                            reps = 5,
+                        ),
+                        extraOnly,
+                        LoggedSet(
+                            kind = SetKind.MYO,
+                            segmentOf = extraOnly.id,
+                            completed = true,
+                            weightKg = 23.0,
+                            reps = 3,
+                        ),
+                        LoggedSet(completed = true, weightKg = 5.0, reps = 11),
+                        LoggedSet(completed = true, warmup = true, weightKg = 101.0, reps = 30),
+                        // Actuals do not imply local completion or source persisted !isSkipped.
+                        LoggedSet(weightKg = 99.0, reps = 9),
+                    ),
+            )
+        val saved =
+            Workout(
+                id = "logical",
+                name = "Side work",
+                startedAt = now,
+                finishedAt = now + 1,
+                exercises = listOf(entry),
+            )
+        val data = AppData(active = saved, history = listOf(saved))
+        assertEquals(4, saved.completedWorkingSets())
+        assertEquals(TrainingTotals(4, 1, 2), data.dashboardMetrics(catalog, today).totals)
+        assertEquals(
+            4.0,
+            muscleContributions(listOf(saved), catalog, 7, "Lats", today).single().weightedSets,
+            0.0,
+        )
+        assertEquals(
+            2.0,
+            muscleContributions(listOf(saved), catalog, 7, "Biceps", today).single().weightedSets,
+            0.0,
+        )
+        // 17*7 + 29*4 + 11*3 + 13*2 + 31*5 + 23*3 + 5*11.
+        // Grouping counts must neither discard right/extra actuals nor average their workload.
+        assertEquals(573.0, saved.volumeKg(), 0.0)
+        val restored = DataCodec.decode(DataCodec.encode(data)).history.single()
+        assertEquals(saved, restored)
+        assertEquals(4, restored.completedWorkingSets())
+        val undone =
+            saved.copy(
+                exercises =
+                    listOf(
+                        entry.copy(
+                            sets =
+                                entry.sets.map {
+                                    if (it.logicalRootId == paired.id) it.copy(completed = false)
+                                    else it
+                                }
+                        )
+                    )
+            )
+        assertEquals(3, undone.completedWorkingSets())
+        assertEquals(279.0, undone.volumeKg(), 0.0)
+        val blankCompleted =
+            saved.copy(exercises = listOf(entry.copy(sets = listOf(LoggedSet(completed = true)))))
+        // Retain the ordinary completed-set contract; do not silently add source emptiness rules.
+        assertEquals(1, blankCompleted.completedWorkingSets())
+        val unweighted =
+            saved.copy(
+                exercises =
+                    listOf(
+                        entry.copy(
+                            sets =
+                                listOf(
+                                    LoggedSet(completed = true, reps = 13),
+                                    LoggedSet(completed = true, reps = 5, assistanceKg = 17.0),
+                                    LoggedSet(completed = true, durationSeconds = 47.0),
+                                    LoggedSet(completed = true, distanceMeters = 283.0),
+                                    LoggedSet(durationSeconds = 89.0),
+                                )
+                        )
+                    )
+            )
+        assertEquals(4, unweighted.completedWorkingSets())
+        // Local volume still uses external weight only, not an invented body/assistance load.
+        assertEquals(0.0, unweighted.volumeKg(), 0.0)
+    }
+
+    @Test
     fun cyclePlanUsesExactSetsSkipsAndMusclesRatherThanUnrelatedTemplates() {
         val cycles =
             listOf(
