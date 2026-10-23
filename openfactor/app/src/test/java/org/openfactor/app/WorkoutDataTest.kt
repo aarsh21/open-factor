@@ -5,6 +5,22 @@ import org.junit.Test
 
 class WorkoutDataTest {
     @Test
+    fun setKindsSurviveBackupAndLegacyRowsRemainStandard() {
+        val sets = SetKind.entries.map { LoggedSet(kind = it, weightKg = 23.0, reps = 7) } + LoggedSet(warmup = true)
+        val workout = Workout(name = "Kinds", exercises = listOf(SessionExercise(exerciseId = "row", sets = sets)))
+        val data = AppData(active = workout, history = listOf(workout.copy(id = "history")))
+        assertEquals(data, DataCodec.decode(DataCodec.encode(data)))
+        val legacy = DataCodec.encode(data).replace(Regex(",?\\s*\"kind\"\\s*:\\s*\"[A-Z]+\"\\s*,?")) { match ->
+            if (match.value.startsWith(",") && match.value.endsWith(",")) "," else ""
+        }
+        assertTrue(DataCodec.decode(legacy).active!!.exercises.single().sets.all { it.kind == SetKind.STANDARD })
+        assertTrue(DataCodec.decode(legacy).active!!.exercises.single().sets.last().warmup)
+        assertThrows(IllegalArgumentException::class.java) {
+            DataCodec.decode(DataCodec.encode(data).replace("\"MYO\"", "\"UNKNOWN\""))
+        }
+    }
+
+    @Test
     fun distanceUnitsConvertMilesAndYardsWithoutChangingOtherActuals() {
         assertEquals(2414.016, SetMetric.DISTANCE_LONG.parse("1.5", false, true)!!, 0.000001)
         assertEquals(1500.0, SetMetric.DISTANCE_LONG.parse("1.5", true, false)!!, 0.0)

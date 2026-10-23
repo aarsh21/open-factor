@@ -52,6 +52,7 @@ data class LoggedSet(
     val assistanceKg: Double? = null,
     val durationSeconds: Double? = null,
     val distanceMeters: Double? = null,
+    val kind: SetKind = SetKind.STANDARD,
 )
 
 data class SessionExercise(
@@ -273,6 +274,7 @@ object DataCodec {
             .put("assistanceKg", assistanceKg)
             .put("durationSeconds", durationSeconds)
             .put("distanceMeters", distanceMeters)
+            .put("kind", kind.name)
 
     private fun SessionExercise.json() =
         JSONObject()
@@ -416,6 +418,7 @@ object DataCodec {
                     assistanceKg = s.actual("assistanceKg", 5000.0),
                     durationSeconds = s.actual("durationSeconds"),
                     distanceMeters = s.actual("distanceMeters"),
+                    kind = if (!s.has("kind")) SetKind.STANDARD else SetKind.valueOf(s.getString("kind")),
                 )
             },
             optString("notes"),
