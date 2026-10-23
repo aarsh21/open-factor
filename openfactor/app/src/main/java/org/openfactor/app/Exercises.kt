@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.SubcomposeAsyncImage
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ExerciseLibrary(
     exercises: List<Exercise>,
@@ -105,6 +106,7 @@ fun ExerciseLibrary(
                         .thenBy { it.id }
                 )
         }
+    val compactEmptyState = onBack == null && filtered.isEmpty() && WindowInsets.isImeVisible
     val groups =
         remember(filtered) {
             val order =
@@ -252,7 +254,7 @@ fun ExerciseLibrary(
                         muscle = it
                     }
                 }
-            Row(
+            if (!compactEmptyState) Row(
                 Modifier.horizontalScroll(rememberScrollState())
                     .padding(horizontal = 14.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -407,7 +409,7 @@ fun ExerciseLibrary(
             searchField(
                 Modifier.align(Alignment.BottomCenter)
                     .navigationBarsPadding()
-                    .padding(bottom = 88.dp)
+                    .padding(bottom = if (compactEmptyState) 0.dp else 88.dp)
             )
     }
     if (resistanceSheet) ResistanceFilterSheet(
