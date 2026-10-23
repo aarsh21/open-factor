@@ -83,11 +83,11 @@ for _ in range(4):
  adb('shell','input','swipe','540','1300','540','700','300')
 else:raise AssertionError('Program target card not found')
 tap('7 Cycles');find('Target set 1 minimum reps','content-desc')
-enter('Target set 1 minimum reps','6','content-desc');enter('Target set 1 maximum reps','10','content-desc');enter('Target set 1 RIR','2','content-desc');enter('Rest timer override (seconds)','45');capture('program-targets');tap('Save')
+enter('Target set 1 minimum reps','6','content-desc');enter('Target set 1 maximum reps','10','content-desc');tap('Target set 1 RIR:','content-desc',prefix=True);tap('2',last=True);enter('Rest timer override (seconds)','45');capture('program-targets');tap('Save')
 draft=state()['programDraft'];assert len(draft['days'])==2;planned=draft['days'][1]['exercises'][0]
 assert len(planned['cycles'])==7
 assert all(c['sets'][0]['repsMin']==6 and c['sets'][0]['repsMax']==10 and c['sets'][0]['rir']==2 and c['restSeconds']==45 for c in planned['cycles'])
-tap('7 Cycles');tap('Cycle 2');enter('Target set 1 minimum reps','8','content-desc');enter('Target set 1 maximum reps','12','content-desc');enter('Target set 1 RIR','1','content-desc');tap('Cycle 3');tap('Save')
+tap('7 Cycles');tap('Cycle 2');enter('Target set 1 minimum reps','8','content-desc');enter('Target set 1 maximum reps','12','content-desc');tap('Target set 1 RIR:','content-desc',prefix=True);tap('1',last=True);tap('Cycle 3');tap('Save')
 cycles=state()['programDraft']['days'][1]['exercises'][0]['cycles']
 assert cycles[1]['sets'][0]['repsMin']==8 and cycles[1]['sets'][0]['repsMax']==12 and cycles[1]['sets'][0]['rir']==1
 assert cycles[0]['sets'][0]['repsMin']==6 and cycles[2]['sets'][0]['repsMin']==6

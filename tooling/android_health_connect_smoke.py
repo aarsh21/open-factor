@@ -16,6 +16,8 @@ import tarfile
 import time
 import xml.etree.ElementTree as ET
 
+from android_offline_suite import Device, archive_manifest
+
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--serial', required=True)
 parser.add_argument('--output', type=Path, required=True)
@@ -227,7 +229,16 @@ finally:
         else:
             adb('shell', 'settings', 'put', 'system', 'font_scale', font)
         adb('shell', 'rm', '-f', ui_file, remote_prefs)
+    after = archive()
+    (args.output / 'private-app-before-restoration.tar').write_bytes(after)
+    actual_files = user_files(after)
+    changed = sorted(name for name in set(actual_files) | set(baseline_files)
+                     if actual_files.get(name) != baseline_files.get(name))
+    (args.output / 'private-file-drift.json').write_text(json.dumps(changed, indent=2) + '\n')
+    backup_path = args.output / 'private-app-backup.tar'
+    Device(args.serial).replace_tree(backup_path, archive_manifest(backup_path), '/data/local/tmp/' + tag + '-restore.tar')
     assert user_files(archive()) == baseline_files, 'Private app files changed; use the complete saved archive for recovery'
+    assert set(changed) <= {'files/profileInstalled'}, 'Unexpected user-data change during UI-only inspection'
     assert 'Active default network: none' in adb('shell', 'dumpsys', 'connectivity')
     assert adb('shell', 'settings', 'get', 'system', 'font_scale').strip() == font
     restored = True

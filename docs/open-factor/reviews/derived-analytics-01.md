@@ -215,8 +215,34 @@ The schema dependencies are the logger's original commits
 and
 [`79db940c`](https://github.com/aarsh21/open-factor/commit/79db940c89b2d9ab8e04e5f919986111303c8ff4).
 Do not integrate their validation-only cherry-pick copies a second time.
-`build-final.log` and `host-results/` retain this bounded run. Native rendering
-acceptance is pending an allocated emulator; no source-device operation ran.
+`build-final.log` and `host-results/` retain this bounded run.
+
+The bounded offline native check passes on emulator-5580 at normal and 1.3 font
+scale. Dashboard exercise and muscle tiles report two logical working sets.
+Exercise history shows six distinct completed actuals: both root sides, both
+Myo sides, a right-only second set and a warm-up. The unfinished left actual is
+absent. Both final captures were inspected; every label and value is readable
+without clipping or overlap. History data is unchanged after viewing and
+restarting at the second font scale. This checks the worker APK, not the
+parent's combined application or a populated source-app comparison.
+
+The tested APK has SHA-256
+`2d95c2c67ca04b7a79a94b653d3a463be60243671f28c542e250206caa4e8fe5`.
+`native-final/result.json`, `canonical-history.json`, `history-normal.png` and
+`history-130.png` retain the final evidence. The first driver run passed its UI
+assertions but failed a comparison against sparse hand-written JSON. Inspection
+of `native/failed-state.tar` and the decoder confirmed added codec defaults;
+omitted weight/repetition keys use legacy zero/eight defaults. The corrected
+fixture supplies explicit nulls for the unfinished side, validates every
+supplied field, and compares the complete canonical history after the flow.
+That rerun passes on the unchanged APK. An earlier Python module-name collision
+failed before any device access. Neither failure is counted as a passing run.
+
+`native-final/independent-release.json` records the separate restoration check.
+The original application/test APKs, all 21 private-tree entries, both original
+photo files, modes, UID/GID and device settings match the incoming baseline.
+The application is force-stopped and the emulator lease is released. No source
+phone, source account or health-store operation ran.
 
 Keep the existing raw six-range body charts and explicit unavailable states
 for Weight Trend, records and estimated 1-RM. The recovered helpers narrow the

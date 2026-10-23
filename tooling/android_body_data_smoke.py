@@ -212,6 +212,7 @@ try:
     settings()
     tap('Units')
     tap('Pounds (lb)')
+    tap('Back', 'content-desc')
     tap('Body Data')
     find('181.55 lb')
     find('174.25 lb')
@@ -305,11 +306,18 @@ try:
     assert training(state()) == original_training
     # Latest value is selected by record date, not by list insertion/edit order.
     reachable('Scale Weight')
-    find('181.55 lb · 2026-10-19')
+    reachable('181.55 lb · 2026-10-19')
     capture('dashboard-body-data')
     tap('Scale Weight')
+    if 'bodyCharts' not in exported_data['preferences'].get('dismissedTutorials', []):
+        find('About body charts')
+        capture('dashboard-chart-first-entry')
+        tap('Got it')
+        exported_data['preferences']['dismissedTutorials'] = sorted(set(exported_data['preferences'].get('dismissedTutorials', [])) | {'bodyCharts'})
+        assert state() == exported_data, 'Dismissing chart help changed unrelated saved data'
+    find('Body Charts')
     find('181.55 lb')
-    capture('restored-history')
+    capture('restored-dashboard-chart')
     back()
     tap('Shortcuts', 'content-desc')
     tap('Log Measurements')

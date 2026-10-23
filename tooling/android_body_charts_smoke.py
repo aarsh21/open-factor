@@ -139,6 +139,7 @@ def settings():
 
 def units(pounds):
     settings(); tap('Units'); tap('Pounds (lb)' if pounds else 'Kilograms (kg)')
+    tap('Back', 'content-desc')
 
 
 def open_charts(measurements=False):

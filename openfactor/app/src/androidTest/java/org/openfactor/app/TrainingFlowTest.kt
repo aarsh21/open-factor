@@ -273,10 +273,16 @@ class TrainingFlowTest {
         assertEquals("Compound Lower", resolved.single { it.name == "Burpee" }.infoTypeLabel)
         assertEquals(9, resolved.count { it.infoTypeLabel == null })
         assertTrue(resolved.all { it.movementPatterns != null })
+        val bundled = context.assets.open("catalog.json").bufferedReader().use {
+            DataCodec.catalog(it.readText())
+        }.associateBy { it.id }
         imported?.forEach { source ->
             val actual = resolved.single { it.id == source.id }
-            assertEquals(source, actual.copy(properties = source.properties))
+            assertEquals(source, actual.copy(properties = source.properties, generationFacts = source.generationFacts))
             source.properties.forEach { (key, value) -> assertEquals(value, actual.properties[key]) }
+            val fallback = bundled.getValue(source.id).generationFacts
+            assertEquals(fallback.descriptorLists + source.generationFacts.descriptorLists, actual.generationFacts.descriptorLists)
+            assertEquals(fallback.recommendationLevels + source.generationFacts.recommendationLevels, actual.generationFacts.recommendationLevels)
         }
         val duplicateDraft = resolved.single { it.id == bench.id }.duplicateDraft(resistance, supports)
         val duplicate = duplicateDraft.toExercise(equipment.items)

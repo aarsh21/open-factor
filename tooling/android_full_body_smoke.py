@@ -212,12 +212,17 @@ try:
     assert saved['bodyMeasurements'][2:] == baseline.get('bodyMeasurements', [])
     assert {k:v for k,v in saved.items() if k != 'bodyMeasurements'} == {k:v for k,v in baseline.items() if k != 'bodyMeasurements'}
     # Both history summaries, chart separation, manual edits and discard are real routes.
-    tap('Edit measurements '+day2, 'content-desc'); back(); capture('full-body-history'); history_top()
+    tap('Edit measurements '+day2, 'content-desc'); target('Close measurements', 'content-desc'); back(); capture('full-body-history'); history_top()
     tap('Edit measurements '+day1, 'content-desc'); enter('Visual Body Fat', '19.5'); tap('Close measurements', 'content-desc')
     history_top(); assert state() == saved
     tap('Edit measurements '+day1, 'content-desc'); tap('Delete measurements', 'content-desc'); capture('full-body-delete-confirm')
     tap('Cancel'); target('Full Body'); back(); history_top(); assert state() == saved
-    tap('View Charts'); tap('Neck'); tap('Visual Body Fat'); tap('All'); target('26.13 %'); target('0 %')
+    tap('View Charts')
+    if 'bodyCharts' not in saved['preferences'].get('dismissedTutorials', []):
+        target('About body charts'); capture('chart-first-entry'); tap('Got it')
+        saved['preferences']['dismissedTutorials'] = sorted(set(saved['preferences'].get('dismissedTutorials', [])) | {'bodyCharts'})
+        assert state() == saved, 'Dismissing chart help changed unrelated saved data'
+    tap('Neck'); tap('Visual Body Fat'); tap('All'); target('26.13 %'); target('0 %')
     capture('visual-fat-chart'); assert state() == saved
     settings(); tap('Export Backup')
     filename = f'offullbody-{time.time_ns()}.json'
@@ -226,7 +231,7 @@ try:
     tap('Save', last=True); target('Export Backup')
     exported = json.loads(adb('shell', 'cat', '/sdcard/Download/'+filename))
     assert {k:v for k,v in exported.items() if k != 'photoAssets'} == saved
-    assert {ref:base64.b64decode(value) for ref,value in exported['photoAssets'].items()} == photos
+    assert {ref:base64.b64decode(value) for ref,value in exported.get('photoAssets', {}).items()} == photos
     invalid = json.loads(json.dumps(exported)); invalid['bodyMeasurements'][0]['visualBodyFatPercent'] = 100.01
     invalid_name = 'offullbody-invalid.json'; path = args.output/invalid_name; path.write_text(json.dumps(invalid))
     adb('push', str(path), '/sdcard/Download/'+invalid_name)

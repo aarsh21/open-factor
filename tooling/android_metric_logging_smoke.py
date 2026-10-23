@@ -182,12 +182,10 @@ for i, exercise in enumerate(cases):
 # RIR is optional for rep-based rows and absent from duration/distance rows.
 tap('Workout options', 'content-desc')
 tap('Workout settings')
-switches = [n for n in nodes() if n.get('checkable') == 'true']
-assert len(switches) == 2
-left, top, right, bottom = bounds(switches[0])
-adb('shell', 'input', 'tap', str((left + right) // 2), str((top + bottom) // 2))
+preferences_before = state()['preferences']
+tap('Reps in reserve')
 tap('Done')
-assert state()['preferences']['showRir']
+assert state()['preferences'] == {**preferences_before, 'showRir': True}
 assert not any('reps in reserve' in n.get('content-desc', '') for n in nodes())
 name = '45° Cable Rear Delt Fly'
 select(name, reverse=True)

@@ -113,6 +113,13 @@ def launch():
     adb('shell', 'am', 'start', '-n', 'org.openfactor.app/.MainActivity')
 
 
+def open_shortcuts():
+    tap('Shortcuts', 'content-desc')
+    left, top, right, bottom = bounds(find('Drag handle', 'content-desc')[0])
+    adb('shell', 'input', 'swipe', str((left+right)//2), str((top+bottom)//2),
+        str((left+right)//2), '150', '500')
+
+
 def create_custom(name):
     enter('Exercise Name', name)
     tap('Trackable Metric 1', 'content-desc')
@@ -217,7 +224,7 @@ tap('Workout options', 'content-desc')
 tap('Minimize Workout')
 
 # Editing a program while a session exists must not change that session.
-tap('Shortcuts', 'content-desc')
+open_shortcuts()
 tap('New Program')
 enter('Name', 'Synthetic Context Plan')
 tap('Next')

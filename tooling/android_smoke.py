@@ -48,6 +48,11 @@ def launch():adb('shell','am','start','-n','org.openfactor.app/.MainActivity')
 def persisted():
  xml=ET.fromstring(adb('shell','run-as','org.openfactor.app','cat','shared_prefs/open_factor.xml'))
  return json.loads(next(n.text for n in xml if n.get('name')=='data'))
+def open_shortcuts():
+ tap('Shortcuts','content-desc')
+ handle=find('Drag handle','content-desc')[0]
+ left,top,right,bottom=map(int,re.findall(r'\d+',handle.get('bounds')))
+ adb('shell','input','swipe',str((left+right)//2),str((top+bottom)//2),str((left+right)//2),'150','500')
 # Clear only a leftover active Open Factor smoke workout, through its UI.
 adb('shell','am','force-stop','org.openfactor.app');launch();find('Dashboard')
 if persisted().get('active') is not None:
@@ -62,15 +67,15 @@ if a.parity_actions:
    return (left+right)/2
   plus=center_x(find('Shortcuts','content-desc')[0])
   assert center_x(find('Workout')[-1])<plus<center_x(find('Exercises')[-1]), 'Plus is not in the middle of the navigation pill'
-  tap('Shortcuts','content-desc');find('New Program');find('History')
+  open_shortcuts();find('New Program');find('History')
   capture('shortcuts-'+tab.lower());tap('Close shortcuts','content-desc')
  assert 'android.permission.INTERNET' not in adb('shell','dumpsys','package','org.openfactor.app'), 'Installed app still has network permission'
  tap('Dashboard',last=True)
  shortcuts_before=persisted()
- tap('Shortcuts','content-desc');tap('History');find('Workout History');capture('shortcut-history');tap('Back','content-desc')
- tap('Shortcuts','content-desc');tap('New Workout');find('Create Workout');find('Workout name');find('Save Workout');capture('shortcut-new-workout');tap('Back','content-desc')
+ open_shortcuts();tap('History');find('Workout History');capture('shortcut-history');tap('Back','content-desc')
+ open_shortcuts();tap('New Workout');find('Create Workout');find('Workout name');find('Save Workout');capture('shortcut-new-workout');tap('Back','content-desc')
  assert persisted()==shortcuts_before, 'Canceled shortcut forms changed training data'
- tap('Shortcuts','content-desc');tap('New Program');find('Create Program');capture('shortcut-new-program');tap('Back','content-desc');find('Leave program draft?')
+ open_shortcuts();tap('New Program');find('Create Program');capture('shortcut-new-program');tap('Back','content-desc');find('Leave program draft?')
  tap('Keep Draft' if shortcuts_before.get('programDraft') else 'Discard Draft');find('Programs');tap('Back','content-desc')
  assert persisted()==shortcuts_before, 'Opening and closing program shortcut changed prior training data'
  tap('Shortcuts','content-desc');tap('Empty Workout');find('Start Workout');capture('shortcut-empty-workout')

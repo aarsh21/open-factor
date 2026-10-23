@@ -67,6 +67,14 @@ Trend, records and estimated 1-RM remain unavailable, not accepted as equivalent
 to conventional substitute formulas. This is binary evidence, not a populated
 source UI comparison or a combined application acceptance pass.
 
+The logical-set consumer change passes 95 JVM tests and a bounded offline
+worker-APK native check at normal and 1.3 font scale. Counts group sides and
+Myo components while Dashboard history retains their distinct completed
+actuals. Both final history captures were inspected. The full original APK
+pair, private files and device settings were restored and independently
+rechecked before releasing emulator-5580. The report retains the earlier
+fixture-serialization failure separately from the corrected passing run.
+
 ## Cycles are real; the full program policy is not recovered
 
 The current source phone literally displays **Cycle 1**. Retained manual-program
@@ -119,7 +127,88 @@ Original app and test APKs, the complete private tree with ownership and modes,
 both original photos, and device settings match the baseline after restoration.
 This is local emulator acceptance, not physical-device or full source parity.
 
-## Combined integration checkpoint
+## Private combined-build acceptance, October 23
+
+The integrated product at
+[`fb979767`](https://github.com/aarsh21/open-factor/commit/fb97976719fbcebc7579ab610a03ddcbcc4e9fcb)
+passes 110 maintained JVM tests, with no failures, errors, or skips. Lint reports
+zero errors and eleven warnings, and both APK assemblies pass. The subsequent
+test-only correction at
+[`d493af60`](https://github.com/aarsh21/open-factor/commit/d493af60777259a1e279f0c948b4dbff80a3a176)
+checks catalog generation-fact enrichment on device without changing the product.
+All native runs below pin that revision and the installed APK pair. Product and
+native-test source files remain byte-identical through these runs and the later
+driver and documentation corrections.
+
+Fifteen representative offline cases pass across corrected replays on three
+emulators. This is the same compiled build with two signing variants, not one
+uninterrupted single-APK suite pass. All eleven native instrumentation tests pass
+on both variants. Not every UI case runs on both variants.
+
+The assembled private application and test APK hashes are respectively
+`7deb516b808b37fba8dd365b4ca7eb860f14455d3da247df600f9e81e509e35b` and
+`6baf8daa782c16ed9e62286d57a7a33900f2d343155b03e647ee66d73093a204`.
+Emulator-5582 requires baseline-compatible signed copies, with hashes
+`e8f18e0d1e840bb5b55096beb8dcd59807bd453408e068f615122701b247adf5` and
+`12307dfc1050200a787aa945d29da6877257ba16196ed238e524f0ae6d3b5b8b`.
+All 5,674 entries of the assembled application APK and all nine test-APK entries
+byte-match their signed copies. Each copy adds only three V1 signing files.
+These are APK entry counts, not counts of original reference files.
+
+Evidence is locally excluded under `.amp/in/artifacts/astra-parity/`.
+`acceptance-summary.json` indexes every attempt and these passing case receipts:
+
+- `combined`: contract, library, photo-sheet, and portability.
+- `replay-5580`: workout-media, program, and composition.
+- `replay-5584`: custom, metrics, and charts.
+- `replay-full-body-photos`: photos.
+- `replay-followup-5582`: onboarding and Health UI only, without transfers or grants.
+- `replay-body-final`: body data.
+- `replay-full-body-observed`: illustrated full-body measurements.
+
+All 32 case attempts remain retained, including seventeen failed attempts.
+Corrections target the actual controls: expanded Shortcuts, RIR menus, the
+separate Units page, the Health panel, an explicit existing gym, and first-entry
+chart help. Tutorial dismissal must change only its expected preference.
+Empty backups may omit `photoAssets`, as the writer deliberately does. Exact
+original-photo byte equality still rejects omitted nonempty assets, changed
+bytes, missing photos, and unexpected photos. Seven host mutation controls pass.
+The ten corrected drivers match their executed copies, apart from retaining the
+portable Health artifact-root expression. `driver-source-equivalence.json`
+records that comparison. No product behavior changed to satisfy these drivers.
+
+One full-body child passed its UI and data checks but failed the enclosing
+post-case APK pin in `replay-full-body-complete`. That attempt did not record
+the actual mismatched hash, so its cause remains unverified. The unchanged
+child passes again in `replay-full-body-observed`, with all six explicit APK-pin
+observations matching. The failed receipt is not counted as a pass, and the
+pin checks remain strict.
+
+The corrected Health run records only AndroidX `files/profileInstalled`
+metadata drift before recovery. It restores the complete archive and rejects
+any other user-file drift. The earlier failed Health attempt lacks an after
+archive, so this later observation does not establish that earlier failure's
+exact cause.
+
+All nine outer runs and their enclosed suites pass restoration, including the
+runs with failed cases. Independent final checks confirm original APK pairs,
+private bytes, types, modes, UID/GID, external file names and bytes, and settings
+with key presence. Emulator-5580 retains 21 private entries and two photos;
+5582 retains 22 entries and twelve photos; 5584 retains thirteen entries and no
+photos. All three apps are stopped and their leases are released. The separate
+`independent-release-5580.json`, `independent-release-5582.json`, and
+`independent-release-5584.json` receipts record the checks. These are app-boundary
+checks, not bitwise emulator-image comparisons.
+
+The inspected `review/index.html` illustrates the bounded worker-APK UI checks,
+not the later combined runs. See the [native UX report](reviews/native-ux-adversarial-01.md).
+Full generation, history-based progression, and derived analytics remain
+incomplete. New movement, ranking, precondition, and equipment checkpoints remain
+separate from this tested product. No physical-source-device operation, Health
+grant or transfer, shared-pack edit, private-original publication, or push is
+part of this acceptance round.
+
+## Earlier combined integration checkpoints
 
 The preceding source-only snapshot at
 [`c663f01d`](https://github.com/aarsh21/open-factor/commit/c663f01df672c5aabb7996649ebe27ef49c38abd)
@@ -216,6 +305,8 @@ All integration commits remain local and unpushed.
 
 All local acceptance cases must run without an active default network. "Partial"
 below is not an acceptance pass.
+Rows retain earlier per-surface checkpoints. The October 23 combined results
+above supersede older driver-failure notes, not unresolved source-parity gaps.
 
 | Surface | Evidence-backed state | Remaining acceptance work |
 | --- | --- | --- |
