@@ -81,16 +81,17 @@ fun healthConnectScaleExport(
 
 /**
  * Ten-second sequential WORKOUT segments and max(elapsed, count * 10s) follow the source.
- * The flat local logger exports only completed actuals: it has no source skipped/lateral log model.
+ * Local eligibility uses completed actuals, not source persisted skipped flags. One segment represents
+ * one logical set; repetitions sum its completed side/component logs (a local export policy).
  */
 fun healthConnectWorkoutExport(workout: Workout, zone: ZoneId, version: Long): ExerciseSessionRecord? {
     val finished = workout.finishedAt ?: return null
-    val sets = workout.exercises.flatMap { it.sets }.filter {
+    val sets = workout.exercises.flatMap { it.logicalSets() }.filterNot { it.root.warmup }.map { group -> group.logs.filter {
         it.completed && !it.warmup && (
             (it.reps ?: 0) > 0 || (it.weightKg ?: 0.0) > 0 ||
                 (it.durationSeconds ?: 0.0) > 0 || (it.distanceMeters ?: 0.0) > 0
             )
-    }
+    } }.filter { it.isNotEmpty() }
     val elapsed = (finished - workout.startedAt - workout.pausedDurationMs).coerceAtLeast(0)
     val duration = maxOf(elapsed, sets.size * 10_000L)
     // Android rejects equal endpoints. Do not invent a time for a zero-set, zero-duration session.
@@ -102,7 +103,7 @@ fun healthConnectWorkoutExport(workout: Workout, zone: ZoneId, version: Long): E
             startTime = start.plusSeconds(index * 10L),
             endTime = start.plusSeconds((index + 1) * 10L),
             segmentType = ExerciseSegment.EXERCISE_SEGMENT_TYPE_OTHER_WORKOUT,
-            repetitions = set.reps ?: 0,
+            repetitions = set.sumOf { it.reps ?: 0 },
         )
     }
     return ExerciseSessionRecord(

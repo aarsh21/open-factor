@@ -13,6 +13,23 @@ class ScopedDataExportTest {
     private fun JSONArray.ids() = (0 until length()).map { getJSONObject(it).getString("id") }
 
     @Test
+    fun advancedExportKeepsRawLinksButCountsLogicalRootsOnly() {
+        val entry = SessionExercise(exerciseId = "row", sets = listOf(LoggedSet(id = "root", reps = 7, completed = true)))
+            .withSetKind("root", SetKind.MYO).withSplitSides()
+        val data = AppData(history = listOf(Workout(name = "Myo", exercises = listOf(entry), finishedAt = 1)))
+        val export = ScopedDataExport.document(data, emptyList(), ScopedExportRequest(false, ExportTimeFrame.ALL_TIME,
+            setOf(ExportCategory.MUSCLE_GROUPS, ExportCategory.EXERCISES)), today, zone).getJSONObject("data")
+        val roots = export.getJSONArray("muscleGroups").getJSONObject(0).getJSONArray("completedWorkingSetIds")
+        assertEquals(1, roots.length())
+        assertEquals("root", roots.getString(0))
+        val rows = export.getJSONArray("exercises").getJSONObject(0).getJSONArray("sets")
+        assertEquals(4, rows.length())
+        assertEquals("root", rows.getJSONObject(1).getString("pairId"))
+        assertEquals("root", rows.getJSONObject(3).getString("segmentOf"))
+        assertEquals("RIGHT", rows.getJSONObject(3).getString("side"))
+    }
+
+    @Test
     fun calendarScopesIncludeBothBoundariesLeapDayAndAllTimeFutureWithoutChangingHiddenValues() {
         val dates = listOf("2024-01-31", "2024-02-01", "2024-02-16", "2024-02-17", "2024-02-23", "2024-02-24", "2024-02-29", "2024-03-01", "2024-03-02")
         val data = AppData(
@@ -92,7 +109,7 @@ class ScopedDataExportTest {
         val data = AppData(
             preferences = Preferences(pounds = true, restSeconds = 73, autoRest = false, displayName = "Renée", dismissedTutorials = setOf("bodyCharts"),
                 keepAlive = true, showWorkoutTimer = false, showBodyweightContribution = false, distanceImperial = true,
-                restAfterLastWarmupSet = false, restBetweenExercises = true),
+                restAfterLastWarmupSet = false, restBetweenExercises = true, supersetAutoNext = false, restBetweenSidesPercent = 37),
             routines = listOf(Routine("routine", "Library routine", listOf("custom"))),
             programs = listOf(TrainingProgram(id = "plan", name = "Manual plan")),
             gyms = listOf(GymProfile(id = "gym", name = "Garage")),
@@ -103,7 +120,7 @@ class ScopedDataExportTest {
         val payload = ScopedDataExport.document(data, emptyList(), ScopedExportRequest(false, ExportTimeFrame.LAST_MONTH, selected), today, zone).getJSONObject("data")
         assertEquals(setOf("userProfile", "workoutSettings", "workouts", "trainingPrograms", "gymProfiles", "exerciseSettings", "customExercises"), payload.keys().asSequence().toSet())
         assertEquals("Renée", payload.getJSONObject("userProfile").getString("displayName"))
-        assertEquals(setOf("pounds", "restSeconds", "autoRest", "showRir", "exerciseAutoNext", "keepAlive", "showWorkoutTimer", "showBodyweightContribution", "distanceImperial", "restAfterLastWarmupSet", "restBetweenExercises"), payload.getJSONObject("workoutSettings").keys().asSequence().toSet())
+        assertEquals(setOf("pounds", "restSeconds", "autoRest", "showRir", "exerciseAutoNext", "keepAlive", "showWorkoutTimer", "showBodyweightContribution", "distanceImperial", "restAfterLastWarmupSet", "restBetweenExercises", "supersetAutoNext", "restBetweenSidesPercent"), payload.getJSONObject("workoutSettings").keys().asSequence().toSet())
         assertEquals(73, payload.getJSONObject("workoutSettings").getInt("restSeconds"))
         assertTrue(payload.getJSONObject("workoutSettings").getBoolean("keepAlive"))
         assertFalse(payload.getJSONObject("workoutSettings").getBoolean("showWorkoutTimer"))
@@ -111,6 +128,8 @@ class ScopedDataExportTest {
         assertTrue(payload.getJSONObject("workoutSettings").getBoolean("distanceImperial"))
         assertFalse(payload.getJSONObject("workoutSettings").getBoolean("restAfterLastWarmupSet"))
         assertTrue(payload.getJSONObject("workoutSettings").getBoolean("restBetweenExercises"))
+        assertFalse(payload.getJSONObject("workoutSettings").getBoolean("supersetAutoNext"))
+        assertEquals(37, payload.getJSONObject("workoutSettings").getInt("restBetweenSidesPercent"))
         assertEquals(listOf("routine"), payload.getJSONArray("workouts").ids())
         assertEquals(listOf("plan"), payload.getJSONArray("trainingPrograms").ids())
         assertEquals(listOf("gym"), payload.getJSONArray("gymProfiles").ids())

@@ -105,7 +105,9 @@ object ScopedDataExport {
                     .put("showBodyweightContribution", data.preferences.showBodyweightContribution)
                     .put("distanceImperial", data.preferences.distanceImperial)
                     .put("restAfterLastWarmupSet", data.preferences.restAfterLastWarmupSet)
-                    .put("restBetweenExercises", data.preferences.restBetweenExercises))
+                    .put("restBetweenExercises", data.preferences.restBetweenExercises)
+                    .put("supersetAutoNext", data.preferences.supersetAutoNext)
+                    .put("restBetweenSidesPercent", data.preferences.restBetweenSidesPercent))
                 ExportCategory.WORKOUT_LOG_NOTES -> payload.put(category.key, JSONArray(workouts.map { workout ->
                     JSONObject().put("workoutId", workout.id).put("notes", workout.notes)
                         .put("exercises", JSONArray(workout.exercises.map {
@@ -121,7 +123,7 @@ object ScopedDataExport {
                         if (category == ExportCategory.MUSCLE_GROUPS) row
                             .put("primaryMuscles", JSONArray(exercise?.muscles ?: emptyList<String>()))
                             .put("secondaryMuscles", JSONArray(exercise?.secondary ?: emptyList<String>()))
-                            .put("completedWorkingSetIds", JSONArray(entry.sets.filter { it.completed && !it.warmup }.map { it.id }))
+                            .put("completedWorkingSetIds", JSONArray(entry.logicalSets().filter { !it.root.warmup && it.logs.any { log -> log.completed } }.map { it.root.id }))
                         else row.put("sets", encoded.getJSONArray("history").getJSONObject(workoutIndex)
                             .getJSONArray("exercises").getJSONObject(entryIndex).getJSONArray("sets"))
                         row

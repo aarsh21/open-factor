@@ -655,13 +655,18 @@ fun ExerciseDetail(
                             Text(w.localDate().toString(), color = OF.muted)
                             w.exercises
                                 .filter { it.exerciseId == e.id }
-                                .flatMap { it.sets }
-                                .filter { it.completed }
-                                .forEach { s ->
-                                    Text(
-                                        s.describe(e.loggingMetrics(), data.preferences.pounds, data.preferences.distanceImperial),
-                                        Modifier.padding(top = 8.dp),
-                                    )
+                                .flatMap { it.logicalSets() }
+                                .filter { it.logs.any { log -> log.completed } }
+                                .forEachIndexed { index, group ->
+                                    Text("Set ${index + 1} · ${if (group.root.warmup) "Warm-up" else group.root.kind.label}", Modifier.padding(top = 8.dp), color = OF.muted)
+                                    group.components.forEachIndexed { componentIndex, logs -> logs.forEach { s ->
+                                        Text(
+                                            listOfNotNull(s.side?.label, if (componentIndex > 0) "Myo $componentIndex" else null).joinToString(" · ")
+                                                .let { if (it.isEmpty()) "" else "$it: " } +
+                                                if (s.completed) s.describe(e.loggingMetrics(), data.preferences.pounds, data.preferences.distanceImperial) else "Not completed",
+                                            Modifier.padding(top = 4.dp),
+                                        )
+                                    } }
                                 }
                         }
                     }

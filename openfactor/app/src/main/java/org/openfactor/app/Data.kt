@@ -53,6 +53,9 @@ data class LoggedSet(
     val durationSeconds: Double? = null,
     val distanceMeters: Double? = null,
     val kind: SetKind = SetKind.STANDARD,
+    val side: SetSide? = null,
+    val pairId: String? = null,
+    val segmentOf: String? = null,
 )
 
 data class SessionExercise(
@@ -61,6 +64,7 @@ data class SessionExercise(
     val sets: List<LoggedSet> = listOf(LoggedSet()),
     val notes: String = "",
     val restSeconds: Int? = null,
+    val supersetId: String? = null,
 )
 
 data class Workout(
@@ -107,6 +111,9 @@ data class Preferences(
     // Older backups keep rest enabled at these boundaries; these are compatibility defaults.
     val restAfterLastWarmupSet: Boolean = true,
     val restBetweenExercises: Boolean = true,
+    // Local compatibility defaults, not claims about source installation defaults.
+    val supersetAutoNext: Boolean = true,
+    val restBetweenSidesPercent: Int = 100,
 )
 
 data class AppData(
@@ -155,7 +162,7 @@ fun Workout.withExerciseTargets(
         else exercise.copy(
             restSeconds = restSeconds,
             sets = exercise.sets.map { set ->
-                val target = targets[set.id]
+                val target = targets[set.id] ?: targets[set.pairId]
                 if (set.warmup || target == null) set
                 else set.copy(
                     targetRepsMin = target.repsMin,
@@ -170,17 +177,10 @@ fun Workout.withExerciseTargets(
 fun Workout.withEmptyWarmupSet(exerciseId: String): Workout =
     copy(exercises = exercises.map { exercise ->
         if (exercise.id != exerciseId) exercise
-        else {
-            val index = exercise.sets.indexOfFirst { !it.warmup }.let {
-                if (it < 0) exercise.sets.size else it
-            }
-            exercise.copy(sets = exercise.sets.toMutableList().apply {
-                add(index, LoggedSet(warmup = true))
-            })
-        }
+        else exercise.withNewSet(warmup = true)
     })
 
-fun Workout.completedSets() = exercises.sumOf { e -> e.sets.count { it.completed } }
+fun Workout.completedSets() = exercises.sumOf { e -> e.logicalSets().count { it.logs.any { log -> log.completed } } }
 
 fun Workout.volumeKg() =
     exercises.sumOf { e ->
@@ -223,6 +223,10 @@ fun Workout.toggleSetCompletion(
             sets = exercise.sets.map { if (it.id == setId) it.copy(completed = completing) else it }
         )
     val updated = exercises.map { if (it.id == exerciseId) changed else it }
+    val logicalSet = changed.logicalSets().first { it.root.id == set.logicalRootId }
+    val component = logicalSet.components.first { logs -> logs.any { it.id == setId } }
+    val nextInGroup = if (completing && logicalSet.completed && !set.warmup && preferences.supersetAutoNext)
+        copy(exercises = updated).nextSupersetExercise(exerciseId) else null
     val nextUnfinished =
         if (completing && changed.sets.all { it.completed }) {
             (1 until updated.size)
@@ -232,18 +236,20 @@ fun Workout.toggleSetCompletion(
         } else null
     // Warm-up rest belongs only to the last warm-up row, not every warm-up completion.
     val eligibleForRest = when {
-        set.warmup -> exercise.sets.lastOrNull { it.warmup }?.id == setId &&
+        set.warmup -> exercise.logicalSets().lastOrNull { it.root.warmup }?.root?.id == set.logicalRootId &&
             preferences.restAfterLastWarmupSet
         changed.sets.filterNot { it.warmup }.all { it.completed } -> preferences.restBetweenExercises
         else -> true
     }
-    val rest = exercise.restSeconds ?: preferences.restSeconds
+    val rest = if (set.kind == SetKind.MYO && !set.warmup && component != logicalSet.components.last()) 15
+        else exercise.restSeconds ?: preferences.restSeconds
+    val restMs = rest * 1000L * (if (component.any { !it.completed }) preferences.restBetweenSidesPercent.coerceIn(0, 100) else 100) / 100
     return copy(
         exercises = updated,
-        selectedExerciseId = nextUnfinished.takeIf { preferences.exerciseAutoNext } ?: selectedExerciseId,
+        selectedExerciseId = nextInGroup ?: nextUnfinished.takeIf { preferences.exerciseAutoNext } ?: selectedExerciseId,
         restUntil =
-            if (completing && preferences.autoRest && eligibleForRest && rest > 0)
-                now + rest * 1000L else restUntil,
+            if (completing && preferences.autoRest && eligibleForRest && restMs > 0)
+                now + restMs else restUntil,
     )
 }
 
@@ -275,6 +281,9 @@ object DataCodec {
             .put("durationSeconds", durationSeconds)
             .put("distanceMeters", distanceMeters)
             .put("kind", kind.name)
+            .put("side", side?.name)
+            .put("pairId", pairId)
+            .put("segmentOf", segmentOf)
 
     private fun SessionExercise.json() =
         JSONObject()
@@ -283,6 +292,7 @@ object DataCodec {
             .put("sets", JSONArray(sets.map { it.json() }))
             .put("notes", notes)
             .put("restSeconds", restSeconds)
+            .put("supersetId", supersetId)
 
     private fun Workout.json() =
         JSONObject()
@@ -383,7 +393,9 @@ object DataCodec {
                     .put("shortcuts", d.preferences.shortcuts.json())
                     .put("dashboard", d.preferences.dashboard.json())
                     .put("restAfterLastWarmupSet", d.preferences.restAfterLastWarmupSet)
-                    .put("restBetweenExercises", d.preferences.restBetweenExercises),
+                    .put("restBetweenExercises", d.preferences.restBetweenExercises)
+                    .put("supersetAutoNext", d.preferences.supersetAutoNext)
+                    .put("restBetweenSidesPercent", d.preferences.restBetweenSidesPercent),
             )
             .toString(2)
 
@@ -419,11 +431,15 @@ object DataCodec {
                     durationSeconds = s.actual("durationSeconds"),
                     distanceMeters = s.actual("distanceMeters"),
                     kind = if (!s.has("kind")) SetKind.STANDARD else SetKind.valueOf(s.getString("kind")),
+                    side = if (s.isNull("side")) null else SetSide.valueOf(s.getString("side")),
+                    pairId = if (s.isNull("pairId")) null else s.getString("pairId"),
+                    segmentOf = if (s.isNull("segmentOf")) null else s.getString("segmentOf"),
                 )
             },
             optString("notes"),
             if (isNull("restSeconds")) null else getInt("restSeconds"),
-        )
+            supersetId = if (isNull("supersetId")) null else getString("supersetId").also { require(it.isNotBlank()) },
+        ).validateSetLinks()
 
     private fun JSONObject.workout(): Workout =
         Workout(
@@ -483,6 +499,11 @@ object DataCodec {
                 dashboard = DashboardPreferences.decode(p.optJSONObject("dashboard")),
                 restAfterLastWarmupSet = p.optBoolean("restAfterLastWarmupSet", true),
                 restBetweenExercises = p.optBoolean("restBetweenExercises", true),
+                supersetAutoNext = p.optBoolean("supersetAutoNext", true),
+                restBetweenSidesPercent = if (!p.has("restBetweenSidesPercent")) 100 else p.get("restBetweenSidesPercent").let {
+                    require(it is Number && it.toDouble() % 1.0 == 0.0 && it.toDouble() in 0.0..100.0) { "Side rest must be 0–100%" }
+                    it.toInt()
+                },
             ),
             j.optString("activeProgramId").takeIf { it.isNotBlank() && it != "null" },
             j.array("gyms").objects().map { GymCodec.decode(it) },
@@ -829,8 +850,32 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun removeExercise(id: String) = editActive {
-        it.copy(exercises = it.exercises.filterNot { e -> e.id == id })
+        it.copy(exercises = it.exercises.filterNot { e -> e.id == id }).normalizeSupersets()
     }
+
+    fun groupSuperset(ids: Set<String>) = editActive { it.withSuperset(ids) }
+
+    fun leaveSuperset(id: String) = editActive { w ->
+        w.copy(exercises = w.exercises.map { if (it.id == id) it.copy(supersetId = null) else it }).normalizeSupersets()
+    }
+
+    fun moveSessionExercise(id: String, offset: Int) = editActive { w ->
+        val index = w.exercises.indexOfFirst { it.id == id }
+        val target = index + offset
+        if (index < 0 || target !in w.exercises.indices) w else w.copy(exercises = w.exercises.toMutableList().apply {
+            add(target, removeAt(index))
+        })
+    }
+
+    private fun editSessionExercise(id: String, block: (SessionExercise) -> SessionExercise) = editActive { w ->
+        w.copy(exercises = w.exercises.map { if (it.id == id) block(it).validateSetLinks() else it })
+    }
+
+    fun splitSides(id: String) = editSessionExercise(id) { it.withSplitSides() }
+    fun keepLeftSide(id: String) = editSessionExercise(id) { it.withLeftSideOnly() }
+    fun setKind(id: String, setId: String, kind: SetKind, warmup: Boolean = false) =
+        editSessionExercise(id) { it.withSetKind(setId, kind, warmup) }
+    fun addMyoComponent(id: String, rootId: String) = editSessionExercise(id) { it.withMyoComponent(rootId) }
 
     fun saveExerciseTargets(
         exerciseId: String,
@@ -840,30 +885,9 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun addWarmupSet(exerciseId: String) = editActive { it.withEmptyWarmupSet(exerciseId) }
 
-    fun addSet(exerciseId: String) = editActive { w ->
-        w.copy(
-            exercises =
-                w.exercises.map {
-                    if (it.id == exerciseId)
-                        it.copy(
-                            sets =
-                                it.sets + LoggedSet()
-                        )
-                    else it
-                }
-        )
-    }
+    fun addSet(exerciseId: String) = editSessionExercise(exerciseId) { it.withNewSet() }
 
-    fun removeSet(exerciseId: String, setId: String) = editActive { w ->
-        w.copy(
-            exercises =
-                w.exercises.map {
-                    if (it.id == exerciseId)
-                        it.copy(sets = it.sets.filterNot { s -> s.id == setId })
-                    else it
-                }
-        )
-    }
+    fun removeSet(exerciseId: String, setId: String) = editSessionExercise(exerciseId) { it.withoutSet(setId) }
 
     fun editSet(exerciseId: String, setId: String, block: (LoggedSet) -> LoggedSet) =
         editActive { w ->

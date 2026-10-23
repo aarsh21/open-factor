@@ -130,7 +130,7 @@ fun WorkoutComposition(
                         )
                         Text(
                             if (draft.exercises.isEmpty()) "Estimated workout time is 0 min"
-                            else draft.exercises.sumOf { it.sets.size }.let { "$it ${if (it == 1) "set" else "sets"}" },
+                            else draft.exercises.sumOf { it.logicalSets().size }.let { "$it ${if (it == 1) "set" else "sets"}" },
                             color = OF.muted,
                         )
                     }
@@ -148,7 +148,7 @@ fun WorkoutComposition(
                             TextButton({ onDetail(entry.exerciseId) }, Modifier.weight(1f)) {
                                 Column(Modifier.fillMaxWidth()) {
                                     Text(exercise?.title ?: "Exercise")
-                                    Text("${entry.sets.size} ${if (entry.sets.size == 1) "Standard Set" else "Standard Sets"}", color = OF.muted)
+                                    Text(entry.logicalSets().size.let { "$it ${if (it == 1) "Set" else "Sets"}" }, color = OF.muted)
                                 }
                             }
                             IconButton({ onEdit { it.copy(exercises = it.exercises.filterNot { e -> e.id == entry.id }) } }) {

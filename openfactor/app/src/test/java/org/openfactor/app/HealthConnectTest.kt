@@ -168,6 +168,22 @@ class HealthConnectTest {
     }
 
     @Test
+    fun advancedLogsExportOneLogicalSegmentWithOnlyCompletedActualRepetitions() {
+        val entry = SessionExercise(exerciseId = "row", sets = listOf(LoggedSet(id = "root", reps = 7)))
+            .withSetKind("root", SetKind.MYO).withSplitSides().let { exercise ->
+                exercise.copy(sets = exercise.sets.mapIndexed { index, log ->
+                    log.copy(reps = listOf(7, 5, 3, 99)[index], completed = index != 3)
+                })
+            }
+        val workout = Workout(name = "Myo", startedAt = time.toEpochMilli(), finishedAt = time.plusSeconds(2).toEpochMilli(), exercises = listOf(entry))
+        val record = healthConnectWorkoutExport(workout, zone, 1)!!
+        assertEquals(1, record.segments.size)
+        assertEquals(15, record.segments.single().repetitions)
+        assertEquals(time.plusSeconds(10), record.endTime)
+        assertEquals(4, workout.exercises.single().sets.size)
+    }
+
+    @Test
     fun providerDenialRevocationAndPersistenceFailureNeverBecomeSuccessfulExports() = runBlocking {
         val provider = FakeProvider()
         var availability = HealthConnectAvailability.UNAVAILABLE

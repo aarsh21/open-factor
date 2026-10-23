@@ -237,6 +237,9 @@ fun WorkoutSession(
                 var remove by remember { mutableStateOf(false) }
                 var exerciseMenu by remember { mutableStateOf(false) }
                 var exerciseNotes by remember { mutableStateOf(false) }
+                var superset by remember { mutableStateOf(false) }
+                var mergeSides by remember { mutableStateOf(false) }
+                val logicalSets = se.logicalSets()
                 Surface(color = OF.background) {
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -247,7 +250,7 @@ fun WorkoutSession(
                             ) {
                                 Text(e.title, style = MaterialTheme.typography.titleMedium)
                                 Text(
-                                    "${se.sets.count { it.completed }} of ${se.sets.size} sets completed",
+                                    "${logicalSets.count { it.completed }} of ${logicalSets.size} sets completed",
                                     color = OF.muted, fontSize = 12.sp,
                                 )
                             }
@@ -270,11 +273,24 @@ fun WorkoutSession(
                         }
                         var targets by remember { mutableStateOf(false) }
                         var warmup by remember { mutableStateOf(false) }
+                        if (se.supersetId != null) Text(
+                            "Superset · " + workout.exercises.filter { it.supersetId == se.supersetId }
+                                .joinToString(" + ") { entry -> exercises.find { it.id == entry.exerciseId }?.title ?: "Exercise" },
+                            Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodySmall, color = OF.muted,
+                        )
                         Row {
                             Box {
                                 IconButton({ exerciseMenu = true }) { Icon(Icons.Rounded.MoreVert, "Exercise options for ${e.title}") }
                                 DropdownMenu(exerciseMenu, { exerciseMenu = false }) {
                                     DropdownMenuItem(text = { Text("Exercise notes") }, onClick = { exerciseMenu = false; exerciseNotes = true })
+                                    DropdownMenuItem(text = { Text(if (se.sets.any { it.side != null }) "Use left logs only…" else "Log left and right separately") }, onClick = {
+                                        exerciseMenu = false
+                                        if (se.sets.any { it.side != null }) mergeSides = true else vm.splitSides(se.id)
+                                    }, enabled = se.sets.isNotEmpty())
+                                    DropdownMenuItem(text = { Text("Create superset…") }, enabled = workout.exercises.size > 1, onClick = { exerciseMenu = false; superset = true })
+                                    if (se.supersetId != null) DropdownMenuItem(text = { Text("Leave superset") }, onClick = { exerciseMenu = false; vm.leaveSuperset(se.id) })
+                                    DropdownMenuItem(text = { Text("Move earlier") }, enabled = workout.exercises.first().id != se.id, onClick = { exerciseMenu = false; vm.moveSessionExercise(se.id, -1) })
+                                    DropdownMenuItem(text = { Text("Move later") }, enabled = workout.exercises.last().id != se.id, onClick = { exerciseMenu = false; vm.moveSessionExercise(se.id, 1) })
                                     DropdownMenuItem(text = { Text("Remove Exercise") }, onClick = { exerciseMenu = false; remove = true })
                                 }
                             }
@@ -337,18 +353,29 @@ fun WorkoutSession(
                                 )
                             Spacer(Modifier.width(48.dp))
                         }
-                        se.sets.forEachIndexed { index, s ->
-                            key(s.id) {
-                                SetRow(
-                                    index,
-                                    s,
-                                    data.preferences,
-                                    metrics,
-                                    exerciseName = e.title,
-                                    onChange = { changed -> vm.editSet(se.id, s.id) { changed } },
-                                    onComplete = { vm.toggleSetCompletion(se.id, s.id) },
-                                    onRemove = { vm.removeSet(se.id, s.id) },
+                        logicalSets.forEachIndexed { index, group ->
+                            group.components.forEachIndexed { componentIndex, logs ->
+                                if (group.root.kind != SetKind.STANDARD || logs.size > 1) Text(
+                                    if (componentIndex == 0) "Set ${index + 1} · ${if (group.root.warmup) "Warm-up" else group.root.kind.label}"
+                                    else "Myo component $componentIndex", Modifier.padding(top = 10.dp), color = OF.muted,
+                                    style = MaterialTheme.typography.labelMedium,
                                 )
+                                logs.forEach { s -> key(s.id) {
+                                    SetRow(
+                                        index, s, data.preferences, metrics,
+                                        exerciseName = e.title + (s.side?.let { " ${it.label.lowercase()}" } ?: "") +
+                                            (if (componentIndex > 0) " Myo component $componentIndex" else ""),
+                                        onChange = { changed -> vm.editSet(se.id, s.id) { changed } },
+                                        onComplete = { vm.toggleSetCompletion(se.id, s.id) },
+                                        onRemove = { vm.removeSet(se.id, s.id) },
+                                        onKind = { kind, isWarmup -> vm.setKind(se.id, s.id, kind, isWarmup) },
+                                        hasExtras = group.components.size > 1,
+                                    )
+                                } }
+                            }
+                            if (group.root.kind == SetKind.MYO && !group.root.warmup) TextButton({ vm.addMyoComponent(se.id, group.root.id) }) {
+                                Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
+                                Text("Add Myo component", Modifier.padding(start = 6.dp))
                             }
                         }
                         FilledTonalIconButton({ vm.addSet(se.id) }) {
@@ -359,6 +386,14 @@ fun WorkoutSession(
                 if (exerciseNotes) SessionNotesDialog("Exercise notes", se.notes, { exerciseNotes = false }) {
                     vm.exerciseNotes(se.id, it)
                     exerciseNotes = false
+                }
+                if (superset) SupersetDialog(workout, se.id, exercises, { superset = false }) { ids ->
+                    vm.groupSuperset(ids)
+                    superset = false
+                }
+                if (mergeSides) ConfirmDialog("Use left logs only?", "Right-side values and completion will be removed. Left-side values stay unchanged.", "Keep left logs", { mergeSides = false }) {
+                    vm.keepLeftSide(se.id)
+                    mergeSides = false
                 }
                 if (remove)
                     ConfirmDialog(
@@ -385,6 +420,7 @@ fun WorkoutSession(
                         Triple("Use Rest Timers", data.preferences.autoRest, { checked: Boolean -> vm.settings { it.copy(autoRest = checked) } }),
                         Triple("Rest After Last Warm-up Set", data.preferences.restAfterLastWarmupSet, { checked: Boolean -> vm.settings { it.copy(restAfterLastWarmupSet = checked) } }),
                         Triple("Rest Between Exercises", data.preferences.restBetweenExercises, { checked: Boolean -> vm.settings { it.copy(restBetweenExercises = checked) } }),
+                        Triple("Advance within supersets", data.preferences.supersetAutoNext, { checked: Boolean -> vm.settings { it.copy(supersetAutoNext = checked) } }),
                     ).forEach { (label, checked, change) ->
                         Row(
                             Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = change),
@@ -395,6 +431,14 @@ fun WorkoutSession(
                             Switch(checked, onCheckedChange = null)
                         }
                     }
+                    Text("Rest between sides · ${data.preferences.restBetweenSidesPercent}%")
+                    Slider(
+                        value = data.preferences.restBetweenSidesPercent.toFloat(),
+                        onValueChange = { value -> vm.settings { it.copy(restBetweenSidesPercent = value.toInt()) } },
+                        valueRange = 0f..100f,
+                        modifier = Modifier.semantics { contentDescription = "Rest between sides percentage" },
+                    )
+                    Text("0% skips side rest; 100% uses the full timer. Myo uses 15 seconds between components.", style = MaterialTheme.typography.bodySmall, color = OF.muted)
                 }
             },
             confirmButton = { TextButton({ restSettings = false }) { Text("Done") } },
@@ -431,7 +475,7 @@ fun WorkoutSession(
             title = { Text("Finish Workout?") },
             text = {
                 Column {
-                    Text("${workout.completedSets()} completed sets will be saved to your history.")
+                    Text("${workout.completedSets()} sets with completed logs will be saved to your history. Incomplete sides remain unfinished.")
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(saveTemplate, { saveTemplate = it })
                         Text("Save as workout template")
@@ -455,6 +499,28 @@ fun WorkoutSession(
 }
 
 @Composable
+private fun SupersetDialog(workout: Workout, currentId: String, catalog: List<Exercise>, onDismiss: () -> Unit, onSave: (Set<String>) -> Unit) {
+    var selected by remember { mutableStateOf(setOf(currentId)) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Create superset") },
+        text = { Column(Modifier.verticalScroll(rememberScrollState())) {
+            Text("Choose at least two exercises. Existing group memberships for these exercises will be replaced.")
+            workout.exercises.forEach { exercise ->
+                Row(Modifier.fillMaxWidth().toggleable(exercise.id in selected, role = Role.Checkbox) {
+                    selected = if (it) selected + exercise.id else selected - exercise.id
+                }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(exercise.id in selected, null)
+                    Text(catalog.find { it.id == exercise.exerciseId }?.title ?: "Exercise", Modifier.weight(1f))
+                }
+            }
+        } },
+        confirmButton = { TextButton({ onSave(selected) }, enabled = selected.size >= 2) { Text("Create") } },
+        dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
 private fun SessionNotesDialog(title: String, initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
     var notes by rememberSaveable { mutableStateOf(initial) }
     AlertDialog(
@@ -472,7 +538,7 @@ private fun WorkoutTargetsDialog(
     onDismiss: () -> Unit,
     onSave: (Map<String, WorkingSetTarget>, Int?) -> Unit,
 ) {
-    val sets = remember { exercise.sets.filterNot { it.warmup } }
+    val sets = remember { exercise.logicalSets().map { it.root }.filterNot { it.warmup } }
     var values by remember {
         mutableStateOf(sets.associate { it.id to listOf(
             it.targetRepsMin?.toString().orEmpty(),
@@ -540,9 +606,12 @@ private fun SetRow(
     onChange: (LoggedSet) -> Unit,
     onComplete: () -> Unit,
     onRemove: () -> Unit,
+    onKind: (SetKind, Boolean) -> Unit,
+    hasExtras: Boolean,
 ) {
     var options by remember { mutableStateOf(false) }
-    var rir by remember(set.id) { mutableStateOf(set.rir?.toString() ?: "") }
+    var pendingKind by remember { mutableStateOf<Pair<SetKind, Boolean>?>(null) }
+    var rir by remember(set.id, set.rir) { mutableStateOf(set.rir?.toString() ?: "") }
     val rirValue = rir.toIntOrNull()
     val rirError = rir.isNotEmpty() && (rirValue == null || rirValue !in 0..10)
     val showRir = prefs.showRir && metrics.any { it.isReps }
@@ -564,18 +633,26 @@ private fun SetRow(
                 },
                 contentPadding = PaddingValues(0.dp),
             ) {
-                Text(if (set.warmup) "W" else "${index+1}", fontSize = 13.sp)
+                Text(set.side?.label?.take(1) ?: if (set.warmup) "W" else "${index+1}", fontSize = 13.sp)
             }
             DropdownMenu(options, { options = false }) {
+                SetKind.entries.forEach { kind -> DropdownMenuItem(
+                    text = { Text(kind.label) },
+                    trailingIcon = if (set.kind == kind && !set.warmup) { { Icon(Icons.Rounded.Check, null) } } else null,
+                    onClick = {
+                        options = false
+                        if (hasExtras && kind != SetKind.MYO) pendingKind = kind to false else onKind(kind, false)
+                    },
+                ) }
                 DropdownMenuItem(
                     text = { Text(if (set.warmup) "Mark as Working Set" else "Mark as Warm-Up") },
                     onClick = {
                         options = false
-                        onChange(set.copy(warmup = !set.warmup))
+                        if (hasExtras) pendingKind = SetKind.STANDARD to !set.warmup else onKind(SetKind.STANDARD, !set.warmup)
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("Remove Set") },
+                    text = { Text(if (set.segmentOf != null) "Remove Myo component" else "Remove Set") },
                     onClick = {
                         options = false
                         onRemove()
@@ -649,6 +726,10 @@ private fun SetRow(
             )
         }
     }
+    pendingKind?.let { (kind, warmup) -> ConfirmDialog(
+        "Remove Myo components?", "Changing this set type removes its additional component values on both sides. The main set is kept.",
+        "Change set type", { pendingKind = null }, { onKind(kind, warmup); pendingKind = null },
+    ) }
 }
 
 @Composable
@@ -769,20 +850,21 @@ fun WorkoutSummary(
                                 style = MaterialTheme.typography.titleMedium,
                             )
                         }
-                        se.sets
-                            .filter { it.completed }
-                            .forEachIndexed { i, s ->
-                                Row(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                        if (se.supersetId != null) Text("Superset", color = OF.muted, style = MaterialTheme.typography.bodySmall)
+                        se.logicalSets().forEachIndexed { i, group ->
+                            if (group.logs.any { it.completed }) {
+                                Text(if (group.root.warmup) "Warm-up" else "Set ${i + 1} · ${group.root.kind.label}", Modifier.padding(top = 12.dp), color = OF.muted)
+                                group.components.forEachIndexed { componentIndex, logs -> logs.forEach { s ->
                                     Text(
-                                        if (s.warmup) "Warm-up" else "Set ${i+1}",
-                                        Modifier.weight(1f),
-                                        color = OF.muted,
+                                        listOfNotNull(s.side?.label, if (componentIndex > 0) "Myo $componentIndex" else null).joinToString(" · ")
+                                            .let { if (it.isEmpty()) "" else "$it: " } +
+                                            if (s.completed) s.describe(e?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS), prefs.pounds, prefs.distanceImperial)
+                                            else "Not completed",
+                                        Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium,
                                     )
-                                    Text(
-                                        s.describe(e?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS), prefs.pounds, prefs.distanceImperial)
-                                    )
+                                } }
                                 }
-                            }
+                        }
                         if (se.notes.isNotBlank())
                             Text(se.notes, Modifier.padding(top = 12.dp), color = OF.muted)
                     }

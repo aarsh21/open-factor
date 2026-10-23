@@ -80,11 +80,13 @@ Source eligibility excludes warmups, skipped logs, and empty logs. The warmup
 filter is at `0x7bd368`, the skipped/empty filter at `0x7bd45c`, and serialized
 `isSkipped` at `0x7ae2a0`. RIR and rest alone do not make a log nonempty.
 
-Open Factor's flat logger has no equivalent source skipped, lateral, or partial
-log model. Its separate local policy exports completed, non-warmup rows with a
-positive performed metric. Elapsed time subtracts saved pauses. This adaptation
-does not establish one-to-one source set eligibility. A finished positive-
-duration session with no eligible rows has no segments. A zero-duration,
+Open Factor's logger has independent side and Myo component logs, but no source
+skipped or partial-rep model. Its local policy exports one segment for each
+non-warmup logical set with a completed log that has a positive performed metric.
+Segment repetitions sum those eligible logs, including distinct sides and Myo
+components. This grouping and repetition policy is a local adaptation, not
+source equivalence. Elapsed time subtracts saved pauses. A finished positive-
+duration session with no eligible sets has no segments. A zero-duration,
 zero-set session is omitted because Android requires the end after the start.
 
 ## Explicit actions and idempotent writes
