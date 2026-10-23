@@ -1,6 +1,6 @@
-# Selected-template program materialization
+# Smart-generation recovery
 
-`materializeProgram` converts already selected exercise templates into a seven-day, seven-normal-week `TrainingProgram`. It does not implement the complete source smart generator. No smart-generation UI calls this function until exercise selection and allocation are recovered.
+`materializeProgram` converts already selected exercise templates into a seven-day, seven-normal-week `TrainingProgram`. `allocateProgramVolume` recovers the earlier weekly time-budget stage. Neither function implements the complete source smart generator, and neither has a smart-generation UI caller. Exercise selection and day distribution remain incomplete.
 
 ## Input boundary
 
@@ -8,9 +8,9 @@ The function requires a resolved `ProgramGoal`, a resolved `ProgramPeriodization
 
 The native service uses the record `({MuscleGroup? accessoryMuscle, Exercise exercise, int numSets, ExerciseTemplateType type})` after selection. The materializer takes only the facts that its target-construction stage reads. The lifecycle unit projects factual Movement Patterns into the catalog. `Exercise.movementPatterns` distinguishes absent facts from an explicit `None`. The materializer rejects absent Movement Patterns or Metrics instead of inferring them. It uses exact `Horizontal Pull` and `Vertical Pull` values and the existing `loggingMetrics().any { it.isReps }` classification, including per-side reps.
 
-The public catalog still lacks source generator descriptors and ranking fields. Exercise names, muscles, joint actions, and `searchBoost` are not substitutes.
+The public catalog now preserves source goal-specific descriptors and six recommendation levels in `generationFacts`. Exercise names, muscles, joint actions, and `searchBoost` are not substitutes for those fields.
 
-Equipment, focus, session duration, and experience are not accepted as inputs that the function would silently ignore. Their effect on selection and allocation remains unresolved. The function accepts no nullable preference that could imply a fabricated recommendation policy.
+Equipment, focus, session duration, and experience are not materializer inputs. The separate allocator accepts an explicit session-length choice, split, goal, frequency, warm-up setting, and category rest overrides. Neither function accepts a nullable preference that could imply a fabricated recommendation policy.
 
 ## Recovered behavior
 
@@ -41,13 +41,48 @@ The function preserves selected training-day and exercise order. Working-set cou
 
 `cycleCount` remains seven. `cycleUnit=WEEK` records generated-week presentation provenance. This does not establish the source's general Week/Cycle labeling predicate. The existing target model supplies local identities, names for rest days, and unset rest overrides. Those storage details are not recovered source serialization.
 
+## Weekly time allocation
+
+`allocateProgramVolume` returns four category layouts. Each layout records working sets per time-calculation slot and estimated microseconds. A slot is not a selected exercise, a primary or secondary role, or a training day.
+
+| Contract | Source evidence |
+| --- | --- |
+| Length budgets of 18, 30, 50, 75, 105, and 125 minutes | `edc224` |
+| Weekly budget equals length budget × training days | `ecf034` through `ecf048` |
+| Upper-body share by resolved split | `ecf04c` through `ecf0f4` |
+| Compound share is 0.6 for strength, 0.5 for hypertrophy or both | `ecf134` through `ecf1a8` |
+| Compound candidates have at least four upper or two lower total sets | `edb46c` |
+| Choose the nearest estimated duration, including over-budget candidates | `edb380` through `edb468` |
+| Compound ties choose the last candidate; isolation ties choose the first | `a692d8`, `a693f4`, and call arguments in `ecf134` through `ecf49c` |
+| Isolation budget uses the actual remainder after compound allocation | `ecf34c` through `ecf49c` |
+| Candidate order and bounds: 31 compound layouts, 86 isolation layouts | `12a0ab0` and `12a0948` |
+| Cost adds setup and warm-up per slot, 30 seconds per set, and rest between sets only | `ed31ac`, `ed32ec` |
+| Setup is 180 seconds for compounds and 90 for isolation; warm-up is zero or 120 | `ed3330`, `ed33c8` |
+| Default rest is 120 seconds for upper compounds, 180 for lower compounds, and 90 for isolation | `a55508`, `a555bc` |
+
+The upper-body share is 0.65 for full body, push/pull, push/pull/legs, push/pull/legs/accessories, and repeated push/pull/legs. It is 0.6 for upper/lower/upper/lower/upper and push/pull/legs/upper/lower. Other resolved splits use 0.5. These shares do not recommend a split.
+
+The source scores duration differences after truncation to whole milliseconds. Explicit zero rest is valid. Isolation still receives a candidate when compound allocation exhausts its region budget. The candidate enumerators are finite, so a larger budget does not create arbitrary extra slots.
+
+## Factual catalog projection
+
+`tooling/import_reference_apk.py --facts-only` preserves eight original fields under `generationFacts`, without source instructions or media. Six fields contain nullable numbers. Their names combine `strength` or `hypertrophy` with `PrimaryCompoundRecommendationLevel`, `SecondaryCompoundRecommendationLevel`, or `AccessoryRecommendationLevel`. The two list fields are `exerciseClassificationStrength` and `exerciseClassificationHypertrophy`; their values remain ordered source descriptor IDs.
+
+`ExerciseGenerationFacts` distinguishes an absent map key, an explicit null value, and an empty descriptor list. The decoder accepts only the eight named fields and rejects invalid types and nonfinite numbers. A new custom exercise has no inferred generation facts. Explicit facts survive backup encoding.
+
+`DataCodec.catalog(text, bundled)` enriches older imported records by exact ID. Bundled facts fill missing keys only. Imported nulls, empty lists, zero ranks, names, and media remain unchanged. The existing Region and Movement Patterns enrichment keeps the same precedence and does not copy other properties.
+
+The source serializer at `6c9f94` through `6ca0cc` maps import offsets `0x5f`, `0x63`, `0x67`, `0x6b`, `0x6f`, and `0x73` to the six recommendation fields. At `6ca100` and `6ca160`, offsets `0x77` and `0x7b` map to the classification lists. The Exercise constructor at `6d3180` through `6d3274` converts those lists into descriptor fields `0x47` and `0x4b`.
+
+The goal/descriptor accessor at `ed97e4` uses strength recommendations for strength and hypertrophy recommendations for hypertrophy. For both, it uses strength primary-compound recommendations but hypertrophy secondary-compound and accessory recommendations. Descriptor filtering at `edb26c` follows the same goal/role choice. This mapping does not establish the complete ranking policy.
+
 ## Unresolved upstream behavior
 
 The retained split routine at `ec7010` through `ecb998` supplies 17 split/frequency variants. Its three category-list fields still lack established selection roles. Those lists are not final exercise selections.
 
-The selector at `eda978` applies filters and ranking. The goal/descriptor branch at `ed97e4` reads distinct exercise fields at tagged offsets `0x5f` through `0x73`. The public catalog omits those fields. `ed885c` chooses randomly among the remaining candidates. The complete filtering, ranking, tie policy, and candidate-failure behavior are not recovered.
+The selector at `eda978` applies movement-pattern, descriptor, and non-null recommendation filters before ranking at `ed8940`. That ranking also considers prior selections, exclusion-group overlap, and equipment overlap. Those contracts are not yet implemented. `ed885c` chooses randomly among the remaining candidates. The complete filtering, ranking, tie policy, and candidate-failure behavior are not recovered.
 
-`edc224` converts WorkoutLength values to duration budgets of 18, 30, 50, 75, 105, and 125 minutes. This does not establish time allocation or set counts. Muscle-focus weighting, equipment compatibility, user assessment, and experience effects remain unresolved.
+Weekly category volume is recovered, but its distribution among movement patterns, selected exercises, and training days remains incomplete. Muscle-focus weighting, equipment compatibility, user assessment, and experience effects remain unresolved.
 
 At the inspected wizard call, null goal falls back to strength (`ecec14` through `ecec20`), and null periodization falls back to linear (`ecec30` through `ecec44`). This does not establish every UI No preference representation or split recommendation policy.
 
@@ -61,4 +96,10 @@ The progression unit owns recovered deload transforms. Persisted deload placemen
 
 `ProgramMaterializerTest` checks captured press/row target values through codec round-trip and `toWorkout`, five calendar frequencies, contrasting goal/role/pull combinations, all periodization modes, set-count boundaries, and non-rep metrics. It also checks any-match behavior, per-side reps, and absent versus explicit empty facts. Expected fixture values come from native literals and retained capture containers, not the implementation's private tables.
 
-These tests do not validate selection under contrasting equipment, focus, duration, or experience. Those upstream contracts are unresolved. No source account or device mutation is part of this recovery.
+`ProgramVolumeAllocatorTest` checks asymmetric category rest, explicit zero, minimum volumes, over-budget choices, both tie rules, actual-remainder allocation, and finite candidate limits. An excluded temporary test passed 1,836 cases and 7,344 category outputs. Its expected layouts use original ARM64-emitted candidates, not Kotlin private tables, across all 17 supported split/frequency variants, six lengths, three goals, both warm-up settings, and three rest profiles.
+
+An offline Unicorn probe executes the original candidate enumerators, cost routine, and minimum comparator. It supplies VM allocation, yield, collection, and arithmetic shims; it does not run a Dart VM or the source app. The matrix transcribes setup arithmetic separately. Neither check proves full-service or app-level equivalence. Reproduction scripts and outputs remain in the locally excluded `.amp/in/artifacts/smart-generation/` directory.
+
+`ExerciseGenerationFactsTest` checks decoding, backup round-trip, invalid types, and missing-key enrichment without replacing imported nulls or empty lists. The facts-only projection retains all 1,345 exercise IDs in order and every previous public catalog fact. The eight added fields match the retained APK records exactly. The shared private reference pack remains untouched.
+
+These tests do not validate exercise selection under contrasting equipment, focus, duration, or experience. Those upstream contracts are unresolved. No source account or device mutation is part of this recovery.

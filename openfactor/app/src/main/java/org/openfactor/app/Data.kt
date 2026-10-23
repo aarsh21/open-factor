@@ -37,6 +37,7 @@ data class Exercise(
     val resistanceEquipment: List<Set<String>> = emptyList(),
     val supportEquipment: List<Set<String>> = emptyList(),
     val archived: Boolean = false,
+    val generationFacts: ExerciseGenerationFacts = ExerciseGenerationFacts(),
 )
 
 data class LoggedSet(
@@ -333,6 +334,11 @@ object DataCodec {
             .put("browseCategories", JSONArray(browseCategories))
             .put("resistanceEquipment", JSONArray(resistanceEquipment.map { JSONArray(it.toList()) }))
             .put("supportEquipment", JSONArray(supportEquipment.map { JSONArray(it.toList()) }))
+            .also {
+                if (generationFacts.classifications.isNotEmpty() || generationFacts.recommendationLevels.isNotEmpty()) {
+                    it.put("generationFacts", generationFacts.json())
+                }
+            }
 
     fun encode(d: AppData): String =
         JSONObject()
@@ -554,10 +560,24 @@ object DataCodec {
             requirements("resistanceEquipment"),
             requirements("supportEquipment"),
             optBoolean("archived"),
+            ExerciseGenerationFacts.decode(if (has("generationFacts")) getJSONObject("generationFacts") else null),
         ).also { if (custom) it.loggingMetrics() }
     }
 
-    fun catalog(text: String): List<Exercise> = JSONArray(text).objects().map { it.exercise() }
+    fun catalog(text: String, bundled: List<Exercise> = emptyList()): List<Exercise> {
+        val factsById = bundled.associateBy { it.id }
+        return JSONArray(text).objects().map { json ->
+            val exercise = json.exercise()
+            val facts = factsById[exercise.id]
+            if (facts == null) exercise else exercise.copy(
+                properties = facts.properties.filterKeys { it in listOf("Region", "Movement Patterns") } + exercise.properties,
+                generationFacts = ExerciseGenerationFacts(
+                    facts.generationFacts.classifications + exercise.generationFacts.classifications,
+                    facts.generationFacts.recommendationLevels + exercise.generationFacts.recommendationLevels,
+                ),
+            )
+        }
+    }
 }
 
 class WorkoutStore(context: Context) {
@@ -589,22 +609,11 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     private val imported =
         runCatching {
                 application.assets.open("reference/catalog.json").bufferedReader().use {
-                    DataCodec.catalog(it.readText())
+                    DataCodec.catalog(it.readText(), bundled)
                 }
             }
             .getOrElse { emptyList() }
-    val catalog: List<Exercise> =
-        if (imported.isEmpty()) bundled
-        else {
-            val facts = bundled.associate { it.id to it.properties }
-            imported.map { exercise ->
-                val missing = facts[exercise.id].orEmpty().filterKeys {
-                    it in listOf("Region", "Movement Patterns") && it !in exercise.properties
-                }
-                if (missing.isEmpty()) exercise
-                else exercise.copy(properties = exercise.properties + missing)
-            }
-        }
+    val catalog: List<Exercise> = imported.ifEmpty { bundled }
 
     val equipmentCatalog = EquipmentCatalog(application)
 

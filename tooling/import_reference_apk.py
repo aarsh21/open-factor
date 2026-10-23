@@ -118,6 +118,13 @@ def build(apk: Path, dest: Path, video_directory: Path | None = None, public_dat
                 'properties':{label: ', '.join(str(index[i]['name']) for i in (record.get(field,[]) if isinstance(record.get(field),list) else [record.get(field)]) if i in index) or 'None'
                     for label,field in [('Type','exerciseType'),('Region','regionTrained'),('Movement Patterns','movementPattern'),('Laterality','laterality'),('Primary Joint Action','primaryJointAction'),('Secondary Joint Action','secondaryJointAction'),('Metrics','exerciseMetrics'),('Range of Motion','rom'),('Stability','stability')]},
                 'bodyweight':record.get('bodyweight') or 0.0,'searchBoost':record.get('searchBoostValue') or 0.0,
+                # Preserve original descriptor IDs, null ranks, empty lists, and absent fields.
+                # These are generator facts, not searchBoost or inferred exercise classifications.
+                'generationFacts':{field:record[field] for field in (
+                    'exerciseClassificationStrength','exerciseClassificationHypertrophy',
+                    'strengthPrimaryCompoundRecommendationLevel','strengthSecondaryCompoundRecommendationLevel',
+                    'strengthAccessoryRecommendationLevel','hypertrophyPrimaryCompoundRecommendationLevel',
+                    'hypertrophySecondaryCompoundRecommendationLevel','hypertrophyAccessoryRecommendationLevel') if field in record},
                 'browseCategories':classify_browse(record),
                 'equipment':equipment(record),'equipmentOptions':entities(record,'resistanceEquipmentGroupIds'),
                 'supportEquipmentOptions':entities(record,'supportEquipmentGroupIds'),
