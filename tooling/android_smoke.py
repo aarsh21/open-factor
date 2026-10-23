@@ -205,20 +205,27 @@ if a.media:
   cached=[path for path in cached if int(path.split('/')[2])==current]
   expected={path:adb('shell','run-as','org.openfactor.app','sha256sum',path).split()[0] for path in cached}
   assert len(expected)==3, 'Expected the three exercised camera caches'
+  recoveries={}
   try:
-   for path in cached:adb('shell','run-as','org.openfactor.app','truncate','-s','0',path)
-   tap('Info')
-   for view in range(1,4):
-    tap(f'Camera view {view}','content-desc');assert_autoplay()
-   actual={path:adb('shell','run-as','org.openfactor.app','sha256sum',path).split()[0] for path in cached}
-   assert actual==expected, 'Empty playback caches were not restored byte-for-byte'
-   capture('media-recovered-empty-cache')
-   (a.output/'cache-recovery.json').write_text(json.dumps({'status':'passed','original_cache_sha256':expected,'recovered_cache_sha256':actual},indent=2)+'\n')
+   for damage in ['empty','truncated','invalid-header']:
+    for path in cached:
+     if damage=='invalid-header':
+      adb('shell','run-as','org.openfactor.app','dd','if=/dev/zero',f'of={path}','bs=4096','count=1','conv=notrunc')
+     else:
+      adb('shell','run-as','org.openfactor.app','truncate','-s','0' if damage=='empty' else '64',path)
+    tap('Info')
+    for view in range(1,4):
+     tap(f'Camera view {view}','content-desc');assert_autoplay()
+    actual={path:adb('shell','run-as','org.openfactor.app','sha256sum',path).split()[0] for path in cached}
+    assert actual==expected, f'{damage} playback caches were not restored byte-for-byte'
+    capture(f'media-recovered-{damage}-cache')
+    recoveries[damage]=actual
+    adb('shell','input','keyevent','4')
+   (a.output/'cache-recovery.json').write_text(json.dumps({'status':'passed','original_cache_sha256':expected,'recovered_cache_sha256':recoveries},indent=2)+'\n')
   finally:
    for path in cached:
-    if adb('shell','run-as','org.openfactor.app','stat','-c','%s',path).strip()=='0':
+    if adb('shell','run-as','org.openfactor.app','sha256sum',path).split()[0]!=expected[path]:
      adb('shell','run-as','org.openfactor.app','rm',path)
-  adb('shell','input','keyevent','4')
   find('Info');tap('Back','content-desc');find('Chin-Up')
   assert any(n.get('class')=='android.widget.EditText' and n.get('text')=='chin-up' for n in nodes()), 'Info return lost the library query'
  finally:

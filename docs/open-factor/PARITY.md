@@ -93,9 +93,35 @@ The selected-template materializer and deload transformation do not recover
 exercise selection, the history-dependent strength profile, or calendar placement.
 See [manual programs](PROGRAMS.md) and the private `program-recovery/REPORT.md`.
 
+## Corrupt playback-cache recovery, October 23
+
+The unchanged private APK failed after each Chin-Up camera cache was truncated
+to 64 bytes or given a zeroed header without changing its length. Healthy-camera
+controls passed before both failures. The corrected player rebuilds a bundled
+clip's cache once after a native playback error. All three cameras then autoplay,
+and the rebuilt files hash-match the intact originals in both cases.
+
+This bounded native check used private APK SHA-256
+`b954704349b46060866b567633747fd5c4e775c4dcf94938a3e55b6c9dc4a780`.
+Its 89 JVM tests, lint, and both APK assemblies pass. Incremental packaging hit
+the documented large-archive integer overflow. A clean rebuild passed without
+an app workaround. These results precede the newer combined feature integration.
+
+A separately signed control APK changes only one bundled clip to 64 bytes.
+Its executable code matches the candidate. The player shows the photo fallback
+without an Android error dialog, makes no repeated cache writes over eight
+seconds, and can switch to a healthy camera. The shared reference pack is
+unchanged. This control does not certify every codec or storage-failure case.
+
+Evidence is under `.amp/in/artifacts/astra-parity/media/`, including the before
+and after results, rendered captures, control identity, and independent handoff.
+Original app and test APKs, the complete private tree with ownership and modes,
+both original photos, and device settings match the baseline after restoration.
+This is local emulator acceptance, not physical-device or full source parity.
+
 ## Combined integration checkpoint
 
-The latest source-only snapshot at
+The preceding source-only snapshot at
 [`c663f01d`](https://github.com/aarsh21/open-factor/commit/c663f01df672c5aabb7996649ebe27ef49c38abd)
 adds action-specific accessibility names and selected-color states to shortcut
 color controls without changing their appearance. All 88 maintained JVM tests,
@@ -366,16 +392,24 @@ After installing the application/test APKs on an explicitly disposable emulator:
 adb -s emulator-5580 shell am instrument -w \
   org.openfactor.app.test/androidx.test.runner.AndroidJUnitRunner
 python tooling/android_offline_suite.py --serial emulator-5580 \
-  --output .amp/in/artifacts/parity/offline-suite
+  --leased-emulator --output .amp/in/artifacts/parity/offline-suite \
+  --apk-sha256 "$APP_SHA256" --test-apk-sha256 "$TEST_APK_SHA256" \
+  --source-revision "$(git rev-parse HEAD)" --expect-provider "$PROVIDER_STATE"
 ```
 
-The offline suite records installed APK identity and package permissions, disables
-Wi-Fi/mobile data, checks no active default network before each flow, and restores
-prior network settings in `finally`. It runs workout/shortcut/targets/warm-up/live
-settings, original-media cameras/lifecycle, manual programs and onboarding flows.
-The package test verifies absence of Internet permission. Local checks still do
-not certify the missing/unobserved rows above. Record actual run outcomes in the
-review artifacts, including failures; do not mark this entire matrix accepted.
+The hash variables must identify the installed app and test APKs. Use `absent`
+for an absent test APK. `PROVIDER_STATE` is the observed Health Connect state:
+`available`, `unavailable`, or `update-required`. The output directory must be new.
+The full suite requires a private build with original exercise media and the
+nine opt-in body-reference SVGs. Public builds cannot pass those media cases.
+
+The offline suite runs 15 independent synthetic-data cases on one pinned APK.
+It checks no active default network before each flow and preserves failure
+receipts. Recovery verifies the original private tree, owned external files,
+device settings, and unchanged APK identities. It never installs an APK, clears
+the app, grants Health permissions, or transfers provider data. Local checks do
+not certify the missing or unobserved source behavior above. Record failures
+alongside passes rather than marking the entire parity matrix accepted.
 
 The body-data smoke check uses a separate disposable emulator with no body
 records. It exercises native input, editing, deletion, restart, enlarged type,

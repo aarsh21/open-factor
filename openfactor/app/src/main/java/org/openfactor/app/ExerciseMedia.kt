@@ -46,6 +46,7 @@ fun ExerciseMedia(e: Exercise) {
     var player by remember(e.id, selected) { mutableStateOf<MediaPlayer?>(null) }
     var videoView by remember(e.id, selected) { mutableStateOf<VideoView?>(null) }
     var failed by remember(e.id, selected) { mutableStateOf(false) }
+    var cacheRetried by remember(e.id, selected) { mutableStateOf(false) }
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, e.id, selected) {
@@ -63,7 +64,7 @@ fun ExerciseMedia(e: Exercise) {
         context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime
     }
     val clip = e.clips.getOrNull(selected)?.takeIf { it.isNotBlank() } ?: e.video
-    val uri by key(clip) {
+    val uri by key(clip, cacheRetried) {
         produceState<Uri?>(null) {
             value =
                 withContext(Dispatchers.IO) {
@@ -79,7 +80,7 @@ fun ExerciseMedia(e: Exercise) {
                                         "exercise-videos/$installTime/${clip.substringAfterLast('/')}",
                                     )
                                 output.parentFile?.mkdirs()
-                                if (output.length() == 0L) {
+                                if (cacheRetried || output.length() == 0L) {
                                     val pending = File(output.parentFile, output.name + ".partial")
                                     context.assets.open(clip).use { input ->
                                         pending.outputStream().use { input.copyTo(it) }
@@ -114,7 +115,7 @@ fun ExerciseMedia(e: Exercise) {
     }
     Box(Modifier.fillMaxWidth().aspectRatio(4f / 5f).clipToBounds(), contentAlignment = Alignment.Center) {
             if (started && uri != null && !failed) {
-                key(e.id, selected, uri) {
+                key(e.id, selected, uri, cacheRetried) {
                     AndroidView(
                         factory = { ctx ->
                             val video = object : VideoView(ctx) {
@@ -159,8 +160,13 @@ fun ExerciseMedia(e: Exercise) {
                                     }
                                 }
                                 setOnErrorListener { _, _, _ ->
-                                    failed = true
-                                    playing = false
+                                    if (!cacheRetried && clip?.startsWith("reference/") == true) {
+                                        // Rebuild a damaged derivative once; an unplayable original still falls back.
+                                        cacheRetried = true
+                                    } else {
+                                        failed = true
+                                        playing = false
+                                    }
                                     true
                                 }
                                 setVideoURI(uri)
