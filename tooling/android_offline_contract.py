@@ -162,7 +162,8 @@ def contract(device, ui):
                ('Bodyweight Contribution', 'showBodyweightContribution')]
     initial = dict(zip([key for _, key in toggles], [False, True, False, True, False]))
     data['preferences'].update(initial, restSeconds=137, autoRest=False, distanceImperial=True,
-                               restAfterLastWarmupSet=False, restBetweenExercises=True)
+                               restAfterLastWarmupSet=False, restBetweenExercises=True,
+                               supersetAutoNext=False, restBetweenSidesPercent=37)
     device.stop()
     local = ui.output / 'synthetic-preferences.xml'
     local.write_bytes(xml(data))
@@ -179,6 +180,8 @@ def contract(device, ui):
     assert before['bodyMeasurements'] == data['bodyMeasurements']
     assert before['progressPhotos'] == data['progressPhotos']
     assert all(before['preferences'][key] == value for key, value in initial.items())
+    assert before['preferences']['supersetAutoNext'] is False
+    assert type(before['preferences']['restBetweenSidesPercent']) is int and before['preferences']['restBetweenSidesPercent'] == 37
     ui.settings()
     ui.tap('Workout')  # First match is the Settings row, not the bottom nav tab.
     for label, key in toggles:
@@ -214,7 +217,10 @@ def contract(device, ui):
         'pounds': False, 'restSeconds': 137, 'autoRest': False, 'showRir': True,
         'exerciseAutoNext': False, 'keepAlive': True, 'showWorkoutTimer': False,
         'showBodyweightContribution': True, 'distanceImperial': True,
-        'restAfterLastWarmupSet': False, 'restBetweenExercises': True}}
+        'restAfterLastWarmupSet': False, 'restBetweenExercises': True,
+        'supersetAutoNext': False, 'restBetweenSidesPercent': 37}}
+    assert scoped['data']['workoutSettings']['supersetAutoNext'] is False
+    assert type(scoped['data']['workoutSettings']['restBetweenSidesPercent']) is int
     assert ui.state() == expected
     ui.settings()
     ui.tap('Export Backup')
