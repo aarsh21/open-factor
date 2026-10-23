@@ -129,6 +129,7 @@ fun ExerciseSettingsScreen(
                         text, { text = it }, Modifier.fillMaxWidth(),
                         label = { Text(if (rest) "Rest seconds" else "Note") },
                         minLines = if (rest) 1 else 3,
+                        maxLines = if (rest) 1 else 6,
                         singleLine = rest,
                         isError = !valid,
                         supportingText = { Text(if (rest) "0–1800; leave blank for Default" else "Leave blank to remove the note") },
