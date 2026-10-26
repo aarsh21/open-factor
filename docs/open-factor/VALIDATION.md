@@ -130,3 +130,15 @@ The focused correction passed build/lint and all 31 unit tests on reference and 
 
 
 The independent second verdict, [live-metrics-02.md](reviews/live-metrics-02.md), is **ship for the single Levels weekly-average P2 only**. It resolves the period-label/value mismatch and establishes no correction regression in the eight new paired captures. Prior bounded Dashboard/private-photo acceptance is retained; complete analytics, 726 missing photos, original videos, onboarding rebuild, previous parity fixes and accessibility obligations remain open.
+
+
+## Exercise library opening time
+
+Opening the Exercises tab blocked the main thread while building the resistance filter list. That list was produced by scanning every equipment item against every exercise, and each check searched the equipment list linearly by id (297 × 1,345 × 297 comparisons). `EquipmentCatalog.resistanceItems` now inverts the stored resistance requirements in one pass, equipment lookups use an id map, and the gym availability set plus the Type, Laterality and Muscle dropdown values are computed once per catalog/gym change instead of on every keystroke.
+
+Emulator `emulator-5554` (Android 15/API 35, 1080×2400, system animations disabled), identical stored app data before and after, seven cold-process runs per build:
+
+- Resistance filter list computation on device: **1,102 ms → 3 ms**, and the result is byte-identical (**228 equipment items, no additions or removals** across all 1,345 catalog records).
+- Frame that draws the Exercises screen after tapping the tab: median **1,909 ms** (1,721–2,231) before, median **287 ms** (258–339) after.
+
+Correctness evidence: 110 unit tests, 11 instrumented tests on device including new assertions that `resistanceItems` equals the per-item `usesResistance` scan for the whole catalog and for the custom, bodyweight-only, name-matched and empty-requirement fallbacks, and a full `tooling/android_library_smoke.py` pass on the changed build (query/scroll, detail return, resistance alternatives, sheet search/cancel, combined filter and clear, process recreation, read-only filters, exercise defaults, pinned notes, scopes, offline). The launch-time catalog JSON parse (about 270 ms of the same process start) was left unchanged.
