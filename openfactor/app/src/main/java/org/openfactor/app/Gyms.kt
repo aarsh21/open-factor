@@ -182,6 +182,10 @@ class EquipmentCatalog(context: Context) {
                     )
                     .map { EquipmentItem(it, it, "Equipment") }
             }
+    private val itemsById: Map<String, EquipmentItem> = items.associateBy { it.id }
+    private val idsByName: Map<String, Set<String>> =
+        items.groupBy { it.name.lowercase() }.mapValues { (_, matches) -> matches.mapTo(HashSet()) { it.id } }
+    private val bodyweightIds: Set<String> = idsByName["bodyweight only"].orEmpty()
     private val exerciseRequirements: Map<String, Pair<List<Set<String>>, List<Set<String>>>> =
         source?.optJSONArray("exercises")?.let { a ->
             (0 until a.length()).associate { i ->
@@ -211,13 +215,30 @@ class EquipmentCatalog(context: Context) {
     }
 
     fun usesResistance(e: Exercise, equipmentId: String): Boolean {
-        val item = items.find { it.id == equipmentId } ?: return false
+        val item = itemsById[equipmentId] ?: return false
         val resistance = if (e.custom) e.resistanceEquipment else exerciseRequirements[e.id]?.first.orEmpty()
         if (resistance.isNotEmpty()) return resistance.any {
             equipmentId in it || (it.isEmpty() && item.name.equals("Bodyweight only", true))
         }
         return e.equipmentOptions.ifEmpty { listOf(e.equipment) }.any {
             it.equals(item.name, true) || (it.equals("Bodyweight", true) && item.name.equals("Bodyweight only", true))
+        }
+    }
+
+    /** Equipment these exercises log resistance with, in catalog order. */
+    fun resistanceItems(exercises: List<Exercise>): List<EquipmentItem> {
+        val used = HashSet<String>()
+        exercises.forEach { used += resistanceIds(it) }
+        return items.filter { it.id in used }
+    }
+
+    private fun resistanceIds(e: Exercise): Set<String> {
+        val resistance = if (e.custom) e.resistanceEquipment else exerciseRequirements[e.id]?.first.orEmpty()
+        if (resistance.isNotEmpty())
+            return resistance.flatMapTo(HashSet()) { group -> group.ifEmpty { bodyweightIds } }
+        return e.equipmentOptions.ifEmpty { listOf(e.equipment) }.flatMapTo(HashSet()) { name ->
+            idsByName[name.lowercase()].orEmpty() +
+                if (name.equals("Bodyweight", true)) bodyweightIds else emptySet()
         }
     }
 

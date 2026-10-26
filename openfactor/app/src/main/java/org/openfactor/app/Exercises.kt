@@ -64,9 +64,7 @@ fun ExerciseLibrary(
         }
     }
     val resistanceItems = remember(exercises, equipmentCatalog) {
-        equipmentCatalog?.items.orEmpty().filter { item ->
-            exercises.any { equipmentCatalog?.usesResistance(it, item.id) == true }
-        }
+        equipmentCatalog?.resistanceItems(exercises).orEmpty()
     }
     val filtered =
         remember(
