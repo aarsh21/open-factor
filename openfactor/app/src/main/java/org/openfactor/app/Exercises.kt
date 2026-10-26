@@ -66,6 +66,20 @@ fun ExerciseLibrary(
     val resistanceItems = remember(exercises, equipmentCatalog) {
         equipmentCatalog?.resistanceItems(exercises).orEmpty()
     }
+    // Equipment availability and dropdown values depend only on the catalog and gym, not on the
+    // query or filters, so they stay out of the per-keystroke path.
+    val availableIds = remember(exercises, gym, equipmentCatalog) {
+        exercises.filter { equipmentCatalog?.available(it, gym) != false }.mapTo(HashSet()) { it.id }
+    }
+    val types = remember(exercises) {
+        listOf("All types") + exercises.mapNotNull { it.properties["Type"] }.distinct().sorted()
+    }
+    val lateralities = remember(exercises) {
+        listOf("All lateralities") + exercises.mapNotNull { it.properties["Laterality"] }.distinct().sorted()
+    }
+    val muscleGroups = remember(exercises) {
+        listOf("All muscles") + exercises.flatMap { it.muscles }.distinct().sorted()
+    }
     val filtered =
         remember(
             exercises,
@@ -82,6 +96,7 @@ fun ExerciseLibrary(
             performedIds,
             deprioritizedIds,
             modifiedIds,
+            availableIds,
         ) {
             exercises
                 .filter { e ->
@@ -89,7 +104,7 @@ fun ExerciseLibrary(
                     (scope == "All" || (scope == "Performed" && e.id in performedIds) ||
                         (scope == "Deprioritized" && e.id in deprioritizedIds) ||
                         (scope == "Modified" && e.id in modifiedIds) || scope == "Archived") &&
-                    (equipmentCatalog?.available(e, gym) != false) &&
+                    (e.id in availableIds) &&
                         (type == "All types" || e.properties["Type"] == type) &&
                         (laterality == "All lateralities" ||
                             e.properties["Laterality"] == laterality) &&
@@ -200,22 +215,8 @@ fun ExerciseLibrary(
                         }
                     }
                 }
-                FilterChooser(
-                    "Type",
-                    listOf("All types") +
-                        exercises.mapNotNull { it.properties["Type"] }.distinct().sorted(),
-                    type,
-                ) {
-                    type = it
-                }
-                FilterChooser(
-                    "Laterality",
-                    listOf("All lateralities") +
-                        exercises.mapNotNull { it.properties["Laterality"] }.distinct().sorted(),
-                    laterality,
-                ) {
-                    laterality = it
-                }
+                FilterChooser("Type", types, type) { type = it }
+                FilterChooser("Laterality", lateralities, laterality) { laterality = it }
                 if (equipmentCatalog != null) FilterChip(
                     resistanceId.isNotEmpty(),
                     { resistanceSheet = true },
@@ -245,14 +246,7 @@ fun ExerciseLibrary(
             }
             if (filter)
                 Column(Modifier.padding(horizontal = 18.dp)) {
-                    FilterChooser(
-                        "Muscle group",
-                        listOf("All muscles") +
-                            exercises.flatMap { it.muscles }.distinct().sorted(),
-                        muscle,
-                    ) {
-                        muscle = it
-                    }
+                    FilterChooser("Muscle group", muscleGroups, muscle) { muscle = it }
                 }
             if (!compactEmptyState) Row(
                 Modifier.horizontalScroll(rememberScrollState())
