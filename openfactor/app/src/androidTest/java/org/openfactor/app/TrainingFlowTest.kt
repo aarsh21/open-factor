@@ -297,5 +297,22 @@ class TrainingFlowTest {
         assertFalse(equipment.usesResistance(custom, support))
         assertFalse(equipment.usesResistance(custom, bodyweight))
         assertTrue(equipment.usesResistance(custom.copy(resistanceEquipment = listOf(emptySet())), bodyweight))
+        // The resistance filter offers exactly the equipment any listed exercise can log against,
+        // including the bodyweight-only and name-matched fallbacks.
+        val filtered = listOf(
+            custom,
+            custom.copy(resistanceEquipment = listOf(emptySet())),
+            custom.copy(custom = false, resistanceEquipment = emptyList(), equipmentOptions = listOf("Dumbbells")),
+            custom.copy(custom = false, resistanceEquipment = emptyList(), equipmentOptions = emptyList(), equipment = "Bodyweight"),
+            custom.copy(custom = true, resistanceEquipment = emptyList(), equipmentOptions = emptyList(), equipment = "Barbell"),
+        )
+        assertEquals(
+            equipment.items.filter { item -> filtered.any { equipment.usesResistance(it, item.id) } },
+            equipment.resistanceItems(filtered),
+        )
+        assertEquals(
+            equipment.items.filter { item -> resolved.any { equipment.usesResistance(it, item.id) } },
+            equipment.resistanceItems(resolved),
+        )
     }
 }
