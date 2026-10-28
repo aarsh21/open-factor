@@ -1,0 +1,7 @@
+.env*
+.local
+node_modules
+test
+*.py
+compose*.yml
+README.md

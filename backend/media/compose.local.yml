@@ -1,0 +1,7 @@
+services:
+  api:
+    ports:
+      - "127.0.0.1:${MEDIA_LOCAL_PORT:-18310}:3000"
+  rustfs:
+    ports:
+      - "127.0.0.1:${S3_LOCAL_PORT:-18311}:9000"
