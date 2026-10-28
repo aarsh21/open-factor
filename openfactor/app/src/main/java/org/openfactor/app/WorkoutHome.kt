@@ -54,6 +54,24 @@ fun WorkoutHome(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     TextButton(onPrograms) { Icon(Icons.Rounded.CalendarMonth, null); Spacer(Modifier.width(8.dp)); Text("Programs") }
                 }
+                data.programs.firstOrNull { it.id == data.activeProgramId }?.let { program ->
+                    Surface(shape = OF.shape, color = OF.top) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.CalendarMonth, null)
+                                Spacer(Modifier.width(12.dp))
+                                Text(program.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                            }
+                            program.days.filter { it.exercises.isNotEmpty() }.take(4).forEach { day ->
+                                TextButton(onPrograms, Modifier.fillMaxWidth()) {
+                                    Text(day.name, Modifier.weight(1f))
+                                    Icon(Icons.Rounded.ChevronRight, null)
+                                }
+                            }
+                            OutlinedButton(onPrograms, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Open program") }
+                        }
+                    }
+                }
                 SectionTitle("Templates", if (data.routines.isNotEmpty()) "Create" else null, onNewRoutine)
             }
         }

@@ -41,6 +41,7 @@ def verify(path: Path) -> dict:
             "assets/exercise-previews.json", "assets/licenses/CC-BY-SA-3.0.txt",
             "assets/fonts/DM-Sans.ttf", "assets/fonts/OFL.txt",
             "assets/dexopt/baseline.prof", "assets/dexopt/baseline.profm",
+            "assets/media-pack.json",
         }
         for entry in manifest["entries"]:
             asset = "assets/" + entry["asset"]

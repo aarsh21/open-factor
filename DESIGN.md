@@ -124,18 +124,18 @@ components:
 
 ## Overview
 
-Open Factor is a simple native workout logger inspired by Strong and Fitbod. The current direction is a quiet charcoal interface with white actions, clear exercise names and aligned set values. Start on Workout, choose an exercise, enter weight and reps, add warmups, complete sets and finish into history. Page and section titles stand alone without explanatory captions.
+Open Factor makes meaningful training features easy to use. The current direction pairs a quiet charcoal logger with original exercise photos, videos, instructions and anatomy. Guidance is directly reachable from discovery and the active set; it is a core capability rather than decoration. Start on Workout, choose an exercise, view its guide when needed, enter weight and reps, add warmups and finish into history. Page and section titles stand alone without explanatory captions.
 
-The floating Nuvio navigation and grouped Settings remain part of the existing system. Programs, body data, analytics and advanced logging remain available, while the default journey stays short. The current direction at the top of [PRODUCT.md](PRODUCT.md) and the [workouts contract](.impeccable/surfaces/workouts.md) supersedes the older MacroFactor parity brief. Historical parity differences are not release blockers for this direction.
+The floating Nuvio navigation and grouped Settings remain part of the existing system. Programs, body data, analytics and advanced logging remain available; the active program is visible on Workout and the default journey stays short. The current direction at the top of [PRODUCT.md](PRODUCT.md) and the [workouts contract](.impeccable/surfaces/workouts.md) supersedes the older MacroFactor parity brief. Historical parity differences are not release blockers for this direction.
 
 **Key characteristics:**
 
 - Charcoal tonal grouping, white foreground and restrained completion/error colors.
 - Publicly bundled DM Sans, native Compose controls and scalable type.
-- Compact exercise chips, editable set rows and an always visible session Finish action.
-- Device-local persistence, resumable sessions and optional workout/rest notifications.
+- Original media, selectable human anatomy, compact exercise chips and visible Finish.
+- Device-local training, bundled static guidance, explicit HTTPS video playback and a bounded cache.
 
-This document extracts `Ui.kt`, `QuickStart.kt`, `WorkoutHome.kt`, `WorkoutSession.kt`, `MainActivity.kt`, `Exercises.kt` and `Settings.kt`. The final `inspection/release-evidence/phone-{onboarding,home,picker,logger,summary,history}.png` captures and `small-phone-large-type-{onboarding,logger}.png` describe the captured native states. The documentation pass inspected onboarding, home, picker, logger and enlarged-type logger images. Release validation supplied for this refresh records 114 unit tests per debug/release variant, 17 instrumentation tests on each of API 26 and API 35, signed minified release UI recording and process-death recovery checks. This pass did not run builds or device automation. No HTML/CSS detector ran on this native app. Physical-device performance, TalkBack operation and tablets are not certified by these checks; independent finish review is a separate artifact.
+This refresh inspects the native source, including `ExerciseMedia.kt`, `ExerciseAnatomy.kt`, video-source/cache code, build-mode staging and the [media packaging contract](docs/open-factor/MEDIA-PACKAGING.md). Prior `inspection/release-evidence/` screenshots and 0.2.0 checks describe their captured checkpoint; they do not establish verification of the corrected 0.3.0 guidance/media flow. This documentation pass did not run builds or device automation, certify a deployed service, or run an HTML/CSS detector on the native app. Final release evidence belongs to its explicit artifact and test scope. Physical-device performance, TalkBack operation and tablets remain uncertified here.
 
 ## Colors
 
@@ -185,7 +185,7 @@ Shared cards use 16dp corners. `PrimaryAction` and exercise images use 8dp; nume
 
 First run asks only for Kilograms or Pounds, then Start training. Completion saves the unit, disables RIR and exercise auto-next for this quick-start path, and opens Workout. The small “Saved on your device” line is a persistence status, not a title caption. The more extensive legacy onboarding source is retained separately; it does not define the current first-run journey.
 
-Workout exposes Start workout or Resume workout first, a history header action, Programs and Templates. Starting opens exercise selection directly. A saved draft can be continued. Template cards and recent history are conditional on actual saved data. Do not add explanatory captions beneath headings.
+Workout exposes Start workout or Resume workout first, a history header action, Programs and Templates. Starting opens exercise selection directly. A saved draft can be continued. The active program shows its name and up to four workout-day links when present. Template cards and recent history are conditional on actual saved data. Do not add explanatory captions beneath headings.
 
 ### Buttons
 
@@ -197,15 +197,23 @@ Workout exposes Start workout or Resume workout first, a history header action, 
 
 The picker places the capsule outlined search at the top with contextual Clear search and Done actions. Filters reveal optional controls; active selections stay visible. Root Exercises retains its separate bottom search overlay. Do not copy that root placement into the workout picker.
 
-Exercise images use 8dp corners. Public Everkinetic previews have a white backing and preserve the artwork with Fit scaling; absent art uses a consistent fitness icon on the elevated surface. Public coverage is bounded to reviewed exercise-ID mappings. Public builds bundle licensed previews and DM Sans and exclude private `reference/**` assets; [ASSETS.md](docs/open-factor/ASSETS.md) and [LICENSED-MEDIA.md](docs/open-factor/LICENSED-MEDIA.md) record ownership and coverage. Illustrations are not videos or a claim of complete catalog art.
+Exercise thumbnails use 8dp corners. Static/full media modes preserve original exercise photos and available instructions, anatomy and equipment art; source mode uses the limited licensed Everkinetic previews or a consistent fitness icon. Everkinetic previews have a white backing and Fit scaling. These fallback assets do not define the intended original-media experience. [ASSETS.md](docs/open-factor/ASSETS.md), [MEDIA-PACKAGING.md](docs/open-factor/MEDIA-PACKAGING.md) and [LICENSED-MEDIA.md](docs/open-factor/LICENSED-MEDIA.md) distinguish content ownership, modes and coverage.
 
 ### Logger chips and set rows
 
-A horizontal row of native selected chips switches the active exercise without replacing the set list with media tiles. Completed exercises can show a check; Add exercise follows the chips. The selected exercise body sits on the page background. Notes display when present, with pinned exercise notes distinct from session notes.
+A horizontal row of native selected chips switches the active exercise without replacing the set list with media tiles. Completed exercises can show a check; Add exercise follows the chips. The selected exercise body sits on the page background. Its photo, title and Guide action open rich exercise guidance in a sheet above the current workout. Closing the sheet returns to the same selected exercise and values. Notes display when present, with pinned exercise notes distinct from session notes.
 
 For weight/reps exercises, quick setup produces the simple weight-and-reps path with RIR hidden. Other exercise metric families still use their actual required fields; settings may enable RIR. Set rows contain the set-options label, aligned numeric fields and a 48dp completion button. Weight uses a decimal keyboard; reps use a number keyboard. Invalid values receive visible and semantic errors and cannot complete the set. Completed controls turn green with black checks and the row receives an 8% green wash. Warmups display W, stay distinct from working-set numbers and remain addable alongside Add set.
 
 The timer row and optional rest strip remain above the scrolling fields. Rest exposes +30s and Skip. Overflow menus retain targets/rest, notes, set kinds, supersets and other advanced choices. Finish confirms the completed-set count, optionally saves a template and opens the saved workout summary/history journey.
+
+### Exercise guide, video and anatomy
+
+Discovery opens the exercise guide directly; exercise settings are a secondary header action. Guide, Muscles and History tabs keep media, anatomy and previous training accessible. The logger opens the same content in a closeable sheet rather than replacing its current set.
+
+The media frame uses a black 4:5 viewport with the original photo as its initial preview. Video fills the frame and starts only after Play; it has no seek bar. Numbered camera thumbnails retain original view order. Playback exposes 1X/2.5X/5X, pause and replay; errors retain the preview with status and Retry. Bundled clips take precedence; other clips use HTTPS and a 128 MiB least-recently-used cache. Opening guidance does not stream a video, and cache storage is not a permanent offline library. These are implemented paths, not a certification of server availability or every device codec.
+
+The Muscles tab gives original anatomy a full-width square reading area, a Male/Female segmented choice, and a horizontal row of selectable muscle chips with 48dp minimum height. The chosen muscle is labeled Primary or Secondary. Preserve the original human figures and readable scale; generic fallback icons only describe unavailable source-mode assets.
 
 ### Navigation and grouped Settings
 
@@ -223,9 +231,9 @@ Active sessions are saved durably after changes and can be resumed after process
 - **Do** pair theme primary and on-primary colors and use the bundled public DM Sans.
 - **Do** preserve visible Finish, top picker search, compact exercise chips and native IME handling.
 - **Do** retain system insets, scroll end clearance, labeled actions and durable session state.
-- **Do** keep legacy advanced routes and licensed-media coverage accurately scoped.
+- **Do** keep original guidance prominent, keep active programs visible, and scope media coverage and build modes accurately.
 - **Don't** add explanatory captions beneath page or section titles.
 - **Don't** spread the navigation rim gradient or Settings-specific palette across logging content.
 - **Don't** restore exact MacroFactor parity as the current release criterion.
-- **Don't** substitute private recovered assets, invented media or claimed videos for missing public art.
+- **Don't** replace the intended original guidance with generic icons or confuse source-only fallback with a full content pack.
 - **Don't** infer TalkBack, physical performance, tablet or universal large-font certification from source or screenshots.

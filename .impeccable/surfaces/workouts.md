@@ -2,11 +2,17 @@
 
 ## Current user direction — October 2026
 
+Clarification: retain meaningful features and the recovered exercise media as the app's differentiator. The simple logger must expose a photo and Guide action leading to original videos/instructions/anatomy/history in place. The library opens the rich guide first; advanced exercise settings remain an explicit secondary action. Anatomy stays readable, with muscle selection and original male/female figures. Active programs remain visible from Workout. Static assets belong in the app; video starts only on request and uses a bounded cache.
+
 The current brief replaces one-to-one parity as the acceptance target. Mode remains Operate and the existing charcoal/white system remains. Workout is the opening destination. One unit choice completes initial setup; Start workout opens exercise selection directly. Picker search stays at the top, advanced filters expand on request, and IME padding belongs to the picker viewport. Active logging exposes Finish, Add set and Warmup, with weight/reps fields and native feedback. Section and page titles have no explanatory captions. Rest timing is visible without hiding set inputs. Reopening an active workout restores the session; notifications open it directly.
 
-Public typography is bundled DM Sans. Public exercise illustrations have reviewed, explicit mappings and credits; absent art uses a consistent icon. Private reference media remains excluded from public release builds. Existing programs, body data, history and settings remain functional but do not determine the default workout journey. The older parity requirements below are historical, not release blockers for the new direction.
+Typography uses bundled public DM Sans. Original photos, instructions, anatomy and equipment art are included by static/full modes; original videos start only after Play, use HTTPS when not bundled, and have a bounded 128 MiB cache. Source mode explicitly excludes recovered content and retains the licensed preview/icon fallback. Not every exercise has original guidance. Existing programs, body data, history and settings remain functional. The older parity requirements below are historical, not release blockers for the current direction. See [media packaging](../../docs/open-factor/MEDIA-PACKAGING.md) for mode and content boundaries.
 
 Mode: Operate. Platform: Android. Artifact: `openfactor/app/`.
+
+## Historical parity contract
+
+The sections below record the earlier brief and investigations. The current direction above supersedes their parity gates, original-media exclusions and route descriptions.
 
 ## THESIS
 

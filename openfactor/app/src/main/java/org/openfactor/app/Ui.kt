@@ -447,13 +447,13 @@ fun NameDialog(
 }
 
 @Composable
-fun MuscleImage(muscle: String, modifier: Modifier = Modifier) {
+fun MuscleImage(muscle: String, modifier: Modifier = Modifier, figure: String = "male") {
     val path = muscle.lowercase().replace(' ', '_')
     val context = LocalContext.current
     val exists =
-        remember(path) {
+        remember(path, figure) {
             runCatching {
-                    context.assets.open("reference/muscle_groups/male/$path.svg").close()
+                    context.assets.open("reference/muscle_groups/$figure/$path.svg").close()
                     true
                 }
                 .getOrDefault(false)
@@ -464,10 +464,10 @@ fun MuscleImage(muscle: String, modifier: Modifier = Modifier) {
     ) {
         if (exists) {
             val themed =
-                remember(path) {
+                remember(path, figure) {
                     java.nio.ByteBuffer.wrap(
                         context.assets
-                            .open("reference/muscle_groups/male/$path.svg")
+                            .open("reference/muscle_groups/$figure/$path.svg")
                             .bufferedReader()
                             .use { it.readText() }
                             .replace("#EEEEEE", "#555555")

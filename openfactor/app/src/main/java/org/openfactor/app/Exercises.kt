@@ -490,6 +490,7 @@ fun ExerciseDetail(
     onBack: () -> Unit,
     onAdd: (() -> Unit)?,
     closeable: Boolean = false,
+    onSettings: (() -> Unit)? = null,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var collapsedSections by rememberSaveable(e.id) { mutableStateOf(emptyList<Int>()) }
@@ -510,6 +511,7 @@ fun ExerciseDetail(
             displayTitle = false,
             actions = {
                 if (closeable) IconButton(onBack) { Icon(Icons.Rounded.Close, "Close Info") }
+                if (onSettings != null) IconButton(onSettings) { Icon(Icons.Rounded.Tune, "Exercise settings") }
                 IconButton({ vm.favorite(e.id) }) {
                     Icon(
                         if (e.id in data.favorites) Icons.Rounded.Star
@@ -520,7 +522,7 @@ fun ExerciseDetail(
             },
         )
         SecondaryTabRow(tab, containerColor = OF.top) {
-            listOf("Instructions", "Details", "History").forEachIndexed { i, s ->
+            listOf("Guide", "Muscles", "History").forEachIndexed { i, s ->
                 Tab(tab == i, { tab = i }, text = { Text(s) })
             }
         }
@@ -557,25 +559,7 @@ fun ExerciseDetail(
                         }
                     }
             } else if (tab == 1) {
-                item { SectionTitle("Target Muscles") }
-                item {
-                    Row(
-                        Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        (e.muscles + e.secondary).distinct().forEach { m ->
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                MuscleImage(m, Modifier.size(110.dp))
-                                Text(m, style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    if (m in e.muscles) "Primary" else "Secondary",
-                                    color = OF.muted,
-                                    fontSize = 12.sp,
-                                )
-                            }
-                        }
-                    }
-                }
+                item { ExerciseAnatomy(e) }
                 if (e.properties.isNotEmpty())
                     item {
                         SectionTitle("Properties")

@@ -389,6 +389,10 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                     vm,
                                     { route = previousRoute },
                                     { pickExercise(e.id, previousRoute) },
+                                    onSettings = {
+                                        exerciseSettingsReturnRoute = "exercise"
+                                        route = "exercise-settings"
+                                    },
                                 )
                             }
                     "picker" -> routeState.SaveableStateProvider("picker") {
@@ -543,7 +547,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                     exercises,
                                     data.favorites,
                                     vm::favorite,
-                                    { detailId = it; exerciseSettingsReturnRoute = ""; route = "exercise-settings" },
+                                    ::openExercise,
                                     onCustom = ::openCustom,
                                     gyms = data.gyms,
                                     equipmentCatalog = vm.equipmentCatalog,

@@ -6,18 +6,21 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Device storage/media checks. The end-to-end UI flow uses tooling/android_smoke.py. */
+/** Device storage/media contracts; the activity journey is QuickWorkoutJourneyTest. */
 @RunWith(AndroidJUnit4::class)
 class TrainingFlowTest {
     @Test
-    fun installedAppCannotAccessTheInternet() {
+    fun mediaNetworkConfigurationIsHttpsOnly() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val permissions =
             context.packageManager.getPackageInfo(
                 context.packageName,
                 android.content.pm.PackageManager.GET_PERMISSIONS,
             ).requestedPermissions.orEmpty()
-        assertFalse("android.permission.INTERNET" in permissions)
+        assertTrue("android.permission.INTERNET" in permissions)
+        assertFalse(android.security.NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted)
+        val base = BuildConfig.EXERCISE_MEDIA_BASE_URL
+        if (base.isNotBlank()) assertNotNull("Media endpoint must be HTTPS", normalizedExerciseMediaBase(base))
     }
 
     @Test
@@ -197,6 +200,9 @@ class TrainingFlowTest {
     @Test
     fun fullCatalogHasResolvableLocalMedia() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val pack = context.assets.open("media-pack.json").bufferedReader().use { org.json.JSONObject(it.readText()) }
+        val mode = pack.getString("mode")
+        assertTrue(mode in listOf("source", "static", "full"))
         val imported =
             runCatching {
                     context.assets.open("reference/catalog.json").bufferedReader().use {
@@ -212,9 +218,24 @@ class TrainingFlowTest {
                     context.assets.open(it).use { stream -> assertTrue(stream.read() >= 0) }
                 }
                 if (e.instructions.isNotBlank()) context.assets.open(e.instructions).close()
-                e.clips.filter { it.isNotBlank() }.forEach { context.assets.open(it).close() }
+                e.clips.filter { it.isNotBlank() }.forEach { clip ->
+                    val reference = ExerciseVideoReference.parse(clip)
+                    assertNotNull("Invalid original video object: $clip", reference)
+                    assertEquals(e.id, reference!!.exerciseId)
+                    if (mode == "full") context.assets.open(clip).use { assertTrue(it.read() >= 0) }
+                    else if (BuildConfig.EXERCISE_MEDIA_BASE_URL.isNotBlank()) {
+                        val remote = exerciseVideoLocation(reference, false, BuildConfig.EXERCISE_MEDIA_BASE_URL)
+                        assertNotNull(remote)
+                        assertTrue(remote!!.uri.startsWith("https://"))
+                    }
+                }
             }
+            assertTrue(mode == "static" || mode == "full")
+            assertEquals(619, imported.count { it.clips.any(String::isNotBlank) })
+            assertEquals(1831, imported.sumOf { it.clips.count(String::isNotBlank) })
+            if (mode == "static") assertTrue(context.assets.list("reference/videos").isNullOrEmpty())
         } else {
+            assertEquals("source", mode)
             val baseline =
                 context.assets.open("catalog.json").bufferedReader().use {
                     DataCodec.catalog(it.readText())
@@ -276,9 +297,16 @@ class TrainingFlowTest {
         val bundled = context.assets.open("catalog.json").bufferedReader().use {
             DataCodec.catalog(it.readText())
         }.associateBy { it.id }
+        val fallbackMedia = loadExerciseMediaCredits(context).groupBy { it.exerciseId }
         imported?.forEach { source ->
             val actual = resolved.single { it.id == source.id }
-            assertEquals(source, actual.copy(properties = source.properties, generationFacts = source.generationFacts))
+            // Original camera frames are authoritative. Only an empty original may receive the
+            // separately attributed, exact-ID fallback illustrations supplied by the app.
+            val expectedFrames = source.frames.ifEmpty { fallbackMedia[source.id].orEmpty().map { it.asset } }
+            assertEquals(source.id, expectedFrames, actual.frames)
+            expectedFrames.forEach { context.assets.open(it).close() }
+            assertEquals(source, actual.copy(frames = source.frames,
+                properties = source.properties, generationFacts = source.generationFacts))
             source.properties.forEach { (key, value) -> assertEquals(value, actual.properties[key]) }
             val fallback = bundled.getValue(source.id).generationFacts
             assertEquals(fallback.descriptorLists + source.generationFacts.descriptorLists, actual.generationFacts.descriptorLists)

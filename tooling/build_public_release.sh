@@ -9,7 +9,7 @@ build_tools="${OPENFACTOR_BUILD_TOOLS:-$ANDROID_HOME/build-tools/35.0.0}"
 output_dir="${OPENFACTOR_RELEASE_DIR:-$project_dir/openfactor/app/build/public-release}"
 mkdir -p "$output_dir"
 cd "$project_dir/openfactor"
-./gradlew :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease
+./gradlew :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease -PopenfactorMediaMode=source
 "$build_tools/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk "$output_dir/aligned.apk"
 "$build_tools/apksigner" sign --ks "$OPENFACTOR_KEYSTORE" --ks-key-alias open-factor \
     --ks-pass "file:$OPENFACTOR_PASSWORD_FILE" \

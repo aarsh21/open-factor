@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutSession(
     data: AppData,
@@ -62,6 +63,7 @@ fun WorkoutSession(
         }
         return
     }
+    var guidanceExerciseId by rememberSaveable { mutableStateOf<String?>(null) }
     var confirm by remember { mutableStateOf("") }
     var menu by remember { mutableStateOf(false) }
     var rename by remember { mutableStateOf(false) }
@@ -255,18 +257,35 @@ fun WorkoutSession(
                 val showTargets = se.sets.any { it.targetRepsMin != null || it.targetRepsMax != null || it.targetRir != null }
                 Surface(color = OF.background) {
                     Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(
-                                Modifier.weight(1f).clickable {
-                                    onExercise(e.id)
-                                }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Surface(
+                                onClick = { focus.clearFocus(); guidanceExerciseId = e.id },
+                                shape = RoundedCornerShape(8.dp),
+                                color = OF.card,
+                                modifier = Modifier.size(width = 48.dp, height = 60.dp).semantics {
+                                    contentDescription = "Exercise guide for ${e.title}"
+                                },
                             ) {
-                                Text(e.title, style = MaterialTheme.typography.titleLarge)
+                                ExerciseImage(e, Modifier.fillMaxSize())
+                            }
+                            Text(
+                                e.title,
+                                Modifier.weight(1f).clickable(onClickLabel = "Open exercise guide") {
+                                    focus.clearFocus()
+                                    guidanceExerciseId = e.id
+                                },
+                                style = MaterialTheme.typography.titleLarge,
+                            )
+                            TextButton({ focus.clearFocus(); guidanceExerciseId = e.id }) {
+                                Text("Guide")
                             }
                             Box {
                                 IconButton({ exerciseMenu = true }) { Icon(Icons.Rounded.MoreVert, "Exercise options for ${e.title}") }
                                 DropdownMenu(exerciseMenu, { exerciseMenu = false }) {
-                                    DropdownMenuItem(text = { Text("Exercise info") }, onClick = { exerciseMenu = false; onExercise(e.id) })
+                                    DropdownMenuItem(text = { Text("Exercise guide") }, onClick = { exerciseMenu = false; focus.clearFocus(); guidanceExerciseId = e.id })
                                     DropdownMenuItem(text = { Text("Targets & rest") }, onClick = { exerciseMenu = false; targets = true })
                                     if (metrics.any { it.isReps }) DropdownMenuItem(text = { Text(if (showRir) "Hide RIR" else "Show RIR") }, onClick = { exerciseMenu = false; vm.settings { it.copy(showRir = !it.showRir) } })
                                     DropdownMenuItem(text = { Text("Exercise notes") }, onClick = { exerciseMenu = false; exerciseNotes = true })
@@ -392,6 +411,25 @@ fun WorkoutSession(
                             vm.removeExercise(se.id)
                             remove = false
                         },
+                    )
+                }
+            }
+        }
+    }
+    guidanceExerciseId?.let { id ->
+        exercises.firstOrNull { it.id == id }?.let { exercise ->
+            ModalBottomSheet(
+                onDismissRequest = { guidanceExerciseId = null },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = OF.background,
+                dragHandle = null,
+            ) {
+                Box(Modifier.fillMaxHeight(.95f)) {
+                    ExerciseDetail(
+                        exercise, data, vm,
+                        onBack = { guidanceExerciseId = null },
+                        onAdd = null,
+                        closeable = true,
                     )
                 }
             }
