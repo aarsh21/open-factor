@@ -159,7 +159,7 @@ fun ExerciseLibrary(
             searchModifier
                 .fillMaxWidth()
                 .then(if (onBack != null) Modifier.background(OF.top) else Modifier)
-                .imePadding()
+                .then(if (picking) Modifier else Modifier.imePadding())
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -181,13 +181,14 @@ fun ExerciseLibrary(
                 Button(onBack, shape = RoundedCornerShape(50)) { Text("Done") }
         }
     }
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().then(if (picking) Modifier.imePadding() else Modifier)) {
         Column(Modifier.fillMaxSize()) {
             PageHeading(
                 if (picking) "Add Exercise" else "Exercises",
                 onBack,
                 actions = { RoundAction(Icons.Rounded.Add, "Create custom exercise", onCustom) },
             )
+            if (picking) searchField(Modifier)
             Row(
                 Modifier.fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
@@ -195,7 +196,7 @@ fun ExerciseLibrary(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (!picking) FilterChooser("Scope", listOf("All", "Performed", "Deprioritized", "Modified", "Archived"), scope) { scope = it }
-                Box {
+                if (!picking || filter) Box {
                     FilterChip(
                         true,
                         { gymMenu = true },
@@ -215,8 +216,10 @@ fun ExerciseLibrary(
                         }
                     }
                 }
-                FilterChooser("Type", types, type) { type = it }
-                FilterChooser("Laterality", lateralities, laterality) { laterality = it }
+                if (filter) {
+                    FilterChooser("Type", types, type) { type = it }
+                    FilterChooser("Laterality", lateralities, laterality) { laterality = it }
+                }
                 if (equipmentCatalog != null) FilterChip(
                     resistanceId.isNotEmpty(),
                     { resistanceSheet = true },
@@ -248,7 +251,7 @@ fun ExerciseLibrary(
                 Column(Modifier.padding(horizontal = 18.dp)) {
                     FilterChooser("Muscle group", muscleGroups, muscle) { muscle = it }
                 }
-            if (!compactEmptyState) Row(
+            if (!compactEmptyState && !picking) Row(
                 Modifier.horizontalScroll(rememberScrollState())
                     .padding(horizontal = 14.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -369,17 +372,6 @@ fun ExerciseLibrary(
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                 )
-                                Text(
-                                    e.muscles.joinToString(", ") +
-                                        if (e.secondary.isNotEmpty())
-                                            " • " + e.secondary.joinToString(", ")
-                                        else "",
-                                    color = OF.muted,
-                                    fontSize = 14.sp,
-                                    lineHeight = 21.sp,
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
                             }
                             RoundAction(
                                 if (picking) Icons.Rounded.Add
@@ -397,7 +389,7 @@ fun ExerciseLibrary(
                     }
                 }
             }
-            if (onBack != null) searchField(Modifier)
+            if (onBack != null && !picking) searchField(Modifier)
         }
         if (onBack == null)
             searchField(

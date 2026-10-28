@@ -1,5 +1,15 @@
 # Open Factor
 
+## Current direction — 29 October 2026
+
+The current user request supersedes the older source-parity brief below. Open Factor is a simple workout logger inspired by Strong and Fitbod, retaining the charcoal visual system. Exact MacroFactor reproduction is no longer a product requirement. Start on Workout, choose an exercise, enter weight and reps, add warmups, complete sets, and finish into history. Titles have no explanatory captions. Advanced training and body-data features stay available without obstructing logging.
+
+The core works offline without an account. Active sessions are durably saved after each change, resume after process recreation, and provide optional Android workout/rest notifications. Precise background timers require Android special access; force-stop suppresses alarms until the app opens again. Accounts and a Dokploy/Hono/RustFS video service are optional future extensions, not dependencies or shipped capabilities.
+
+Public builds explicitly exclude private recovered assets. They bundle DM Sans under its OFL license and a bounded, attributed collection of Everkinetic exercise illustrations under CC BY-SA 3.0. Release acceptance uses unit tests, Android 8 and 15 instrumented journeys, signed-artifact device checks, media/hash verification, and recorded evidence. Tests establish their stated scope and do not establish a universal claim of zero defects.
+
+The following sections retain historical context for the existing application and its asset provenance.
+
 <!-- impeccable:product-schema 1 -->
 
 ## Platform

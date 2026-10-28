@@ -73,11 +73,11 @@ fun OpenFactorTheme(theme: AppTheme = AppTheme.DARK, content: @Composable () -> 
                 )
             }
             .getOrDefault(FontFamily.SansSerif)
-    val body = remember { importedFamily("reference/fonts/DMSans-VariableFont_opsz,wght.ttf", 400) }
+    val body = remember { importedFamily("fonts/DM-Sans.ttf", 400) }
     val medium = remember {
-        importedFamily("reference/fonts/DMSans-VariableFont_opsz,wght.ttf", 500)
+        importedFamily("fonts/DM-Sans.ttf", 500)
     }
-    val bold = remember { importedFamily("reference/fonts/DMSans-VariableFont_opsz,wght.ttf", 700) }
+    val bold = remember { importedFamily("fonts/DM-Sans.ttf", 700) }
 
     MaterialTheme(
         colorScheme =
@@ -222,7 +222,7 @@ fun NuvioWorkoutNavigation(
                                     contentColor = Color.Black,
                                 ),
                             ) {
-                                Icon(Icons.Rounded.Add, "Shortcuts", Modifier.size(28.dp))
+                                Icon(Icons.Rounded.Add, "Start or resume workout", Modifier.size(28.dp))
                             }
                         }
                     val iconScale by
@@ -273,7 +273,7 @@ fun NuvioWorkoutNavigation(
 
 @Composable
 fun RoundAction(icon: ImageVector, description: String, onClick: () -> Unit) {
-    IconButton(onClick, Modifier.size(44.dp).clip(RoundedCornerShape(50)).background(OF.elevated)) {
+    IconButton(onClick, Modifier.size(48.dp).clip(RoundedCornerShape(50)).background(OF.elevated)) {
         Icon(icon, description, Modifier.size(24.dp))
     }
 }
@@ -284,7 +284,7 @@ fun workoutDisplayFont(): FontFamily {
     return remember {
         runCatching {
                 FontFamily(
-                    Typeface.Builder(context.assets, "reference/fonts/MacroSans-VF.ttf")
+                    Typeface.Builder(context.assets, "fonts/DM-Sans.ttf")
                         .setWeight(700)
                         .setFontVariationSettings("'wght' 700")
                         .build()
@@ -347,7 +347,7 @@ fun PrimaryAction(
         enabled = enabled,
         shape = RoundedCornerShape(8.dp),
         colors =
-            ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+            ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
     ) {
         if (icon != null) {
             Icon(icon, null, Modifier.size(20.dp))
@@ -390,7 +390,9 @@ fun ExerciseImage(
     contentScale: androidx.compose.ui.layout.ContentScale = androidx.compose.ui.layout.ContentScale.Fit,
 ) {
     Box(
-        modifier.clip(RoundedCornerShape(8.dp)).background(OF.elevated),
+        modifier.clip(RoundedCornerShape(8.dp)).background(
+            if (exercise.frames.firstOrNull()?.startsWith("previews/") == true) Color.White else OF.elevated
+        ),
         contentAlignment = Alignment.Center,
     ) {
         if (exercise.frames.isNotEmpty())

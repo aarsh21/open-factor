@@ -112,6 +112,10 @@ fun SettingsScreen(
         UnitsSettings(p, vm) { dialog = "" }
         return
     }
+    if (dialog == "media-credits") {
+        MediaCreditsScreen { dialog = "" }
+        return
+    }
     Column(
         Modifier.fillMaxSize()
             .verticalScroll(rememberScrollState())
@@ -212,7 +216,11 @@ fun SettingsScreen(
             }
         }
         SettingsSection("OPEN FACTOR") {
+            StorageRecoveryExportRow(vm, snackbar)
             OfflineHelpRows(onOpen = { portabilityPage = it })
+            SettingsRow(Icons.Rounded.PhotoLibrary, "Exercise media credits", "") {
+                dialog = "media-credits"
+            }
             SettingsRow(Icons.Rounded.Info, "About", "Version ${BuildConfig.VERSION_NAME}") {
                 dialog = "about"
             }
@@ -412,9 +420,8 @@ internal fun SettingsRow(icon: ImageVector, title: String, subtitle: String, onC
             }
             Column(Modifier.weight(1f)) {
                 Text(title, fontSize = 17.sp)
-                Text(subtitle, fontSize = 14.sp, lineHeight = 21.sp,
-                    color = if (isSystemInDarkTheme()) Color(0xFF96999F) else OF.muted)
             }
+            Icon(Icons.Rounded.ChevronRight, null, tint = OF.muted)
         }
         HorizontalDivider(
             Modifier.padding(start = 71.dp),
@@ -440,7 +447,6 @@ internal fun PreferenceSwitch(title: String, subtitle: String, checked: Boolean,
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f)) {
             Text(title)
-            if (subtitle.isNotEmpty()) Text(subtitle, color = OF.muted, style = MaterialTheme.typography.bodySmall)
         }
         Switch(checked, null)
     }

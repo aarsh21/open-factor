@@ -1,5 +1,11 @@
 # Workout application direction contract
 
+## Current user direction — October 2026
+
+The current brief replaces one-to-one parity as the acceptance target. Mode remains Operate and the existing charcoal/white system remains. Workout is the opening destination. One unit choice completes initial setup; Start workout opens exercise selection directly. Picker search stays at the top, advanced filters expand on request, and IME padding belongs to the picker viewport. Active logging exposes Finish, Add set and Warmup, with weight/reps fields and native feedback. Section and page titles have no explanatory captions. Rest timing is visible without hiding set inputs. Reopening an active workout restores the session; notifications open it directly.
+
+Public typography is bundled DM Sans. Public exercise illustrations have reviewed, explicit mappings and credits; absent art uses a consistent icon. Private reference media remains excluded from public release builds. Existing programs, body data, history and settings remain functional but do not determine the default workout journey. The older parity requirements below are historical, not release blockers for the new direction.
+
 Mode: Operate. Platform: Android. Artifact: `openfactor/app/`.
 
 ## THESIS

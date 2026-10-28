@@ -40,6 +40,7 @@ iosApp/Configuration/DeviceSigning.local.json
 
 # Open Factor local inspection and imported reference media
 inspection/private/
+inspection/release-evidence/
 openfactor/app/src/main/assets/reference/
 openfactor/local.properties
 .impeccable/review/

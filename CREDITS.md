@@ -1,5 +1,7 @@
 # Credits
 
+The public workout app bundles DM Sans by the DM Sans project authors under the SIL Open Font License (full license in `openfactor/app/src/main/assets/fonts/OFL.txt`). It also bundles 44 unmodified exercise illustrations by Everkinetic, distributed through wger under Creative Commons BY-SA 3.0 Unported. [The media manifest and attribution guide](docs/open-factor/LICENSED-MEDIA.md) record the 21 reviewed exercise mappings, source URLs, original authors, licenses, and hashes. These image licenses are independent of the GPLv3 application code. No endorsement is implied.
+
 Open Factor is independently maintained by [aarsh21](https://github.com/aarsh21) and Open Factor contributors.
 
 ## Base application

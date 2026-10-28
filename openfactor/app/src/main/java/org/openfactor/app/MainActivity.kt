@@ -32,8 +32,17 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
+    private var workoutOpenRequest by mutableIntStateOf(0)
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.action == WorkoutNotifications.OPEN_WORKOUT) workoutOpenRequest++
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (intent.action == WorkoutNotifications.OPEN_WORKOUT) workoutOpenRequest++
         enableEdgeToEdge(
             statusBarStyle =
                 androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
@@ -56,7 +65,7 @@ class MainActivity : ComponentActivity() {
                         isAppearanceLightNavigationBars = !dark
                     }
                 }
-                OpenFactorApp(vm)
+                OpenFactorApp(vm, workoutOpenRequest)
             }
         }
     }
@@ -64,10 +73,10 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
+fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 0) {
     val data by vm.data.collectAsState()
-    var tab by rememberSaveable { mutableIntStateOf(0) }
-    var route by rememberSaveable { mutableStateOf("") }
+    var tab by rememberSaveable { mutableIntStateOf(1) }
+    var route by rememberSaveable { mutableStateOf(if (data.active != null) "session" else "") }
     var detailId by rememberSaveable { mutableStateOf("") }
     var previousRoute by rememberSaveable { mutableStateOf("") }
     var exerciseInfo by rememberSaveable { mutableStateOf(false) }
@@ -87,12 +96,36 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
     var bodyEntryReturn by rememberSaveable { mutableStateOf("body-data") }
     val contentRoute =
         if (route == "measurement-entry" || route == "photo-entry") bodyEntryReturn else route
-    val exercises = vm.exercises(data)
+    val exercises = remember(vm, data.customExercises) { vm.exercises(data) }
     val snackbar = remember { SnackbarHostState() }
     val routeState = rememberSaveableStateHolder()
     val context = LocalContext.current
     val view = LocalView.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    StorageRecoveryAlert(vm)
+    val currentData by rememberUpdatedState(data)
+    val notificationPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { WorkoutNotifications.sync(context, currentData, forceRefresh = true) }
+    LaunchedEffect(data.active?.id) {
+        if (data.active != null && android.os.Build.VERSION.SDK_INT >= 33) {
+            val prefs = context.getSharedPreferences("notification-permission", android.content.Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("requested", false) && !WorkoutNotifications.notificationsAllowed(context)) {
+                prefs.edit().putBoolean("requested", true).apply()
+                notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+    LaunchedEffect(workoutOpenRequest) {
+        if (workoutOpenRequest > 0 && data.active != null) route = "session"
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) WorkoutNotifications.sync(context, currentData, forceRefresh = true)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val keepAlive = data.preferences.keepAlive && route == "session" && data.active != null &&
         (data.onboarding.completed || data.onboarding.deferred)
     DisposableEffect(view, lifecycleOwner, keepAlive) {
@@ -151,13 +184,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
         data, vm::importHealthConnectWeights, onClose = { healthConnect = false },
     )
     if (!data.onboarding.completed && !data.onboarding.deferred) {
-        OnboardingScreen(data, vm, onManualProgram = {
-            if (data.programDraft != null) route = "program-editor"
-            else {
-                vm.beginProgram(TrainingProgram(name = "My Program"))
-                route = "program-setup"
-            }
-        }, onHealthConnect = { healthConnect = true })
+        QuickStartScreen(data, vm) { tab = 1 }
         return
     }
     var scrollEnergy by remember { mutableFloatStateOf(0f) }
@@ -426,6 +453,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                     if (vm.startWorkoutDraft()) route = "session"
                                 },
                                 onDiscard = { vm.discardWorkoutDraft(); route = "" },
+                                canStart = data.active == null,
                             )
                         } ?: run { LaunchedEffect(Unit) { route = "" } }
                     "session" ->
@@ -468,6 +496,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                         vm.deleteWorkout(w.id)
                                         route = "history"
                                     },
+                                    repeatLabel = if (data.active != null) "Resume active workout" else "Repeat workout",
                                 )
                             } ?: run { LaunchedEffect(Unit) { route = "history" } }
                     "routine" ->
@@ -494,10 +523,10 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                     },
                                 )
                             1 ->
-                                WorkoutScreen(
+                                WorkoutHome(
                                     data,
                                     exercises,
-                                    onStart = { shortcuts = true },
+                                    onStart = { vm.start(); route = "picker" },
                                     onResume = { route = "session" },
                                     onRoutine = { r ->
                                         vm.start(r.name, r.exerciseIds)
@@ -505,7 +534,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                                     },
                                     onNewRoutine = { route = "routine" },
                                     onDeleteRoutine = vm::deleteRoutine,
-                                    onReorderRoutines = vm::reorderRoutines,
+                                    onDraft = { route = "workout-draft" },
                                     onPrograms = { route = "programs" },
                                     onHistory = { route = "history" },
                                 )
@@ -546,7 +575,10 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel()) {
                 NuvioWorkoutNavigation(
                     tab,
                     scrollEnergy,
-                    onAdd = { shortcuts = true },
+                    onAdd = {
+                        if (data.active != null) route = "session"
+                        else { vm.start(); route = "picker" }
+                    },
                     modifier = Modifier.align(Alignment.BottomCenter)
                         .padding(bottom = padding.calculateBottomPadding()),
                 ) {

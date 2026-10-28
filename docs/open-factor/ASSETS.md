@@ -1,8 +1,12 @@
 # Asset provenance
 
+## Public release 0.2.0
+
+The public build now includes a separate, reviewed collection of 44 Everkinetic illustrations for 21 exercise variants, licensed CC BY-SA 3.0, and bundled DM Sans under OFL. See [licensed media and exact coverage](LICENSED-MEDIA.md). Public builds exclude `reference/**` through a dedicated asset staging task; external reference directories require an explicit private-build opt-in. The public APK verifier rejects unreviewed assets and verifies every bundled preview hash. The recovered-media inventories below document private inspection content, not public-release payloads.
+
 Open Factor's application code inherits GNU GPLv3 from NuvioMedia/NuvioMobile. That license does not establish redistribution rights for content extracted from a separate application.
 
-The public source uses Material icons and a custom geometric Open Factor launcher mark. The public descriptive dataset contains 1,345 exercise names and their muscle/equipment facts, plus 297 equipment entities, group memberships and literal preset/weight metadata. It includes no source instructions, images, fonts or videos. `catalog-provenance.json` records input hashes and the projection scope.
+The public source uses Material icons and a custom geometric Open Factor launcher mark. The public descriptive dataset contains 1,345 exercise names and their muscle/equipment facts, plus 297 equipment entities, group memberships and literal preset/weight metadata. That descriptive projection includes no recovered source instructions, images, fonts or videos; the separately licensed public previews and DM Sans bundle are described above. `catalog-provenance.json` records the descriptive projection’s input hashes and scope.
 
 The reproducible local importer at `tooling/import_reference_apk.py` reads an operator-supplied APK and creates `openfactor/app/src/main/assets/reference/`. Git ignores that directory. It records the source APK digest and each copied member's original path, byte length and SHA-256 in `provenance.json`. It preserves the full original exercise/equipment UUID index in `source-catalog.json` and provides a UI projection in `catalog.json`.
 

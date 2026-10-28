@@ -3,6 +3,13 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+val privateReference = providers.gradleProperty("includePrivateReference").map(String::toBoolean).getOrElse(false)
+val bundledAssets = tasks.register<Sync>("prepareBundledAssets") {
+    from("src/main/assets") {
+        if (!privateReference) exclude("reference/**")
+    }
+    into(layout.buildDirectory.dir("generated/bundledAssets"))
+}
 android {
     namespace = "org.openfactor.app"
     compileSdk = 36
@@ -10,19 +17,29 @@ android {
         applicationId = "org.openfactor.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.1.0-alpha.4"
+        versionCode = 6
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }
+    // Public builds must be reproducible even on a workstation with a private reference pack.
+    sourceSets.getByName("main").assets.setSrcDirs(listOf(layout.buildDirectory.dir("generated/bundledAssets")))
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
-    buildTypes { release { isMinifyEnabled = false } }
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+        }
+    }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     providers.gradleProperty("openfactorBodyReferenceDir").orNull?.let {
+        require(privateReference) { "External reference assets require -PincludePrivateReference=true" }
         sourceSets.getByName("main").assets.srcDir(it)
     }
 }
+tasks.named("preBuild").configure { dependsOn(bundledAssets) }
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.04.01"))
     implementation("androidx.activity:activity-compose:1.10.1")
@@ -38,5 +55,8 @@ dependencies {
     testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2025.04.01"))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

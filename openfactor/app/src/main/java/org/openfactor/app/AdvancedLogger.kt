@@ -81,9 +81,28 @@ fun SessionExercise.withoutSet(setId: String): SessionExercise {
         else sets.filterNot { it.componentId == set.componentId })
 }
 
+/** New working sets reuse the last working load and reps; completion and effort never carry over. */
 fun SessionExercise.withNewSet(warmup: Boolean = false): SessionExercise {
-    val row = LoggedSet(warmup = warmup)
-    val added = if (sets.any { it.side != null }) listOf(row.copy(side = SetSide.LEFT), row.copy(id = newId(), side = SetSide.RIGHT, pairId = row.id)) else listOf(row)
+    val previous = if (warmup) null else logicalSets().lastOrNull { !it.root.warmup }
+    fun next(source: LoggedSet?) = LoggedSet(
+        warmup = warmup,
+        weightKg = source?.weightKg,
+        reps = source?.reps,
+        assistanceKg = source?.assistanceKg,
+        durationSeconds = source?.durationSeconds,
+        distanceMeters = source?.distanceMeters,
+        targetRepsMin = source?.targetRepsMin,
+        targetRepsMax = source?.targetRepsMax,
+        targetRir = source?.targetRir,
+    )
+    val row = next(previous?.root)
+    val added = if (sets.any { it.side != null }) {
+        listOf(
+            row.copy(side = SetSide.LEFT),
+            next(previous?.components?.firstOrNull()?.find { it.side == SetSide.RIGHT })
+                .copy(side = SetSide.RIGHT, pairId = row.id),
+        )
+    } else listOf(row)
     val index = if (warmup) sets.indexOfFirst { !it.warmup }.takeIf { it >= 0 } ?: sets.size else sets.size
     return copy(sets = sets.toMutableList().apply { addAll(index, added) })
 }

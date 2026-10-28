@@ -51,6 +51,7 @@ fun WorkoutComposition(
     onDetail: (String) -> Unit,
     onStart: () -> Unit,
     onDiscard: () -> Unit,
+    canStart: Boolean = true,
 ) {
     var menu by remember { mutableStateOf(false) }
     var rename by remember { mutableStateOf(false) }
@@ -181,7 +182,7 @@ fun WorkoutComposition(
                 }
             }
         }
-        Box(Modifier.padding(18.dp)) { PrimaryAction("Start Workout", onStart) }
+        Box(Modifier.padding(18.dp)) { PrimaryAction("Start Workout", onStart, enabled = canStart) }
     }
     if (rename) NameDialog("Rename Workout", draft.name, { rename = false }) { name ->
         onEdit { it.copy(name = name.trim()) }

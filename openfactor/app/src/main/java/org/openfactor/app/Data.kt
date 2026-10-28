@@ -10,6 +10,8 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
@@ -580,18 +582,90 @@ object DataCodec {
     }
 }
 
-class WorkoutStore(context: Context) {
-    private val prefs = context.getSharedPreferences("open_factor", Context.MODE_PRIVATE)
+data class StorageRecovery(val restoredPreviousData: Boolean, val originalCount: Int)
 
-    fun load(): AppData =
-        prefs.getString("data", null)?.let { runCatching { DataCodec.decode(it) }.getOrNull() }
-            ?: AppData()
+class WorkoutStore(context: Context, preferencesName: String = "open_factor") {
+    private val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
+    // SharedPreferences rewrites its whole XML on commit: keep large checkpoints outside the hot file.
+    private val recoveryPrefs = context.getSharedPreferences("${preferencesName}_recovery", Context.MODE_PRIVATE)
+    private var unreadablePrimary: String? = null
+    private var restoredPreviousData = false
+
+    private fun decode(raw: String?): AppData? = raw?.let {
+        try { DataCodec.decode(it) } catch (_: Exception) { null }
+    }
+
+    fun load(): AppData {
+        val raw = prefs.getString("data", null) ?: return AppData()
+        val decoded = decode(raw)
+        if (decoded != null) {
+            unreadablePrimary = null
+            // A startup checkpoint avoids duplicating the full history on each typed digit.
+            if (recoveryPrefs.getString("data_last_good", null) != raw)
+                recoveryPrefs.edit().putString("data_last_good", raw).commit()
+            return decoded
+        }
+        unreadablePrimary = raw
+        val previous = decode(recoveryPrefs.getString("data_last_good", null))
+        restoredPreviousData = previous != null
+        // Keep the original before allowing initialization or a later edit to replace primary data.
+        // If this commit fails, save() includes preservation in the same atomic commit as new data.
+        if (preserveUnreadable(recoveryPrefs.edit()).commit()) unreadablePrimary = null
+        return previous ?: AppData()
+    }
+
+    private fun preserveUnreadable(editor: android.content.SharedPreferences.Editor): android.content.SharedPreferences.Editor {
+        unreadablePrimary?.let { raw ->
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+            editor.putString("recovery_raw_$digest", raw)
+                .putBoolean("recovery_pending", true)
+                .putBoolean("recovery_restored_previous", restoredPreviousData)
+        }
+        return editor
+    }
 
     fun save(data: AppData) {
-        check(prefs.edit().putString("data", DataCodec.encode(data)).commit()) {
+        check(preserveUnreadable(prefs.edit()).putString("data", DataCodec.encode(data)).commit()) {
             "Could not save workout data"
         }
+        unreadablePrimary = null
     }
+
+    fun recovery(): StorageRecovery? {
+        val pending = when {
+            prefs.getBoolean("recovery_pending", false) -> prefs
+            recoveryPrefs.getBoolean("recovery_pending", false) -> recoveryPrefs
+            else -> return null
+        }
+        return StorageRecovery(pending.getBoolean("recovery_restored_previous", false), recoveryPayloads().size)
+    }
+
+    private fun recoveryPayloads(): Map<String, String> = (recoveryPrefs.all + prefs.all).entries
+        .filter { it.key.startsWith("recovery_raw_") && it.value is String }
+        .associate { it.key.removePrefix("recovery_raw_") to it.value as String }.toSortedMap()
+
+    /** Archive the exact original strings; damaged/newer JSON must not be decoded and rewritten. */
+    fun exportRecovery(output: OutputStream) {
+        val originals = recoveryPayloads()
+        check(originals.isNotEmpty()) { "No original storage payload is available" }
+        ZipOutputStream(output).use { zip ->
+            originals.forEach { (digest, raw) ->
+                zip.putNextEntry(ZipEntry("original-$digest.json"))
+                zip.write(raw.toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
+        }
+    }
+
+    /** Acknowledgment hides the notice, while original payloads stay available for later export. */
+    fun dismissRecovery(): Boolean {
+        val primary = prefs.edit().putBoolean("recovery_pending", false).commit()
+        val archive = recoveryPrefs.edit().putBoolean("recovery_pending", false).commit()
+        return primary && archive
+    }
+
+    fun hasRecoveryPayloads(): Boolean = recoveryPayloads().isNotEmpty()
 }
 
 class WorkoutViewModel(application: Application) : AndroidViewModel(application) {
@@ -599,6 +673,15 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     val photoStore = ProgressPhotoStore(application)
     private val _data = MutableStateFlow(store.load())
     val data = _data.asStateFlow()
+    private val _storageRecovery = MutableStateFlow(store.recovery())
+    val storageRecovery = _storageRecovery.asStateFlow()
+    val hasStorageRecovery: Boolean get() = store.hasRecoveryPayloads()
+
+    fun exportStorageRecovery(output: OutputStream) = store.exportRecovery(output)
+
+    fun dismissStorageRecovery() {
+        if (store.dismissRecovery()) _storageRecovery.value = null
+    }
     private val bundled =
         runCatching {
                 application.assets.open("catalog.json").bufferedReader().use {
@@ -613,7 +696,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
             .getOrElse { emptyList() }
-    val catalog: List<Exercise> = imported.ifEmpty { bundled }
+    val catalog: List<Exercise> = withLicensedExercisePreviews(application, imported.ifEmpty { bundled })
 
     val equipmentCatalog = EquipmentCatalog(application)
 
@@ -630,6 +713,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                         )
                 )
             }
+        WorkoutNotifications.sync(application, _data.value)
     }
 
     fun saveGym(gym: GymProfile): String {
@@ -655,9 +739,12 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun exercises(d: AppData = _data.value) = catalog + d.customExercises
 
     private fun update(block: (AppData) -> AppData) {
-        val next = block(_data.value)
+        val previous = _data.value
+        val next = block(previous)
+        if (next == previous) return
         store.save(next)
         _data.value = next
+        if (previous.active != next.active) WorkoutNotifications.sync(getApplication(), next)
     }
 
     fun saveScaleWeight(record: ScaleWeightRecord) = update { it.withScaleWeight(record) }
@@ -1008,6 +1095,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         backup.install()
         store.save(d)
         _data.value = d
+        WorkoutNotifications.sync(getApplication(), d)
         cleanPhotos()
     }
 

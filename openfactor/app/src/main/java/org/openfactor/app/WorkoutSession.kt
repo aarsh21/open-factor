@@ -10,6 +10,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -18,6 +19,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -37,6 +45,9 @@ fun WorkoutSession(
     onWorkoutSettings: () -> Unit,
     onGymSettings: () -> Unit,
 ) {
+    val focus = LocalFocusManager.current
+    val context = LocalContext.current
+    var timerSettingsError by remember { mutableStateOf(false) }
     val workout = data.active
     if (workout == null) {
         Column {
@@ -68,6 +79,7 @@ fun WorkoutSession(
             now = System.currentTimeMillis()
         }
     }
+    LaunchedEffect(workout.restUntil) { now = System.currentTimeMillis() }
     val elapsed = workout.elapsedSeconds(now)
     val remaining = ((restUntil - now + 999) / 1000).coerceAtLeast(0)
     Column(Modifier.fillMaxSize().imePadding()) {
@@ -76,8 +88,17 @@ fun WorkoutSession(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            IconButton(onBack) { Icon(Icons.Rounded.KeyboardArrowDown, "Minimize workout") }
+            Column(Modifier.weight(1f)) {
+                Text(workout.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Button(
+                { focus.clearFocus(); confirm = "finish" },
+                enabled = workout.completedSets() > 0,
+                contentPadding = PaddingValues(horizontal = 16.dp),
+            ) { Text("Finish") }
             Box {
-                IconButton({ menu = true }) { Icon(Icons.Rounded.Menu, "Workout options") }
+                IconButton({ menu = true }) { Icon(Icons.Rounded.MoreVert, "Workout options") }
                 DropdownMenu(menu, { menu = false }) {
                     DropdownMenuItem(
                         text = { Text("Workout settings") },
@@ -140,26 +161,27 @@ fun WorkoutSession(
                     )
                 }
             }
-            Column(Modifier.weight(1f)) {
-                if (data.preferences.showWorkoutTimer)
-                    Text(
-                        "%d:%02d:%02d".format(elapsed / 3600, elapsed / 60 % 60, elapsed % 60),
-                        fontSize = 22.sp,
-                    )
-                if (workout.pausedAt != null) Text("Paused", color = OF.muted, fontSize = 12.sp)
-            }
-            TextButton({ restSettings = true }) {
-                Icon(Icons.Rounded.Timer, null, Modifier.size(20.dp))
-                Spacer(Modifier.width(6.dp))
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            if (data.preferences.showWorkoutTimer || workout.pausedAt != null) {
                 Text(
-                    "${remaining/60}:${(remaining%60).toString().padStart(2, '0')}",
-                    Modifier.semantics { contentDescription = "Rest timer settings, $remaining seconds remaining" },
-                    fontSize = 20.sp,
+                    if (workout.pausedAt != null) "Paused" else "%d:%02d:%02d".format(elapsed / 3600, elapsed / 60 % 60, elapsed % 60),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = OF.muted,
                 )
+            } else Spacer(Modifier.width(1.dp))
+            TextButton({ restSettings = true }) {
+                Icon(Icons.Rounded.Timer, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(if (remaining > 0) "${remaining / 60}:${(remaining % 60).toString().padStart(2, '0')}" else "Rest timer")
             }
         }
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.selectableGroup(),
         ) {
@@ -168,34 +190,23 @@ fun WorkoutSession(
                     exercises.find { it.id == entry.exerciseId }
                         ?: Exercise(entry.exerciseId, "Exercise", "Other", "Other")
                 val active = entry.id == selected?.id
-                Column(
-                    Modifier.width(80.dp)
-                        .selectable(
-                            selected = active,
-                            role = Role.Tab,
-                            onClick = { vm.selectExercise(entry.id) },
-                        )
-                        .semantics { contentDescription = "Select ${exercise.title}" }
-                ) {
-                    ExerciseImage(exercise, Modifier.fillMaxWidth().height(104.dp))
-                    Spacer(Modifier.height(5.dp))
-                    Box(
-                        Modifier.fillMaxWidth()
-                            .height(3.dp)
-                            .background(
-                                if (active) MaterialTheme.colorScheme.onSurface else OF.line
-                            )
-                    )
-                }
+                FilterChip(
+                    selected = active,
+                    onClick = { focus.clearFocus(); vm.selectExercise(entry.id) },
+                    label = { Text(exercise.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    leadingIcon = if (entry.logicalSets().all { it.completed } && entry.sets.isNotEmpty()) {
+                        { Icon(Icons.Rounded.Check, null, Modifier.size(18.dp)) }
+                    } else null,
+                    modifier = Modifier.widthIn(max = 240.dp).heightIn(min = 48.dp)
+                        .semantics { contentDescription = "Select ${exercise.title}" },
+                )
             }
             item {
-                FilledTonalIconButton(
-                    onAdd,
-                    Modifier.size(width = 80.dp, height = 104.dp),
-                    shape = RoundedCornerShape(8.dp),
-                ) {
-                    Icon(Icons.Rounded.Add, "Add Exercise", Modifier.size(32.dp))
-                }
+                AssistChip(
+                    onAdd, label = { Text("Add exercise") },
+                    leadingIcon = { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)) },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                )
             }
         }
         if (remaining > 0)
@@ -240,6 +251,8 @@ fun WorkoutSession(
                 var superset by remember { mutableStateOf(false) }
                 var mergeSides by remember { mutableStateOf(false) }
                 val logicalSets = se.logicalSets()
+                var targets by remember { mutableStateOf(false) }
+                val showTargets = se.sets.any { it.targetRepsMin != null || it.targetRepsMax != null || it.targetRir != null }
                 Surface(color = OF.background) {
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -248,40 +261,14 @@ fun WorkoutSession(
                                     onExercise(e.id)
                                 }
                             ) {
-                                Text(e.title, style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    "${logicalSets.count { it.completed }} of ${logicalSets.size} sets completed",
-                                    color = OF.muted, fontSize = 12.sp,
-                                )
+                                Text(e.title, style = MaterialTheme.typography.titleLarge)
                             }
-                            if (data.preferences.showBodyweightContribution && e.bodyweight > 0.0) {
-                                val weight = data.scaleWeights.filter { it.date <= workout.localDate() }.maxByOrNull { it.date }
-                                val unit = if (data.preferences.pounds) "lb" else "kg"
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp), color = OF.background,
-                                    border = BorderStroke(1.dp, OF.green),
-                                ) {
-                                    Text(
-                                        if (weight == null) "No scale weight\n${(e.bodyweight * 100).toInt()}% contribution"
-                                        else "${weight.weightKg.displayWeight(data.preferences.pounds)} $unit\n" +
-                                            "+${(weight.weightKg * e.bodyweight).displayWeight(data.preferences.pounds)} $unit (${(e.bodyweight * 100).toInt()}%)",
-                                        Modifier.padding(horizontal = 8.dp, vertical = 4.dp), color = OF.green,
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                }
-                            }
-                        }
-                        var targets by remember { mutableStateOf(false) }
-                        var warmup by remember { mutableStateOf(false) }
-                        if (se.supersetId != null) Text(
-                            "Superset · " + workout.exercises.filter { it.supersetId == se.supersetId }
-                                .joinToString(" + ") { entry -> exercises.find { it.id == entry.exerciseId }?.title ?: "Exercise" },
-                            Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodySmall, color = OF.muted,
-                        )
-                        Row {
                             Box {
                                 IconButton({ exerciseMenu = true }) { Icon(Icons.Rounded.MoreVert, "Exercise options for ${e.title}") }
                                 DropdownMenu(exerciseMenu, { exerciseMenu = false }) {
+                                    DropdownMenuItem(text = { Text("Exercise info") }, onClick = { exerciseMenu = false; onExercise(e.id) })
+                                    DropdownMenuItem(text = { Text("Targets & rest") }, onClick = { exerciseMenu = false; targets = true })
+                                    if (metrics.any { it.isReps }) DropdownMenuItem(text = { Text(if (showRir) "Hide RIR" else "Show RIR") }, onClick = { exerciseMenu = false; vm.settings { it.copy(showRir = !it.showRir) } })
                                     DropdownMenuItem(text = { Text("Exercise notes") }, onClick = { exerciseMenu = false; exerciseNotes = true })
                                     DropdownMenuItem(text = { Text(if (se.sets.any { it.side != null }) "Use left logs only…" else "Log left and right separately") }, onClick = {
                                         exerciseMenu = false
@@ -294,10 +281,12 @@ fun WorkoutSession(
                                     DropdownMenuItem(text = { Text("Remove Exercise") }, onClick = { exerciseMenu = false; remove = true })
                                 }
                             }
-                            TextButton({ onExercise(e.id) }) { Text("Info") }
-                            TextButton({ warmup = true }) { Text("Warm Up") }
-                            TextButton({ targets = true }) { Text("Targets") }
                         }
+                        if (se.supersetId != null) Text(
+                            "Superset · " + workout.exercises.filter { it.supersetId == se.supersetId }
+                                .joinToString(" + ") { entry -> exercises.find { it.id == entry.exerciseId }?.title ?: "Exercise" },
+                            Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodySmall, color = OF.muted,
+                        )
                         val pinnedNote = data.exerciseDefaults[e.id]?.note.orEmpty()
                         if (pinnedNote.isNotBlank()) Row(
                             Modifier.fillMaxWidth().padding(vertical = 12.dp),
@@ -320,29 +309,15 @@ fun WorkoutSession(
                                 vm.saveExerciseTargets(se.id, values, rest)
                                 targets = false
                             }
-                        if (warmup)
-                            AlertDialog(
-                                onDismissRequest = { warmup = false },
-                                title = { Text("Warm Up") },
-                                text = { Text("Add an empty warm-up set before your working sets.") },
-                                confirmButton = {
-                                    TextButton({ vm.addWarmupSet(se.id); warmup = false }) {
-                                        Text("Add empty warm-up set")
-                                    }
-                                },
-                                dismissButton = {
-                                    TextButton({ warmup = false }) { Text("Cancel") }
-                                },
-                            )
                         Row(
                             Modifier.fillMaxWidth().padding(bottom = 6.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text("Set", Modifier.width(40.dp), color = OF.muted, fontSize = 12.sp)
-                            Text("Auto", Modifier.width(48.dp), color = OF.muted, fontSize = 12.sp)
+                            if (showTargets) Text("Target", Modifier.width(48.dp), color = OF.muted, fontSize = 12.sp)
                             metrics.forEach { metric ->
-                                Text(metric.label(data.preferences.pounds, data.preferences.distanceImperial), Modifier.weight(if (metric.isLoad) 1.3f else 1f), color = OF.muted, fontSize = 12.sp)
+                                Text(metric.label(data.preferences.pounds, data.preferences.distanceImperial), Modifier.weight(if (metric.isLoad) 1.3f else 1f), color = OF.muted, fontSize = 12.sp, textAlign = TextAlign.Center)
                             }
                             if (showRir)
                                 Text(
@@ -350,13 +325,14 @@ fun WorkoutSession(
                                     Modifier.weight(0.65f),
                                     color = OF.muted,
                                     fontSize = 12.sp,
+                                    textAlign = TextAlign.Center,
                                 )
                             Spacer(Modifier.width(48.dp))
                         }
                         logicalSets.forEachIndexed { index, group ->
                             group.components.forEachIndexed { componentIndex, logs ->
                                 if (group.root.kind != SetKind.STANDARD || logs.size > 1) Text(
-                                    if (componentIndex == 0) "Set ${index + 1} · ${if (group.root.warmup) "Warm-up" else group.root.kind.label}"
+                                    if (componentIndex == 0) "${if (group.root.warmup) "Warm-up" else "Set ${logicalSets.take(index + 1).count { !it.root.warmup }}"} · ${group.root.kind.label}"
                                     else "Myo component $componentIndex", Modifier.padding(top = 10.dp), color = OF.muted,
                                     style = MaterialTheme.typography.labelMedium,
                                 )
@@ -366,10 +342,12 @@ fun WorkoutSession(
                                         exerciseName = e.title + (s.side?.let { " ${it.label.lowercase()}" } ?: "") +
                                             (if (componentIndex > 0) " Myo component $componentIndex" else ""),
                                         onChange = { changed -> vm.editSet(se.id, s.id) { changed } },
-                                        onComplete = { vm.toggleSetCompletion(se.id, s.id) },
+                                        onComplete = { focus.clearFocus(); vm.toggleSetCompletion(se.id, s.id) },
                                         onRemove = { vm.removeSet(se.id, s.id) },
                                         onKind = { kind, isWarmup -> vm.setKind(se.id, s.id, kind, isWarmup) },
                                         hasExtras = group.components.size > 1,
+                                        showTargets = showTargets,
+                                        displayNumber = logicalSets.take(index + 1).count { it.root.warmup == group.root.warmup },
                                     )
                                 } }
                             }
@@ -378,8 +356,17 @@ fun WorkoutSession(
                                 Text("Add Myo component", Modifier.padding(start = 6.dp))
                             }
                         }
-                        FilledTonalIconButton({ vm.addSet(se.id) }) {
-                            Icon(Icons.Rounded.Add, "Add Set")
+                        Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedButton({ focus.clearFocus(); vm.addWarmupSet(se.id) }, Modifier.weight(1f).heightIn(min = 48.dp)) {
+                                Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Warmup")
+                            }
+                            FilledTonalButton({ focus.clearFocus(); vm.addSet(se.id) }, Modifier.weight(1f).heightIn(min = 48.dp)) {
+                                Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Add set")
+                            }
                         }
                     }
                 }
@@ -395,7 +382,7 @@ fun WorkoutSession(
                     vm.keepLeftSide(se.id)
                     mergeSides = false
                 }
-                if (remove)
+                if (remove) {
                     ConfirmDialog(
                         "Remove ${e.name}?",
                         "Its sets will be removed from this workout.",
@@ -406,6 +393,7 @@ fun WorkoutSession(
                             remove = false
                         },
                     )
+                }
             }
         }
     }
@@ -415,7 +403,30 @@ fun WorkoutSession(
             title = { Text("Rest Timers") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Changes apply to the next set you complete. A running timer keeps its deadline.")
+                    var seconds by remember { mutableStateOf(data.preferences.restSeconds.toString()) }
+                    val duration = seconds.toIntOrNull()
+                    val durationError = seconds.isNotEmpty() && (duration == null || duration !in 0..1800)
+                    OutlinedTextField(
+                        seconds,
+                        { value ->
+                            seconds = value
+                            value.toIntOrNull()?.takeIf { it in 0..1800 }?.let { valid -> vm.settings { it.copy(restSeconds = valid) } }
+                        },
+                        Modifier.fillMaxWidth(),
+                        label = { Text("Rest duration (seconds)") },
+                        isError = durationError,
+                        supportingText = { Text(if (durationError) "Use 0–1800 seconds" else "Applies to your next completed set") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
+                    )
+                    if (!WorkoutNotifications.preciseTimersAllowed(context)) {
+                        Text("Android may delay background alerts without precise timer access.", style = MaterialTheme.typography.bodyMedium, color = OF.muted)
+                        TextButton({
+                            timerSettingsError = runCatching { context.startActivity(WorkoutNotifications.preciseTimerSettings(context)) }.isFailure
+                        }) { Text("Precise timer alerts") }
+                        if (timerSettingsError) Text("Open Android Settings → Apps → Open Factor → Alarms & reminders.", color = MaterialTheme.colorScheme.error)
+                    }
                     listOf(
                         Triple("Use Rest Timers", data.preferences.autoRest, { checked: Boolean -> vm.settings { it.copy(autoRest = checked) } }),
                         Triple("Rest After Last Warm-up Set", data.preferences.restAfterLastWarmupSet, { checked: Boolean -> vm.settings { it.copy(restAfterLastWarmupSet = checked) } }),
@@ -475,7 +486,7 @@ fun WorkoutSession(
             title = { Text("Finish Workout?") },
             text = {
                 Column {
-                    Text("${workout.completedSets()} sets with completed logs will be saved to your history. Incomplete sides remain unfinished.")
+                    Text("Save ${workout.completedSets()} completed sets to history?")
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(saveTemplate, { saveTemplate = it })
                         Text("Save as workout template")
@@ -608,13 +619,18 @@ private fun SetRow(
     onRemove: () -> Unit,
     onKind: (SetKind, Boolean) -> Unit,
     hasExtras: Boolean,
+    showTargets: Boolean,
+    displayNumber: Int,
 ) {
+    val focus = LocalFocusManager.current
+    var remove by remember { mutableStateOf(false) }
     var options by remember { mutableStateOf(false) }
     var pendingKind by remember { mutableStateOf<Pair<SetKind, Boolean>?>(null) }
     var rir by remember(set.id, set.rir) { mutableStateOf(set.rir?.toString() ?: "") }
     val rirValue = rir.toIntOrNull()
     val rirError = rir.isNotEmpty() && (rirValue == null || rirValue !in 0..10)
     val showRir = prefs.showRir && metrics.any { it.isReps }
+    val spokenKind = if (set.warmup) "warmup set" else "set"
     Row(
         Modifier.fillMaxWidth()
             .padding(vertical = 4.dp)
@@ -629,11 +645,11 @@ private fun SetRow(
             TextButton(
                 { options = true },
                 Modifier.width(40.dp).semantics {
-                    contentDescription = "Set ${index + 1} options for $exerciseName"
+                    contentDescription = "${spokenKind.replaceFirstChar { it.uppercase() }} $displayNumber options for $exerciseName"
                 },
                 contentPadding = PaddingValues(0.dp),
             ) {
-                Text(set.side?.label?.take(1) ?: if (set.warmup) "W" else "${index+1}", fontSize = 13.sp)
+                Text(set.side?.label?.take(1) ?: if (set.warmup) "W" else "$displayNumber", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             }
             DropdownMenu(options, { options = false }) {
                 SetKind.entries.forEach { kind -> DropdownMenuItem(
@@ -655,13 +671,13 @@ private fun SetRow(
                     text = { Text(if (set.segmentOf != null) "Remove Myo component" else "Remove Set") },
                     onClick = {
                         options = false
-                        onRemove()
+                        remove = true
                     },
                 )
             }
         }
-        Text(
-            set.targetDescription(), Modifier.width(48.dp),
+        if (showTargets) Text(
+            set.targetDescription().takeUnless { it == "No Target" } ?: "—", Modifier.width(48.dp),
             color = OF.muted, style = MaterialTheme.typography.labelSmall,
         )
         metrics.forEach { metric ->
@@ -678,7 +694,7 @@ private fun SetRow(
                         onChange(changed.copy(completed = set.completed && changed.canComplete(metrics)))
                     },
                     Modifier.weight(if (metric.isLoad) 1.3f else 1f).semantics {
-                        contentDescription = "$exerciseName set ${index + 1} ${metric.catalogName.lowercase()} (${metric.label(prefs.pounds, prefs.distanceImperial)})"
+                        contentDescription = "$exerciseName $spokenKind $displayNumber ${metric.catalogName.lowercase()} (${metric.label(prefs.pounds, prefs.distanceImperial)})"
                         if (invalid) error(if (metric.isReps) "Enter a whole number from 1 to 9999" else "Enter a valid ${metric.label(prefs.pounds, prefs.distanceImperial)} value")
                     },
                     isError = invalid,
@@ -686,8 +702,10 @@ private fun SetRow(
                         { Text(if (metric.isReps) "Use 1–9999" else "Invalid value") }
                     } else null,
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = if (metric.isReps) KeyboardType.Number else KeyboardType.Decimal),
-                    textStyle = MaterialTheme.typography.bodyMedium,
+                    keyboardOptions = KeyboardOptions(keyboardType = if (metric.isReps) KeyboardType.Number else KeyboardType.Decimal, imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center, fontWeight = FontWeight.Medium),
+                    shape = RoundedCornerShape(10.dp),
                 )
             }
         }
@@ -700,7 +718,7 @@ private fun SetRow(
                     onChange(set.copy(rir = value, completed = set.completed && (it.isBlank() || value != null)))
                 },
                 Modifier.weight(0.65f).semantics {
-                    contentDescription = "$exerciseName set ${index + 1} reps in reserve"
+                    contentDescription = "$exerciseName $spokenKind $displayNumber reps in reserve"
                     if (rirError) error("Enter RIR from 0 to 10, or leave empty")
                 },
                 supportingText =
@@ -709,8 +727,10 @@ private fun SetRow(
                     } else null,
                 singleLine = true,
                 isError = rirError,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                textStyle = MaterialTheme.typography.bodyMedium,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center),
+                shape = RoundedCornerShape(10.dp),
             )
         IconButton(
             onComplete,
@@ -720,12 +740,16 @@ private fun SetRow(
         ) {
             Icon(
                 Icons.Rounded.Check,
-                if (set.completed) "Mark set incomplete ${index + 1} for $exerciseName"
-                else "Complete set ${index + 1} for $exerciseName",
-                tint = if (set.completed) Color.Black else OF.muted,
+                if (set.completed) "Mark $spokenKind incomplete $displayNumber for $exerciseName"
+                else "Complete $spokenKind $displayNumber for $exerciseName",
+                tint = if (set.completed) Color.Black else if (set.canComplete(metrics)) MaterialTheme.colorScheme.onSurface else OF.muted,
             )
         }
     }
+    if (remove) ConfirmDialog(
+        "Remove set?", "This removes the set and its logged values.", "Remove",
+        { remove = false }, { onRemove(); remove = false },
+    )
     pendingKind?.let { (kind, warmup) -> ConfirmDialog(
         "Remove Myo components?", "Changing this set type removes its additional component values on both sides. The main set is kept.",
         "Change set type", { pendingKind = null }, { onKind(kind, warmup); pendingKind = null },
@@ -772,7 +796,7 @@ fun HistoryScreen(
                             style = MaterialTheme.typography.titleLarge,
                         )
                         Text(
-                            "${w.exercises.size} exercises · ${w.completedSets()} sets",
+                            "${w.exercises.size} ${if (w.exercises.size == 1) "exercise" else "exercises"} · ${w.completedSets()} ${if (w.completedSets() == 1) "set" else "sets"}",
                             color = OF.muted,
                         )
                         Text(
@@ -800,6 +824,7 @@ fun WorkoutSummary(
     onBack: () -> Unit,
     onRepeat: () -> Unit,
     onDelete: () -> Unit,
+    repeatLabel: String = "Repeat workout",
 ) {
     var delete by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
@@ -851,9 +876,10 @@ fun WorkoutSummary(
                             )
                         }
                         if (se.supersetId != null) Text("Superset", color = OF.muted, style = MaterialTheme.typography.bodySmall)
-                        se.logicalSets().forEachIndexed { i, group ->
+                        val summarySets = se.logicalSets()
+                        summarySets.forEachIndexed { i, group ->
                             if (group.logs.any { it.completed }) {
-                                Text(if (group.root.warmup) "Warm-up" else "Set ${i + 1} · ${group.root.kind.label}", Modifier.padding(top = 12.dp), color = OF.muted)
+                                Text(if (group.root.warmup) "Warm-up" else "Set ${summarySets.take(i + 1).count { !it.root.warmup }} · ${group.root.kind.label}", Modifier.padding(top = 12.dp), color = OF.muted)
                                 group.components.forEachIndexed { componentIndex, logs -> logs.forEach { s ->
                                     Text(
                                         listOfNotNull(s.side?.label, if (componentIndex > 0) "Myo $componentIndex" else null).joinToString(" · ")
@@ -876,7 +902,7 @@ fun WorkoutSummary(
                     Text(w.notes, color = OF.muted)
                 }
         }
-        Box(Modifier.padding(18.dp)) { PrimaryAction("Repeat Workout", onRepeat) }
+        Box(Modifier.padding(18.dp)) { PrimaryAction(repeatLabel, onRepeat) }
     }
     if (delete)
         ConfirmDialog(

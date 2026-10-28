@@ -212,7 +212,7 @@ fun ExerciseMedia(e: Exercise) {
                         color = OF.card,
                         modifier =
                             Modifier.size(56.dp, 72.dp).semantics {
-                                contentDescription = "Camera view ${index + 1}"
+                                contentDescription = "Preview ${index + 1}"
                                 this.selected = selected == index
                             },
                     ) {
@@ -257,7 +257,8 @@ fun ExerciseMedia(e: Exercise) {
     }
     if (clip == null || failed)
         Text(
-            if (failed) "Video unavailable. Photo preview shown." else "Photo preview",
+            if (failed) "Video unavailable. Preview shown."
+            else if (e.frames.firstOrNull()?.startsWith("previews/") == true) "Illustration" else "Preview",
             color = OF.muted,
             style = MaterialTheme.typography.labelMedium,
         )

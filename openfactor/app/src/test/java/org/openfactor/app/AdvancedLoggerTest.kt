@@ -105,6 +105,53 @@ class AdvancedLoggerTest {
         assertEquals(entry.logicalSets().map { it.root.id }, merged.logicalSets().map { it.root.id })
     }
 
+    @Test fun addedWorkingSetsReuseActualsWithoutCompletionEffortOrMyoLinks() {
+        val source = LoggedSet(id = "main", weightKg = 42.5, reps = 8, rir = 1, completed = true,
+            assistanceKg = 6.0, durationSeconds = 30.0, distanceMeters = 100.0,
+            targetRepsMin = 6, targetRepsMax = 10, targetRir = 2)
+        val exercise = SessionExercise(exerciseId = "row", sets = listOf(source))
+            .withSetKind(source.id, SetKind.MYO)
+        val changed = exercise.withNewSet().validateSetLinks()
+        val added = changed.logicalSets().last().root
+        assertEquals(exercise.sets, changed.sets.take(exercise.sets.size))
+        assertNotEquals(source.id, added.id)
+        assertEquals(42.5, added.weightKg!!, 0.0)
+        assertEquals(8, added.reps)
+        assertEquals(6.0, added.assistanceKg!!, 0.0)
+        assertEquals(30.0, added.durationSeconds!!, 0.0)
+        assertEquals(100.0, added.distanceMeters!!, 0.0)
+        assertEquals(6, added.targetRepsMin)
+        assertEquals(10, added.targetRepsMax)
+        assertEquals(2, added.targetRir)
+        assertNull(added.rir)
+        assertFalse(added.completed)
+        assertFalse(added.warmup)
+        assertNull(added.segmentOf)
+        assertNull(added.pairId)
+        assertEquals(SetKind.STANDARD, added.kind)
+        val warmup = changed.withNewSet(warmup = true).validateSetLinks().sets.first()
+        assertTrue(warmup.warmup)
+        assertNull(warmup.weightKg)
+        assertNull(warmup.reps)
+        assertNull(warmup.targetRepsMin)
+        assertFalse(warmup.completed)
+    }
+
+    @Test fun addedSplitSetsKeepIndependentLeftAndRightActuals() {
+        val exercise = SessionExercise(exerciseId = "row", sets = listOf(
+            LoggedSet(id = "left", weightKg = 20.0, reps = 8, completed = true, side = SetSide.LEFT),
+            LoggedSet(id = "right", weightKg = 17.5, reps = 7, completed = true, side = SetSide.RIGHT, pairId = "left"),
+        ))
+        val changed = exercise.withNewSet().validateSetLinks()
+        val added = changed.logicalSets().last().logs
+        assertEquals(listOf(20.0, 17.5), added.map { it.weightKg })
+        assertEquals(listOf(8, 7), added.map { it.reps })
+        assertTrue(added.none { it.completed })
+        assertEquals(added.first().id, added.last().pairId)
+        assertNotEquals("left", added.first().id)
+        assertEquals(exercise.sets, changed.sets.take(2))
+    }
+
     @Test fun backupRejectsCrossExercisePairsCyclesAndMissingRoots() {
         fun rejected(vararg rows: LoggedSet) = assertThrows(IllegalArgumentException::class.java) {
             DataCodec.decode(DataCodec.encode(AppData(active = Workout(name = "Invalid", exercises = listOf(
