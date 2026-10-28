@@ -40,7 +40,7 @@ def transfer(base, source, name, expected, token, upload, read_prefix='/v1', ver
     if local_hash != expected['sha256']:
         raise ValueError(f'Source checksum does not match index: {name}')
     if not upload:
-        return {'filename': name, 'status': 'validated', 'bytes': expected['bytes']}
+        return {'filename': name, 'status': 'validated', 'bytes': expected['bytes'], 'sha256': local_hash}
     url = f'{base}{read_prefix}/videos/{name}'
     verify_readback = False
     wrote = False
@@ -55,7 +55,7 @@ def transfer(base, source, name, expected, token, upload, read_prefix='/v1', ver
                 error.close()
                 if code != 404: raise
             if exists and not verify_readback and not verify_existing:
-                return {'filename': name, 'status': 'already-present', 'bytes': expected['bytes']}
+                return {'filename': name, 'status': 'already-present', 'bytes': expected['bytes'], 'sha256': local_hash}
             if not exists:
                 payload = path.read_bytes()  # Index entries are capped at 32 MiB.
                 request = Request(f'{base}/admin/videos/{name}', data=payload, method='PUT',
@@ -77,7 +77,7 @@ def transfer(base, source, name, expected, token, upload, read_prefix='/v1', ver
                     if remote_bytes > expected['bytes']: raise ValueError(f'Readback exceeded expected bytes: {name}')
             if remote_bytes != expected['bytes'] or remote_hash.hexdigest() != local_hash:
                 raise ValueError(f'Uploaded full-body checksum verification failed: {name}')
-            return {'filename': name, 'status': 'uploaded-and-verified' if wrote else 'existing-and-verified', 'bytes': remote_bytes}
+            return {'filename': name, 'status': 'uploaded-and-verified' if wrote else 'existing-and-verified', 'bytes': remote_bytes, 'sha256': local_hash}
         except (HTTPError, URLError, TimeoutError, ConnectionError, http.client.IncompleteRead) as error:
             retryable = not isinstance(error, HTTPError) or error.code in (408, 429, 500, 502, 503, 504)
             if isinstance(error, HTTPError): error.close()
@@ -85,6 +85,17 @@ def transfer(base, source, name, expected, token, upload, read_prefix='/v1', ver
                 # Do not include exception/header contents, which may contain authorization details.
                 raise RuntimeError(f'Media transfer failed for {name}; HTTP {getattr(error, "code", "network")}') from None
             time.sleep(2 ** attempt)
+
+
+def atomic_report(path, report):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + '.partial')
+    with temporary.open('w') as stream:
+        json.dump(report, stream, indent=2)
+        stream.write('\n')
+        stream.flush()
+        os.fsync(stream.fileno())
+    temporary.replace(path)
 
 
 def main():
@@ -100,6 +111,8 @@ def main():
     parser.add_argument('--verify-existing', action='store_true', help='Read back and SHA-verify matching existing videos too')
     parser.add_argument('--allow-local-http', action='store_true')
     parser.add_argument('--report', type=Path)
+    parser.add_argument('--resume-report', type=Path, help='Resume exact full-SHA receipts from a previous run')
+    parser.add_argument('--batch-size', type=int, choices=range(1, 301), help='Process at most this many remaining objects')
     args = parser.parse_args()
     endpoint = urlparse(args.base_url)
     local = endpoint.hostname in ('127.0.0.1', 'localhost', '::1')
@@ -118,8 +131,38 @@ def main():
     token = load_token(args.env_file, args.token_file) if args.upload else ''
     if args.upload and len(token) < 32: parser.error('Set MEDIA_ADMIN_TOKEN or provide its private file')
     results, failures = [], []
+    index_sha = hashlib.sha256(args.index.read_bytes()).hexdigest()
+    if args.resume_report:
+        previous = json.loads(args.resume_report.read_text())
+        if previous.get('origin', '').rstrip('/') != args.base_url.rstrip('/') or previous.get('read_prefix') != '/v1' or previous.get('source_index_sha256') != index_sha:
+            parser.error('Resume receipt must match this origin, canonical prefix and exact index')
+        if not args.upload or not args.verify_existing:
+            parser.error('Resuming verified receipts requires --upload --verify-existing')
+        seen = set()
+        for result in previous.get('files', []):
+            name = result.get('filename')
+            if name not in selected: continue
+            expected = records[name]
+            if name in seen or result.get('status') not in ('uploaded-and-verified', 'existing-and-verified') or result.get('bytes') != expected['bytes'] or result.get('sha256') != expected['sha256']:
+                parser.error('Resume receipt contains an invalid or unverified result')
+            seen.add(name)
+            results.append(result)
+    completed = {result['filename'] for result in results}
+    pending = [name for name in selected if name not in completed]
+    if args.batch_size: pending = pending[:args.batch_size]
+
+    def checkpoint():
+        report = {'origin': args.base_url.rstrip('/'), 'read_prefix': '/v1', 'upload_requested': args.upload,
+                  'verified_existing': args.verify_existing, 'source_index_sha256': index_sha,
+                  'requested_files': len(selected), 'completed_files': len(results), 'remaining_files': len(selected) - len(results),
+                  'files': sorted(results, key=lambda item: item['filename']), 'failures': failures,
+                  'bytes': sum(item['bytes'] for item in results)}
+        if args.report: atomic_report(args.report, report)
+        return report
+
+    checkpoint()
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        jobs = {executor.submit(transfer, args.base_url.rstrip('/'), args.videos, name, records[name], token, args.upload, verify_existing=args.verify_existing): name for name in selected}
+        jobs = {executor.submit(transfer, args.base_url.rstrip('/'), args.videos, name, records[name], token, args.upload, verify_existing=args.verify_existing): name for name in pending}
         for job in as_completed(jobs):
             try:
                 result = job.result()
@@ -128,12 +171,9 @@ def main():
             except Exception as error:
                 failures.append({'filename': jobs[job], 'error': str(error)})
                 print(f'{len(results) + len(failures)}/{len(selected)} failed {jobs[job]}', flush=True)
-    report = {'origin': args.base_url, 'read_prefix': '/v1', 'upload_requested': args.upload, 'verified_existing': args.verify_existing,
-              'files': sorted(results, key=lambda item: item['filename']), 'failures': failures, 'bytes': sum(item['bytes'] for item in results)}
-    if args.report:
-        args.report.parent.mkdir(parents=True, exist_ok=True)
-        args.report.write_text(json.dumps(report, indent=2) + '\n')
-    print(json.dumps({'files': len(results), 'failures': len(failures), 'bytes': report['bytes'], 'upload_requested': args.upload}))
+            checkpoint()
+    report = checkpoint()
+    print(json.dumps({'files': len(results), 'remaining_files': report['remaining_files'], 'failures': len(failures), 'bytes': report['bytes'], 'upload_requested': args.upload}))
     if failures: raise SystemExit(1)
 
 

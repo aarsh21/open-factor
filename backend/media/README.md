@@ -29,6 +29,8 @@ The API receives internal `S3_ENDPOINT=http://rustfs:9000`, `S3_REGION=us-east-1
 
 `tooling/upload_exercise_media.py` first verifies local source hashes. It is a dry run unless `--upload` is supplied. Token input is `MEDIA_ADMIN_TOKEN`, `--token-file` or `--env-file`; credentials never belong in command arguments. The script uses up to four workers, retries transient network/HTTP failures, skips matching existing objects and verifies each new upload by HEAD plus full SHA-256 readback from canonical `/v1/videos/` URLs. Add `--verify-existing` for a complete readback audit of previously uploaded files. Failure reports retain successful transfers and exit nonzero; reruns safely resume.
 
+With `--report`, every completed result is atomically checkpointed with its verified byte length and SHA-256. Resume with `--resume-report` pointing to that receipt; only full-body verified records from the same origin, `/v1/` namespace and exact index are accepted. For bounded agent/CI sessions, add `--batch-size 300` and repeat with the same receipt until `remaining_files` is zero. An interrupted process cannot discard already checkpointed verification.
+
 ```sh
 python3 tooling/upload_exercise_media.py \
   --base-url https://factor-media.example.com \
