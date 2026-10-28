@@ -1,6 +1,6 @@
 # Exercise video service
 
-Hono/Bun streams the original exercise videos from a private RustFS bucket. The Android app uses `https://<media-domain>/videos/<32-hex-id>_<view>.mp4`. TLS terminates at Dokploy's HTTPS proxy; the API listens on internal port 3000. Static previews and anatomy remain packaged in the app.
+Hono/Node streams the original exercise videos from a private RustFS bucket. The Android app uses `https://<media-domain>/v1/videos/<32-hex-id>_<view>.mp4`. TLS terminates at Dokploy's HTTPS proxy; the API listens on internal port 3000. Static previews and anatomy remain packaged in the app. `/videos/` remains a compatibility route; `/v1/` is the canonical cache namespace.
 
 The checked-in index contains exactly 1,831 filenames, byte lengths and SHA-256 values. No video, extracted photo, instruction text or secret is committed. Regenerate it only from the matching local catalog and original files:
 
@@ -8,7 +8,7 @@ The checked-in index contains exactly 1,831 filenames, byte lengths and SHA-256 
 python3 backend/media/generate_index.py --reference openfactor/app/src/main/assets/reference
 ```
 
-Read routes support GET/HEAD, single byte ranges (including suffixes), 206/416, ETag/304, If-Range and one-year immutable caching. HEAD describes the full object even when Range is supplied. Unknown names and unuploaded objects return 404 without immutable caching. Successful responses expose `X-Content-SHA256`. Filenames are immutable: authenticated uploads must match the indexed hash and byte length before any S3 write, and are limited to 32 MiB and four concurrent uploads.
+Read routes support GET/HEAD, single byte ranges (including suffixes), 206/416, ETag/304, If-Range and one-year immutable caching. HEAD describes the full object even when Range is supplied. Unknown names and unuploaded objects return 404 without immutable caching. Successful responses expose `X-Content-SHA256`. Filenames are immutable: authenticated uploads must match the indexed hash and byte length before any S3 write, and are limited to 32 MiB and four concurrent uploads. The production HTTP adapter runs on Node 24 to preserve fixed Content-Length on streamed S3 bodies for CDN byte-range support; Bun builds and runs unit tests.
 
 `GET /healthz` checks the process; `GET /readyz` checks the private bucket. Startup creates the bucket if absent. RustFS has no anonymous bucket policy. Only the API is routed publicly; S3 and its console must stay private. The console is disabled. Production Compose publishes no host ports.
 
@@ -27,7 +27,7 @@ The API receives internal `S3_ENDPOINT=http://rustfs:9000`, `S3_REGION=us-east-1
 
 ## Upload
 
-`tooling/upload_exercise_media.py` first verifies local source hashes. It is a dry run unless `--upload` is supplied. Token input is `MEDIA_ADMIN_TOKEN`, `--token-file` or `--env-file`; credentials never belong in command arguments. The script uses up to four workers, retries transient network/HTTP failures, skips matching existing objects and verifies each new upload by HEAD plus full SHA-256 readback.
+`tooling/upload_exercise_media.py` first verifies local source hashes. It is a dry run unless `--upload` is supplied. Token input is `MEDIA_ADMIN_TOKEN`, `--token-file` or `--env-file`; credentials never belong in command arguments. The script uses up to four workers, retries transient network/HTTP failures, skips matching existing objects and verifies each new upload by HEAD plus full SHA-256 readback from canonical `/v1/videos/` URLs. Add `--verify-existing` for a complete readback audit of previously uploaded files. Failure reports retain successful transfers and exit nonzero; reruns safely resume.
 
 ```sh
 python3 tooling/upload_exercise_media.py \

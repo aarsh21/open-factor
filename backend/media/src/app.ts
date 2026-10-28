@@ -58,7 +58,7 @@ export function createApp(index: VideoIndex, store: VideoStore, adminToken: stri
     const ready = await store.ready().catch(() => false)
     return c.json({ status: ready ? 'ready' : 'unavailable', catalog_count: index.count }, ready ? 200 : 503)
   })
-  app.on(['GET', 'HEAD'], '/videos/:filename', async c => {
+  app.on(['GET', 'HEAD'], ['/videos/:filename', '/v1/videos/:filename'], async c => {
     const name = c.req.param('filename')
     const expected = VIDEO_NAME.test(name) ? index.videos[name] : undefined
     if (!expected) return c.json({ error: 'Not found' }, 404)

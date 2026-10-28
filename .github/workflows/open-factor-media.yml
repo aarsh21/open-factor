@@ -1,0 +1,31 @@
+name: Open Factor Media
+on:
+  push:
+    paths: ['backend/media/**', 'tooling/upload_exercise_media.py', '.github/workflows/open-factor-media.yml']
+  pull_request:
+    paths: ['backend/media/**', 'tooling/upload_exercise_media.py', '.github/workflows/open-factor-media.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: open-factor-media-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/media
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.4'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: bun install --frozen-lockfile
+      - run: bun test
+      - run: bun run typecheck
+      - run: python3 test/uploader_test.py
+      - run: docker build -t open-factor-media-contract .

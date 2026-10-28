@@ -17,6 +17,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+USER_AGENT = 'OpenFactor-MediaUploader/1.0'
+
 
 def load_token(env_file, token_file):
     if token_file:
@@ -29,7 +31,7 @@ def load_token(env_file, token_file):
     return os.environ.get('MEDIA_ADMIN_TOKEN', '')
 
 
-def transfer(base, source, name, expected, token, upload):
+def transfer(base, source, name, expected, token, upload, read_prefix='/v1', verify_existing=False):
     path = source / name
     if path.is_symlink() or not path.is_file() or path.stat().st_size != expected['bytes']:
         raise ValueError(f'Source length does not match index: {name}')
@@ -39,41 +41,43 @@ def transfer(base, source, name, expected, token, upload):
         raise ValueError(f'Source checksum does not match index: {name}')
     if not upload:
         return {'filename': name, 'status': 'validated', 'bytes': expected['bytes']}
-    url = f'{base}/videos/{name}'
+    url = f'{base}{read_prefix}/videos/{name}'
     verify_readback = False
+    wrote = False
     for attempt in range(4):
         try:
             exists = False
             try:
-                with urlopen(Request(url, method='HEAD'), timeout=45) as response:
+                with urlopen(Request(url, method='HEAD', headers={'User-Agent': USER_AGENT}), timeout=45) as response:
                     exists = int(response.headers.get('Content-Length', '-1')) == expected['bytes'] and response.headers.get('X-Content-SHA256') == local_hash
             except HTTPError as error:
                 code = error.code
                 error.close()
                 if code != 404: raise
-            if exists and not verify_readback:
+            if exists and not verify_readback and not verify_existing:
                 return {'filename': name, 'status': 'already-present', 'bytes': expected['bytes']}
             if not exists:
                 payload = path.read_bytes()  # Index entries are capped at 32 MiB.
                 request = Request(f'{base}/admin/videos/{name}', data=payload, method='PUT',
-                                  headers={'Authorization': f'Bearer {token}', 'Content-Type': 'video/mp4'})
+                                  headers={'Authorization': f'Bearer {token}', 'Content-Type': 'video/mp4', 'User-Agent': USER_AGENT})
                 # A lost PUT receipt still requires full readback on the next retry.
                 verify_readback = True
+                wrote = True
                 with urlopen(request, timeout=120) as response:
                     result = json.load(response)
                     if response.status != 201 or result.get('sha256') != local_hash: raise ValueError(f'Upload receipt mismatch: {name}')
-            with urlopen(Request(url, method='HEAD'), timeout=45) as response:
+            with urlopen(Request(url, method='HEAD', headers={'User-Agent': USER_AGENT}), timeout=45) as response:
                 if int(response.headers.get('Content-Length', '-1')) != expected['bytes'] or response.headers.get('X-Content-SHA256') != local_hash:
                     raise ValueError(f'Uploaded HEAD verification failed: {name}')
             remote_hash, remote_bytes = hashlib.sha256(), 0
-            with urlopen(url, timeout=120) as response:
+            with urlopen(Request(url, headers={'User-Agent': USER_AGENT}), timeout=120) as response:
                 while block := response.read(1024 * 1024):
                     remote_hash.update(block)
                     remote_bytes += len(block)
                     if remote_bytes > expected['bytes']: raise ValueError(f'Readback exceeded expected bytes: {name}')
             if remote_bytes != expected['bytes'] or remote_hash.hexdigest() != local_hash:
                 raise ValueError(f'Uploaded full-body checksum verification failed: {name}')
-            return {'filename': name, 'status': 'uploaded-and-verified', 'bytes': remote_bytes}
+            return {'filename': name, 'status': 'uploaded-and-verified' if wrote else 'existing-and-verified', 'bytes': remote_bytes}
         except (HTTPError, URLError, TimeoutError, ConnectionError, http.client.IncompleteRead) as error:
             retryable = not isinstance(error, HTTPError) or error.code in (408, 429, 500, 502, 503, 504)
             if isinstance(error, HTTPError): error.close()
@@ -93,6 +97,7 @@ def main():
     parser.add_argument('--workers', type=int, choices=range(1, 5), default=3)
     parser.add_argument('--filename', action='append', help='Limit to explicitly selected indexed filenames')
     parser.add_argument('--upload', action='store_true')
+    parser.add_argument('--verify-existing', action='store_true', help='Read back and SHA-verify matching existing videos too')
     parser.add_argument('--allow-local-http', action='store_true')
     parser.add_argument('--report', type=Path)
     args = parser.parse_args()
@@ -112,18 +117,24 @@ def main():
             parser.error('Invalid selected catalog entry')
     token = load_token(args.env_file, args.token_file) if args.upload else ''
     if args.upload and len(token) < 32: parser.error('Set MEDIA_ADMIN_TOKEN or provide its private file')
-    results = []
+    results, failures = [], []
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        jobs = {executor.submit(transfer, args.base_url.rstrip('/'), args.videos, name, records[name], token, args.upload): name for name in selected}
+        jobs = {executor.submit(transfer, args.base_url.rstrip('/'), args.videos, name, records[name], token, args.upload, verify_existing=args.verify_existing): name for name in selected}
         for job in as_completed(jobs):
-            result = job.result()
-            results.append(result)
-            print(f'{len(results)}/{len(selected)} {result["status"]} {result["filename"]}', flush=True)
-    report = {'origin': args.base_url, 'upload_requested': args.upload, 'files': sorted(results, key=lambda item: item['filename']), 'bytes': sum(item['bytes'] for item in results)}
+            try:
+                result = job.result()
+                results.append(result)
+                print(f'{len(results) + len(failures)}/{len(selected)} {result["status"]} {result["filename"]}', flush=True)
+            except Exception as error:
+                failures.append({'filename': jobs[job], 'error': str(error)})
+                print(f'{len(results) + len(failures)}/{len(selected)} failed {jobs[job]}', flush=True)
+    report = {'origin': args.base_url, 'read_prefix': '/v1', 'upload_requested': args.upload, 'verified_existing': args.verify_existing,
+              'files': sorted(results, key=lambda item: item['filename']), 'failures': failures, 'bytes': sum(item['bytes'] for item in results)}
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(report, indent=2) + '\n')
-    print(json.dumps({'files': len(results), 'bytes': report['bytes'], 'upload_requested': args.upload}))
+    print(json.dumps({'files': len(results), 'failures': len(failures), 'bytes': report['bytes'], 'upload_requested': args.upload}))
+    if failures: raise SystemExit(1)
 
 
 if __name__ == '__main__':

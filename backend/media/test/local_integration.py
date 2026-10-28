@@ -44,30 +44,31 @@ def main():
     except HTTPError as error: check('anonymous upload rejected', error.code == 401)
     result = transfer(args.api, args.reference / 'videos', name, expected, load_token(backend / '.env', None), True)
     check('indexed original upload', result['status'] in ('uploaded-and-verified', 'already-present'))
-    with urlopen(args.api + '/videos/' + name) as response:
+    with urlopen(args.api + '/v1/videos/' + name) as response:
         body = response.read()
         tag = response.headers['ETag']
         check('full original SHA-256', len(body) == expected['bytes'] and hashlib.sha256(body).hexdigest() == expected['sha256'])
         check('immutable cache contract', 'immutable' in response.headers['Cache-Control'])
-    with urlopen(Request(args.api + '/videos/' + name, method='HEAD')) as response:
+        check('GET fixed Content-Length', int(response.headers['Content-Length']) == len(data) and not response.headers.get('Transfer-Encoding'))
+    with urlopen(Request(args.api + '/v1/videos/' + name, method='HEAD')) as response:
         check('HEAD length/hash', int(response.headers['Content-Length']) == len(data) and response.headers['X-Content-SHA256'] == expected['sha256'])
         check('HEAD has no body', response.read() == b'')
     for value, start, end in [('bytes=0-1023', 0, 1023), ('bytes=-307', len(data) - 307, len(data) - 1), ('bytes=2048-', 2048, len(data) - 1)]:
-        with urlopen(Request(args.api + '/videos/' + name, headers={'Range': value})) as response:
+        with urlopen(Request(args.api + '/v1/videos/' + name, headers={'Range': value})) as response:
             check(f'206 exact range {value}', response.status == 206 and response.read() == data[start:end + 1] and response.headers['Content-Range'] == f'bytes {start}-{end}/{len(data)}')
     try:
-        urlopen(Request(args.api + '/videos/' + name, headers={'Range': f'bytes={len(data)}-'}))
+        urlopen(Request(args.api + '/v1/videos/' + name, headers={'Range': f'bytes={len(data)}-'}))
         raise AssertionError('Invalid range accepted')
     except HTTPError as error: check('416 unsatisfiable range', error.code == 416 and error.headers['Content-Range'] == f'bytes */{len(data)}')
     try:
-        urlopen(Request(args.api + '/videos/' + name, headers={'If-None-Match': tag}))
+        urlopen(Request(args.api + '/v1/videos/' + name, headers={'If-None-Match': tag}))
         raise AssertionError('Conditional cache ignored')
     except HTTPError as error: check('304 conditional ETag', error.code == 304 and error.read() == b'')
     try:
         urlopen(args.s3 + '/open-factor-videos/videos/' + name)
         raise AssertionError('Private bucket readable anonymously')
     except HTTPError as error: check('RustFS bucket denies unsigned reads', error.code in (401, 403))
-    report = {'environment': 'isolated local Docker RustFS + Hono/Bun', 'video': name, 'bytes': len(data), 'sha256': expected['sha256'], 'upload_status': result['status'], 'indexed_videos': index['count'], 'checks': checks, 'passed': len(checks)}
+    report = {'environment': 'isolated local Docker RustFS + Hono/Node', 'video': name, 'bytes': len(data), 'sha256': expected['sha256'], 'upload_status': result['status'], 'indexed_videos': index['count'], 'checks': checks, 'passed': len(checks)}
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
