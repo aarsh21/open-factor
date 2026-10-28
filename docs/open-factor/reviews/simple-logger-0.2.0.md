@@ -38,3 +38,18 @@ Actual visible Gboard/IME behavior remains unverified: the enlarged logger captu
 ## Handoff
 
 Keep the sparse native logging flow, charcoal/white hierarchy, prominent Finish, persistent active workout and unobstructed set actions. Apply the two findings, recapture affected screens with the final APK hash, and retain keyboard/notification/hardware boundaries in the release evidence unless separately verified.
+
+## Verdict addendum — two-finding scope
+
+Opened `phone-summary-final.png`, `phone-history-final.png`, `phone-logger-final.png` and `phone-recovered-workout-final.png` at their exact supplied paths under `inspection/release-evidence/`. This scores only the two original findings against the packet's final signed APK SHA-256 `1456bc4673b75d589ef246e22926e9a6c3e784d6e10e29c44ac25580d393657b`, code commit `28b067a99bb4090880ec59802e11a267336a775f`.
+
+| Finding | Verdict | Evidence |
+| --- | --- | --- |
+| Working-set identity after warmups | Resolved | Final logger and recovered logger show `W, 1, 2`; final summary now shows `Warm-up` and `Set 1 · Standard`. `WorkoutSession.kt:350` supplies separate warmup/working ordinals; lines 633, 648, 697, 721 and 743–744 distinguish warmups in semantic labels; line 882 counts nonwarmup groups for summary numbering. |
+| Singular/plural history copy | Resolved | Final history reads `1 exercise · 2 sets`; `WorkoutSession.kt:799` selects both exercise and set singular/plural forms. |
+
+No regression introduced by this fix batch is visible in these four captures. `QuickWorkoutJourneyTest.kt:94` asserts `Set 1 · Standard`; `verified-results/api26.xml` and `verified-results/api35.xml` each report 17 tests with zero failures/errors. These files were inspected without rerunning tests. The original keyboard, spoken-accessibility and hardware-performance boundaries remain unchanged.
+
+Remaining: clear for the two scored findings. This is a ship disposition at fix-list scope only, not a new whole-app audit.
+
+disposition: ship

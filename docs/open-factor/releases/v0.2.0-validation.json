@@ -1,0 +1,40 @@
+{
+  "version": "0.2.0",
+  "code_commit": "28b067a99bb4090880ec59802e11a267336a775f",
+  "artifact": "open-factor-0.2.0.apk",
+  "bytes": 8314466,
+  "sha256": "1456bc4673b75d589ef246e22926e9a6c3e784d6e10e29c44ac25580d393657b",
+  "certificate_sha256": "26d674e28f0df6bfe2fe4a9fc4e2fed332621521d2459331eea645c944e22505",
+  "local_checks": {
+    "debug_unit_tests": 114,
+    "release_unit_tests": 114,
+    "api26_instrumented_tests": 17,
+    "api35_instrumented_tests": 17,
+    "failures": 0,
+    "debug_lint": "passed",
+    "release_lint": "passed",
+    "asset_allowlist": "passed",
+    "licensed_preview_hashes": 44,
+    "zip_integrity": "passed",
+    "signed_release_installed_api26_and_api35": true,
+    "active_workout_recovered_after_background_process_kill_api35": true,
+    "real_gboard_numeric_input_api26_font_scale_1_3": true,
+    "background_rest_alert_and_notification_resume_api26": true,
+    "light_theme_home_api35": "checked",
+    "review": "Two reported consistency findings resolved; fix-list disposition ship"
+  },
+  "ci_url": "https://github.com/aarsh21/open-factor/actions/runs/40776857929",
+  "limits": [
+    "Illustrations cover 21 of 1,345 catalog exercises; no public demonstration videos.",
+    "Accounts, cloud sync and video backend are not included.",
+    "Physical-device performance, OEM background behavior, actual TalkBack speech and tablets are not certified.",
+    "Raw emulator frame samples include missed deadlines; no universal frame-rate claim."
+  ],
+  "evidence_release_asset": "open-factor-0.2.0-evidence.zip",
+  "ci_result": "success",
+  "ci_jobs": {
+    "build": "success",
+    "Android API 26 device tests": "success",
+    "Android API 35 device tests": "success"
+  }
+}
