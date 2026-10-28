@@ -4,6 +4,8 @@ An independently maintained Android workout app with straightforward logging and
 
 “Simple” means useful training features in an uncluttered interface. The current 0.3.0 code restores the recovered exercise photos, instructions, anatomy and equipment artwork through an efficient static pack, with original videos delivered on demand over HTTPS. Core logging and bundled guidance work offline without an account. Videos require a bundled clip or available streamed/cached data. See [media packaging and playback](docs/open-factor/MEDIA-PACKAGING.md).
 
+[Download Open Factor 0.3.0](https://github.com/aarsh21/open-factor/releases/tag/v0.3.0). The release includes the signed original-media APK, checksums and a verification bundle. See the [release notes and exact verification scope](docs/open-factor/releases/v0.3.0.md).
+
 ## Build and test on Android
 
 Open Factor is the independent Android project in `openfactor/`. Use JDK 17 and Android SDK Platform 36. The app targets API 35 and supports Android 8.0 or newer. Static/full media staging additionally needs Python 3.11+ and ImageMagick's `magick`; source-only staging needs Python.
@@ -33,6 +35,8 @@ The default `auto` media mode includes the original static pack when a local `re
 The debug APK is `openfactor/app/build/outputs/apk/debug/app-debug.apk`, package `org.openfactor.app`. It can coexist with Nuvio and the reference app. Service configuration does not establish that a server is deployed or its videos are uploaded. The [Hono/Node and private RustFS service](backend/media/README.md) includes Dokploy configuration and an authenticated uploader; no account service is required for workout logging.
 
 `tooling/build_public_release.sh` explicitly builds the source-only variant, signs it using externally supplied persistent credentials, and writes certificate and SHA-256 receipts. Its public APK verifier checks the source-only asset allowlist, preview hashes, catalog, ZIP integrity and package size. That verifier is not acceptance for a reference-containing artifact. Never commit a keystore or password.
+
+`tooling/build_media_release.sh` builds and signs the intended original-static-media variant using the same external credentials. `tooling/verify_media_apk.py` checks the packaged file manifest, original hashes, media counts and exact video identities against the backend index. Pass `--reference /path/to/reference` to compare the APK against untouched imported source bytes as well. Signature and deployed-video checks are separate receipts.
 
 ## Training and exercise guidance
 

@@ -8,6 +8,8 @@ The current brief replaces one-to-one parity as the acceptance target. Mode rema
 
 Typography uses bundled public DM Sans. Original photos, instructions, anatomy and equipment art are included by static/full modes; original videos start only after Play, use HTTPS when not bundled, and have a bounded 128 MiB cache. Source mode explicitly excludes recovered content and retains the licensed preview/icon fallback. Not every exercise has original guidance. Existing programs, body data, history and settings remain functional. The older parity requirements below are historical, not release blockers for the current direction. See [media packaging](../../docs/open-factor/MEDIA-PACKAGING.md) for mode and content boundaries.
 
+Media preserves the full demonstration frame and stays within the visible guide viewport. Playback controls remain reachable on shorter screens; camera thumbnails scroll above their reserved control area. The final release evidence is recorded in [0.3.0 verification](../../docs/open-factor/releases/v0.3.0.md).
+
 Mode: Operate. Platform: Android. Artifact: `openfactor/app/`.
 
 ## Historical parity contract
