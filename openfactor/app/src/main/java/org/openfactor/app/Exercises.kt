@@ -526,118 +526,121 @@ fun ExerciseDetail(
                 Tab(tab == i, { tab = i }, text = { Text(s) })
             }
         }
-        LazyColumn(
-            Modifier.weight(1f),
-            contentPadding = if (tab == 0) PaddingValues(bottom = 18.dp) else PaddingValues(18.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            if (tab == 0) {
-                item { ExerciseMedia(e) }
-                if (instructions.isNotBlank())
-                    markdownItems(instructions).forEachIndexed { index, (heading, text) ->
-                        item {
-                            Column(
-                                Modifier.padding(horizontal = 18.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                if (heading != null)
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(heading, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                                        val collapsed = index in collapsedSections
-                                        TextButton(
-                                            onClick = {
-                                                collapsedSections = if (collapsed) collapsedSections - index else collapsedSections + index
-                                            },
-                                            modifier = Modifier.semantics {
-                                                contentDescription = "${if (collapsed) "Expand" else "Collapse"} $heading"
-                                            },
-                                        ) { Text(if (collapsed) "Expand" else "Collapse") }
-                                    }
-                                if (index !in collapsedSections)
-                                    Text(text, style = MaterialTheme.typography.bodyLarge, color = OF.muted)
-                            }
-                        }
-                    }
-            } else if (tab == 1) {
-                item { ExerciseAnatomy(e) }
-                if (e.properties.isNotEmpty())
-                    item {
-                        SectionTitle("Properties")
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceAround,
-                        ) {
-                            listOf("Range of Motion", "Stability").forEach { p ->
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(p, color = OF.muted)
-                                    Text(
-                                        "${e.properties[p] ?: "–"}/5",
-                                        style = MaterialTheme.typography.headlineMedium,
-                                    )
+        BoxWithConstraints(Modifier.weight(1f)) {
+            val mediaViewportHeight = maxHeight
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = if (tab == 0) PaddingValues(bottom = 18.dp) else PaddingValues(18.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                if (tab == 0) {
+                    item { ExerciseMedia(e, mediaViewportHeight) }
+                    if (instructions.isNotBlank())
+                        markdownItems(instructions).forEachIndexed { index, (heading, text) ->
+                            item {
+                                Column(
+                                    Modifier.padding(horizontal = 18.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    if (heading != null)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(heading, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                                            val collapsed = index in collapsedSections
+                                            TextButton(
+                                                onClick = {
+                                                    collapsedSections = if (collapsed) collapsedSections - index else collapsedSections + index
+                                                },
+                                                modifier = Modifier.semantics {
+                                                    contentDescription = "${if (collapsed) "Expand" else "Collapse"} $heading"
+                                                },
+                                            ) { Text(if (collapsed) "Expand" else "Collapse") }
+                                        }
+                                    if (index !in collapsedSections)
+                                        Text(text, style = MaterialTheme.typography.bodyLarge, color = OF.muted)
                                 }
                             }
                         }
-                    }
-                item {
-                    SectionTitle("Resistance Equipment")
-                    Text(
-                        e.equipmentOptions.ifEmpty { listOf(e.equipment) }.joinToString(if (e.custom) " or " else ", "),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                }
-                if (e.custom && e.supportEquipment.isNotEmpty()) item {
-                    SectionTitle("Support Equipment")
-                    val names = vm.equipmentCatalog.items.associate { it.id to it.name }
-                    Text(e.supportEquipment.joinToString(" or ") { group ->
-                        group.map { names[it] ?: it }.sorted().joinToString(" + ")
-                    })
-                }
-                item {
-                    SectionTitle("Details")
-                    if (e.aliases.isNotEmpty()) {
-                        Text("Alternative Names", color = OF.muted)
-                        Text(e.aliases.joinToString(", "), Modifier.padding(bottom = 12.dp))
-                    }
-                    val type = e.infoTypeLabel
-                    e.properties
-                        .filterKeys { it !in listOf("Range of Motion", "Stability", "Movement Patterns") && (it != "Region" || type == null) }
-                        .forEach { (label, value) ->
-                            Text(label, color = OF.muted)
-                            Text(if (label == "Type") type ?: value else value, Modifier.padding(bottom = 12.dp))
+                } else if (tab == 1) {
+                    item { ExerciseAnatomy(e) }
+                    if (e.properties.isNotEmpty())
+                        item {
+                            SectionTitle("Properties")
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceAround,
+                            ) {
+                                listOf("Range of Motion", "Stability").forEach { p ->
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(p, color = OF.muted)
+                                        Text(
+                                            "${e.properties[p] ?: "–"}/5",
+                                            style = MaterialTheme.typography.headlineMedium,
+                                        )
+                                    }
+                                }
+                            }
                         }
-                    Text("Body Weight Contribution", color = OF.muted)
-                    Text("${(e.bodyweight*100).toInt()}%")
-                }
-            } else {
-                val history = data.history.filter { w -> w.exercises.any { it.exerciseId == e.id } }
-                if (history.isEmpty())
                     item {
-                        EmptyContent(
-                            Icons.Rounded.History,
-                            "No exercise history",
-                            "Completed sets will appear here after your first workout.",
+                        SectionTitle("Resistance Equipment")
+                        Text(
+                            e.equipmentOptions.ifEmpty { listOf(e.equipment) }.joinToString(if (e.custom) " or " else ", "),
+                            style = MaterialTheme.typography.bodyLarge,
                         )
                     }
-                items(history, key = { it.id }) { w ->
-                    Surface(shape = OF.shape, color = OF.card) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text(w.name, style = MaterialTheme.typography.titleMedium)
-                            Text(w.localDate().toString(), color = OF.muted)
-                            w.exercises
-                                .filter { it.exerciseId == e.id }
-                                .flatMap { it.logicalSets() }
-                                .filter { it.logs.any { log -> log.completed } }
-                                .forEachIndexed { index, group ->
-                                    Text("Set ${index + 1} · ${if (group.root.warmup) "Warm-up" else group.root.kind.label}", Modifier.padding(top = 8.dp), color = OF.muted)
-                                    group.components.forEachIndexed { componentIndex, logs -> logs.forEach { s ->
-                                        Text(
-                                            listOfNotNull(s.side?.label, if (componentIndex > 0) "Myo $componentIndex" else null).joinToString(" · ")
-                                                .let { if (it.isEmpty()) "" else "$it: " } +
-                                                if (s.completed) s.describe(e.loggingMetrics(), data.preferences.pounds, data.preferences.distanceImperial) else "Not completed",
-                                            Modifier.padding(top = 4.dp),
-                                        )
-                                    } }
-                                }
+                    if (e.custom && e.supportEquipment.isNotEmpty()) item {
+                        SectionTitle("Support Equipment")
+                        val names = vm.equipmentCatalog.items.associate { it.id to it.name }
+                        Text(e.supportEquipment.joinToString(" or ") { group ->
+                            group.map { names[it] ?: it }.sorted().joinToString(" + ")
+                        })
+                    }
+                    item {
+                        SectionTitle("Details")
+                        if (e.aliases.isNotEmpty()) {
+                            Text("Alternative Names", color = OF.muted)
+                            Text(e.aliases.joinToString(", "), Modifier.padding(bottom = 12.dp))
+                        }
+                        val type = e.infoTypeLabel
+                        e.properties
+                            .filterKeys { it !in listOf("Range of Motion", "Stability", "Movement Patterns") && (it != "Region" || type == null) }
+                            .forEach { (label, value) ->
+                                Text(label, color = OF.muted)
+                                Text(if (label == "Type") type ?: value else value, Modifier.padding(bottom = 12.dp))
+                            }
+                        Text("Body Weight Contribution", color = OF.muted)
+                        Text("${(e.bodyweight*100).toInt()}%")
+                    }
+                } else {
+                    val history = data.history.filter { w -> w.exercises.any { it.exerciseId == e.id } }
+                    if (history.isEmpty())
+                        item {
+                            EmptyContent(
+                                Icons.Rounded.History,
+                                "No exercise history",
+                                "Completed sets will appear here after your first workout.",
+                            )
+                        }
+                    items(history, key = { it.id }) { w ->
+                        Surface(shape = OF.shape, color = OF.card) {
+                            Column(Modifier.padding(16.dp)) {
+                                Text(w.name, style = MaterialTheme.typography.titleMedium)
+                                Text(w.localDate().toString(), color = OF.muted)
+                                w.exercises
+                                    .filter { it.exerciseId == e.id }
+                                    .flatMap { it.logicalSets() }
+                                    .filter { it.logs.any { log -> log.completed } }
+                                    .forEachIndexed { index, group ->
+                                        Text("Set ${index + 1} · ${if (group.root.warmup) "Warm-up" else group.root.kind.label}", Modifier.padding(top = 8.dp), color = OF.muted)
+                                        group.components.forEachIndexed { componentIndex, logs -> logs.forEach { s ->
+                                            Text(
+                                                listOfNotNull(s.side?.label, if (componentIndex > 0) "Myo $componentIndex" else null).joinToString(" · ")
+                                                    .let { if (it.isEmpty()) "" else "$it: " } +
+                                                    if (s.completed) s.describe(e.loggingMetrics(), data.preferences.pounds, data.preferences.distanceImperial) else "Not completed",
+                                                Modifier.padding(top = 4.dp),
+                                            )
+                                        } }
+                                    }
+                            }
                         }
                     }
                 }
