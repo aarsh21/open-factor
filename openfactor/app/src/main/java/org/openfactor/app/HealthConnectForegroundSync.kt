@@ -1,6 +1,5 @@
 package org.openfactor.app
 
-import android.os.SystemClock
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
@@ -14,29 +13,18 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-internal const val HEALTH_CONNECT_FOREGROUND_INTERVAL_MS = 15L * 60L * 1000L
-
-/** Uses wall time for saved freshness and elapsed time to throttle unsuccessful foreground reads. */
+/** One automatic read per foreground visit, regardless of how recently a previous visit synced. */
 internal class HealthConnectForegroundGate {
-    private var lastAttemptElapsed: Long? = null
-    private var lastAttemptDate: LocalDate? = null
+    private var attemptedThisVisit = false
 
-    fun begin(state: HealthConnectSyncState, enabled: Boolean, now: Long, today: LocalDate, elapsed: Long): Boolean {
-        val lastSync = state.lastSyncedAtMillis ?: return false
-        if (!enabled) return false
-        val age = now - lastSync
-        if (state.lastDate == today && age in 0 until HEALTH_CONNECT_FOREGROUND_INTERVAL_MS) return false
-        val attempted = lastAttemptElapsed
-        if (attempted != null && lastAttemptDate == today && elapsed >= attempted &&
-            elapsed - attempted < HEALTH_CONNECT_FOREGROUND_INTERVAL_MS) return false
-        lastAttemptElapsed = elapsed
-        lastAttemptDate = today
+    fun begin(state: HealthConnectSyncState, enabled: Boolean): Boolean {
+        if (!enabled || state.lastSyncedAtMillis == null || attemptedThisVisit) return false
+        attemptedThisVisit = true
         return true
     }
 
-    fun cancel() {
-        lastAttemptElapsed = null
-        lastAttemptDate = null
+    fun leaveForeground() {
+        attemptedThisVisit = false
     }
 }
 
@@ -63,7 +51,7 @@ fun HealthConnectForegroundSync(
     fun refresh() {
         if (job?.isActive == true) return
         val today = LocalDate.now()
-        if (!gate.begin(latestData, latestEnabled, System.currentTimeMillis(), today, SystemClock.elapsedRealtime())) return
+        if (!gate.begin(latestData, latestEnabled)) return
         job = scope.launch {
             try {
                 val result = withContext(Dispatchers.IO) {
@@ -84,15 +72,15 @@ fun HealthConnectForegroundSync(
     fun cancelPendingRead() {
         if (job?.isActive == true) {
             job?.cancel()
-            gate.cancel()
         }
     }
 
-    DisposableEffect(lifecycle, enabled) {
+    DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) refresh()
             if (event == Lifecycle.Event.ON_PAUSE) {
                 cancelPendingRead()
+                gate.leaveForeground()
             }
         }
         lifecycle.addObserver(observer)
@@ -101,7 +89,11 @@ fun HealthConnectForegroundSync(
             cancelPendingRead()
         }
     }
+    // Closing the explicit panel must not immediately repeat its just-completed transfer.
     LaunchedEffect(enabled) {
+        if (!enabled) cancelPendingRead()
+    }
+    LaunchedEffect(data.healthConnect.lastSyncedAtMillis != null) {
         if (enabled && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) refresh()
     }
 }

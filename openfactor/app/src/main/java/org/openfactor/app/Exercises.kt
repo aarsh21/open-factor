@@ -8,12 +8,16 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -52,6 +56,7 @@ fun ExerciseLibrary(
     var resistanceSheet by rememberSaveable { mutableStateOf(false) }
     var onlyFavorites by rememberSaveable { mutableStateOf(false) }
     var filter by remember { mutableStateOf(false) }
+    var pickInFlight by remember { mutableStateOf(false) }
     var scope by rememberSaveable { mutableStateOf("All") }
     val listState = rememberLazyListState()
     val filters = listOf(query, muscle, resistanceId, gym?.id.orEmpty(), type, laterality, onlyFavorites.toString(), scope)
@@ -305,7 +310,9 @@ fun ExerciseLibrary(
                             else if (e.id in favorites) Icons.Rounded.Star else Icons.Rounded.StarOutline,
                             if (picking) "Add ${e.name}" else "Favorite ${e.name}",
                         ) {
-                            if (picking && onPick != null) onPick(e.id) else onFavorite(e.id)
+                            if (picking && onPick != null) {
+                                if (!pickInFlight) { pickInFlight = true; onPick(e.id) }
+                            } else onFavorite(e.id)
                         }
                     }
                     HorizontalDivider(Modifier.padding(start = 60.dp), color = OF.line.copy(alpha = 0.5f))
@@ -603,30 +610,50 @@ fun RoutineBuilder(
     var query by rememberSaveable { mutableStateOf("") }
     var selected by rememberSaveable { mutableStateOf(listOf<String>()) }
     var leaving by remember { mutableStateOf(false) }
+    var searching by remember { mutableStateOf(false) }
+    var editNameRequest by remember { mutableIntStateOf(0) }
+    val nameFocus = remember { FocusRequester() }
+    val searchIndex = remember(exercises) { ExerciseSearchIndex(exercises) }
+    val matches = remember(searchIndex, query) { searchIndex.search(query).filterNot { it.archived } }
+    val listState = rememberLazyListState()
+    LaunchedEffect(query) { listState.scrollToItem(0) }
+    LaunchedEffect(editNameRequest) { if (editNameRequest > 0) nameFocus.requestFocus() }
     fun back() {
         if (name.isNotBlank() || selected.isNotEmpty()) leaving = true else onBack()
     }
     androidx.activity.compose.BackHandler(onBack = ::back)
     Column(Modifier.fillMaxSize().imePadding()) {
-        PageHeading("Create Workout", ::back)
-        OutlinedTextField(
+        // Search is a working mode: retain the name as an editable header and give the list room
+        // above the keyboard. Never collapse the field while the person is typing its name.
+        Row(Modifier.fillMaxWidth().background(OF.top).padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            IconButton(::back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
+            Text(if (searching && name.isNotBlank()) name else "Create template", Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (searching) IconButton({ searching = false; editNameRequest++ }) {
+                Icon(Icons.Rounded.Edit, "Edit template name")
+            }
+        }
+        if (!searching) OutlinedTextField(
             name,
             { name = it },
-            Modifier.fillMaxWidth().padding(18.dp),
-            label = { Text("Workout name") },
+            Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp).focusRequester(nameFocus),
+            label = { Text("Template name") },
             singleLine = true,
         )
         OutlinedTextField(
             query,
             { query = it },
-            Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 18.dp).onFocusChanged { searching = it.isFocused },
             placeholder = { Text("Search exercises") },
             leadingIcon = { Icon(Icons.Rounded.Search, null) },
+            trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(Icons.Rounded.Close, "Clear search") } },
             singleLine = true,
         )
-        Text("${selected.size} selected", Modifier.padding(18.dp), color = OF.muted)
-        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 18.dp)) {
-            items(selected, key = { "selected-$it" }) { id ->
+        Text("${selected.size} selected", Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.labelLarge, color = OF.muted)
+        LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(horizontal = 18.dp)) {
+            items(if (searching) emptyList() else selected, key = { "selected-$it" }) { id ->
                 val exercise = exercises.find { it.id == id }
                 val index = selected.indexOf(id)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -653,14 +680,17 @@ fun RoutineBuilder(
                     }
                 }
             }
-            if (selected.isNotEmpty())
+            if (selected.isNotEmpty() && !searching)
                 item { HorizontalDivider(Modifier.padding(vertical = 12.dp), color = OF.line) }
+            if (matches.isEmpty()) item {
+                EmptyContent(Icons.Rounded.Search, "No exercises found", "Try a name, muscle or equipment.", "Clear search", { query = "" })
+            }
             items(
-                exercises.filter { !it.archived && it.name.contains(query, true) }.sortedBy { it.name },
+                matches,
                 key = { it.id },
             ) { e ->
                 ListItem(
-                    headlineContent = { Text(e.name) },
+                    headlineContent = { Text(e.title) },
                     supportingContent = { Text("${e.muscle} · ${e.equipment}") },
                     leadingContent = { ExerciseImage(e, Modifier.size(48.dp)) },
                     trailingContent = {
@@ -680,9 +710,9 @@ fun RoutineBuilder(
                 )
             }
         }
-        Box(Modifier.padding(18.dp)) {
+        Box(Modifier.padding(horizontal = 18.dp, vertical = 8.dp)) {
             PrimaryAction(
-                "Save Workout",
+                "Save template",
                 { onSave(name, selected) },
                 enabled = name.isNotBlank() && selected.isNotEmpty(),
             )
@@ -690,8 +720,8 @@ fun RoutineBuilder(
     }
     if (leaving)
         ConfirmDialog(
-            "Discard unsaved workout?",
-            "This workout has not been saved to your library.",
+            "Discard unsaved template?",
+            "This template has not been saved to your library.",
             "Discard",
             { leaving = false },
             {

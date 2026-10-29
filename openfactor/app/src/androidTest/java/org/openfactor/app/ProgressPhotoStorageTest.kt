@@ -16,6 +16,64 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ProgressPhotoStorageTest {
     @Test
+    fun cameraCapturesUsePrivateFullResolutionUrisAndCleanCancelledOrInvalidOutput() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val store = ProgressPhotoStore(context)
+        val cancelled = store.createCapture()
+        val cancelledUri = store.captureUri(cancelled)
+        assertEquals("content", cancelledUri.scheme)
+        assertEquals("${context.packageName}.files", cancelledUri.authority)
+        store.discardCapture(cancelled)
+        assertFalse(java.io.File(context.cacheDir, "photo-captures/$cancelled").exists())
+        val empty = store.createCapture()
+        assertThrows(IllegalArgumentException::class.java) { store.attachCapture(empty) }
+        assertFalse(java.io.File(context.cacheDir, "photo-captures/$empty").exists())
+        val name = store.createCapture()
+        val bitmap = Bitmap.createBitmap(64, 96, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.BLUE)
+        val bytes = ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it) }.toByteArray()
+        bitmap.recycle()
+        context.contentResolver.openOutputStream(store.captureUri(name))!!.use { it.write(bytes) }
+        val reference = store.attachCapture(name)
+        try {
+            assertArrayEquals(bytes, store.file(reference).readBytes())
+            assertFalse(java.io.File(context.cacheDir, "photo-captures/$name").exists())
+            assertThrows(IllegalArgumentException::class.java) { store.captureUri("../exports/private.jpg") }
+        } finally { store.file(reference).delete() }
+    }
+
+    @Test
+    fun interruptedCameraImportCanReplayFromRetainedStageBeforeReferenceDelivery() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val firstStore = ProgressPhotoStore(context)
+        val name = firstStore.createCapture()
+        val stage = java.io.File(context.cacheDir, "photo-captures/$name")
+        val bitmap = Bitmap.createBitmap(79, 113, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.MAGENTA)
+        val bytes = ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, 93, it) }.toByteArray()
+        bitmap.recycle()
+        context.contentResolver.openOutputStream(firstStore.captureUri(name))!!.use { it.write(bytes) }
+        val undeliveredReference = firstStore.importCapture(name)
+        try {
+            assertTrue("An imported but undelivered camera result must retain its source", stage.exists())
+            // A recreated editor may clean an orphaned import before replaying its saveable
+            // pendingCapture + captureReady result. The original camera output is independent.
+            firstStore.file(undeliveredReference).delete()
+            val recreatedStore = ProgressPhotoStore(context)
+            val deliveredReference = recreatedStore.importCapture(name)
+            assertEquals(undeliveredReference, deliveredReference)
+            assertArrayEquals(bytes, recreatedStore.file(deliveredReference).readBytes())
+            assertArrayEquals(bytes, stage.readBytes())
+            recreatedStore.discardCapture(name)
+            assertFalse(stage.exists())
+            assertArrayEquals(bytes, recreatedStore.file(deliveredReference).readBytes())
+        } finally {
+            firstStore.discardCapture(name)
+            firstStore.file(undeliveredReference).delete()
+        }
+    }
+
+    @Test
     fun originalsSurviveReopenAndBackupAndSharedImagesAreRemovedOnlyAfterLastRecord() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val vm = WorkoutViewModel(context.applicationContext as Application)

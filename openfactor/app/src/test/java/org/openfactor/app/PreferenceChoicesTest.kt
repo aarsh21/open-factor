@@ -29,7 +29,7 @@ class PreferenceChoicesTest {
         assertFalse(legacy.clock24Hour)
         assertEquals(AppTheme.DARK, legacy.theme)
         assertEquals(listOf(WorkoutShortcut.WEIGHT, WorkoutShortcut.PHOTOS, WorkoutShortcut.MEASUREMENTS,
-            WorkoutShortcut.HISTORY, WorkoutShortcut.EMPTY_WORKOUT, WorkoutShortcut.NEW_PROGRAM,
+            WorkoutShortcut.HISTORY, WorkoutShortcut.EMPTY_WORKOUT,
             WorkoutShortcut.NEW_WORKOUT), legacy.shortcuts.order)
         assertTrue(legacy.shortcuts.showUpNext)
         assertTrue(legacy.shortcuts.colors.isEmpty())

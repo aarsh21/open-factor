@@ -24,7 +24,7 @@ Each record needs at least one of the three views. Same-day records coexist by
 stable ID. Reopening permits a date change, replacement, individual-slot removal,
 full-image viewing, and confirmed record deletion. Save applies edits. Close,
 Back, an outside tap, or a downward sheet drag discards unsaved changes.
-Cancelling the Android document picker does not change a slot.
+Cancelling the Android camera or document picker does not change a slot. Optional notes are saved with the record, included in complete backups and restored on edit. Older photo records without notes remain readable.
 
 Data Visibility hides individual editor slots, not saved photos. Hidden slots
 keep their hashes when another slot or the date changes. History and complete
@@ -33,9 +33,28 @@ their three-column size. If all slots are hidden, the editor explains the settin
 and still permits a date-only edit of an existing record. These responsive
 layouts are local adaptations; the hidden-slot source layout is unobserved.
 
-The Android document picker selects existing images. Camera capture, editing or
-cropping the image itself, comparison tools, charts, and trend or visual-fat
-calculations are not implemented.
+Quick Log Photos opens the device camera directly for a new record. The native
+camera writes a full-resolution image into a narrowly shared private cache URI;
+returning with a successful capture imports those exact bytes into private photo
+storage and opens the dated record for Save. Each visible pose has a camera
+action; its options menu can choose or replace an existing image through the
+Android document picker, or remove an attachment. Cancel leaves saved records
+unchanged. Devices without a camera handler retain the editor and a library
+recovery action. No camera or storage runtime permission is requested because
+capture is delegated to the native camera app.
+
+Temporary captures are separate from permanent originals. Cancellation, failed
+image validation and a successful import remove the temporary file. Pending
+capture identity, ready state and its selected pose survive activity recreation.
+An interrupted import can replay from the retained camera output; that output
+is consumed only after the reference reaches the editor's saveable state.
+Quick capture is skipped when every photo pose is hidden. Files left
+by an interrupted process expire after one day when another capture begins.
+The camera receives access only to its temporary output URI. Original images
+are never saved to the public gallery by Open Factor.
+
+Editing or cropping the image itself, comparison tools, charts, and trend or
+visual-fat calculations are not implemented.
 
 Attachments are copied into the app's private `noBackupFilesDir/progress-photos`
 directory, named by SHA-256. Records contain hashes, not document URIs or source
@@ -109,5 +128,5 @@ The exact source pose icons are not bundled; the empty slots use a standard
 Material person icon. Source attachment selection, populated history, source
 save and deletion outcomes, and same-day policy remain unobserved. Local date
 dialogs, typography, responsive spacing, privacy copy, and populated-slot actions
-are adaptations. Camera, crop, comparison, and trend or visual-fat calculations
-are not implemented or inferred.
+are adaptations. Native camera capture is a local addition. Crop, comparison, and trend or
+visual-fat calculations are not implemented or inferred.

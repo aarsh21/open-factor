@@ -24,11 +24,13 @@ Manual weight dates take priority. A repeated import updates an existing importe
 
 Steps use the provider's daily aggregate, which applies Health Connect's deduplication and source-priority rules. No hard-coded source package filter excludes phone or wearable data, including newer device-specific step origins. An absent aggregate is an unknown reading; it is not turned into an invented zero. A provider-returned zero remains a valid reading.
 
+The dashboard shows actual daily steps in an interactive 7/30-day bar chart with date selection, observed-day total/average/best values and a sync timestamp. Unknown dates are gaps; a measured zero has a distinct mark.
+
 `AppData.healthConnect` stores `HealthConnectSyncState`: the last successful sync time, its date range, granted categories at that sync, weight-reading count and `dailySteps`. It is part of complete backups and survives process recreation. It records a dated successful snapshot, not a promise that access is still granted now.
 
 ## Foreground refresh
 
-After an explicit successful connection, `HealthConnectForegroundSync` refreshes stale data when the app returns to the foreground. It checks again after 15 minutes, on a new local date, or after a backward wall-clock change. Elapsed time throttles unsuccessful attempts. It never opens a permission prompt, schedules a background worker or writes records to the health provider.
+After an explicit successful connection, `HealthConnectForegroundSync` refreshes once on every foreground visit, even if the last successful sync was seconds ago. Pause cancels an in-flight read and resets the visit gate; resume can retry. Recomposition cannot launch another read in the same visit. It never opens a permission prompt, schedules a background worker or writes records to the health provider.
 
 Opening the explicit Health Connect panel suppresses the foreground controller, so it cannot compete with the panel's sync. Leaving the app cancels an in-flight read; returning can retry that interrupted attempt. Revocation or a provider error keeps the last successful data and timestamp unchanged. The panel's explicit Sync action provides visible recovery.
 
@@ -40,7 +42,7 @@ The earlier export helpers remain pure compatibility code, with unit coverage, b
 
 ## Verification
 
-Unit coverage checks partial grants, paged scale reads, aggregate step requests without origin filtering, missing versus zero readings, live revocation, failed combined reads, manual-data precedence, stable IDs, backup round trips and malformed snapshots. Foreground gate tests cover initial consent, the panel exclusion, 15-minute throttling, day rollover, backward clocks and cancelled attempts.
+Unit coverage checks partial grants, paged scale reads, aggregate step requests without origin filtering, missing versus zero readings, live revocation, failed combined reads, manual-data precedence, stable IDs, backup round trips and malformed snapshots. Foreground gate tests cover initial consent, panel exclusion, repeated recomposition, recent-snapshot refresh on a new visit and cancellation/retry boundaries.
 
 `HealthConnectProviderTest.oneButtonUiImportMatchesExternalProviderAndSurvivesReload` is an opt-in integration test. It requires a separate fixture app or the official Health Connect Toolbox to write known records to the **real Android Health Connect provider**, then the normal Open Factor Connect button and Android permission UI to import them. The test first asserts that this visible one-button flow already saved the external-origin reading and daily steps. It then reads the actual provider again and verifies idempotent persistence through a new store instance. It does not inject an app-local success result or present synthetic fixture records as a person's real health history.
 

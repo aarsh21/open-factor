@@ -49,6 +49,7 @@ internal fun DashboardCustomization(
     }
     var choosing by rememberSaveable { mutableStateOf<DashboardSection?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
+    val exerciseSearch = remember(exercises) { ExerciseSearchIndex(exercises) }
     var reset by rememberSaveable { mutableStateOf(false) }
     BackHandler { if (choosing != null) choosing = null else onBack() }
     Column(Modifier.fillMaxSize()) {
@@ -226,10 +227,11 @@ internal fun DashboardCustomization(
                         },
                     )
                 }
-                val options =
-                    dashboardOptions(data, exercises, section).filter { (_, label) ->
-                        label.contains(query, true) || section != DashboardSection.EXERCISES
-                    }
+                val options = remember(data, exercises, section, query) {
+                    if (section == DashboardSection.EXERCISES)
+                        exerciseSearch.search(query).map { it.id to it.title }
+                    else dashboardOptions(data, exercises, section)
+                }
                 LazyColumn(Modifier.weight(1f)) {
                     if (options.isEmpty())
                         item {

@@ -37,7 +37,7 @@ internal fun DashboardTiles(
             (section == DashboardSection.HABITS && !data.preferences.showHabits)
     )
         return
-    val today = LocalDate.now()
+    val today = rememberToday()
     val metrics = data.copy(preferences = data.preferences.copy(dashboardAllWorkouts = true)).dashboardMetrics(exercises, today)
     Column(Modifier.padding(horizontal = 18.dp)) {
         when (section) {
@@ -105,7 +105,6 @@ internal fun DashboardTiles(
                         }
                     }
                 }
-                if ("workouts" in selected) TextButton(onStart) { Text("Start workout") }
             }
             DashboardSection.BODY -> {
                 val series =
@@ -177,22 +176,7 @@ internal fun DashboardTiles(
                     }
                 }
             }
-            DashboardSection.GENERAL -> {
-                val today = LocalDate.now()
-                val steps = data.healthConnect.dailySteps.find { it.date == today }
-                val lastSync = data.healthConnect.lastSyncedAtMillis
-                SectionTitle("Steps")
-                Surface(Modifier.fillMaxWidth(), shape = OF.shape, color = OF.card) {
-                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(steps?.count?.toString() ?: "—", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium)
-                            if (onHealthConnect != null) TextButton(onHealthConnect) { Text(if (lastSync == null) "Connect" else "Sync") }
-                        }
-                        Text(if (steps != null) "Today" else if (lastSync != null) "No step reading for today" else "Connect Health Connect to import steps", color = OF.muted)
-                        if (lastSync != null) Text("Synced ${java.time.Instant.ofEpochMilli(lastSync).atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ofPattern("d MMM, HH:mm"))}", color = OF.muted, style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }
+            DashboardSection.GENERAL -> StepsCard(data.healthConnect, onHealthConnect)
         }
     }
 }

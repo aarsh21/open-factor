@@ -6,6 +6,22 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DashboardDataTest {
+    @Test fun absentSectionsDoNotLeaveSpacedEmptyLazyItems() {
+        val today = LocalDate.of(2026, 10, 29)
+        val empty = AppData()
+        assertFalse(empty.hasVisibleDashboardSection(DashboardSection.BODY, today))
+        assertFalse(empty.hasVisibleDashboardSection(DashboardSection.MUSCLES, today))
+        assertFalse(empty.hasVisibleDashboardSection(DashboardSection.EXERCISES, today))
+        assertTrue(empty.hasVisibleDashboardSection(DashboardSection.GENERAL, today))
+        val withWeight = empty.copy(scaleWeights = listOf(ScaleWeightRecord(date = today, weightKg = 73.4)))
+        // Weight is already represented by the full-width trend card.
+        assertFalse(withWeight.hasVisibleDashboardSection(DashboardSection.BODY, today))
+        assertTrue(withWeight.copy(preferences = withWeight.preferences.copy(showInsights = false))
+            .hasVisibleDashboardSection(DashboardSection.BODY, today))
+        assertFalse(withWeight.copy(preferences = withWeight.preferences.copy(showHabits = false))
+            .hasVisibleDashboardSection(DashboardSection.HABITS, today))
+    }
+
     @Test
     fun orderedSelectionsAndEmptySectionsSurviveBackupWithoutChangingSavedData() {
         val choices =

@@ -23,7 +23,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
@@ -49,27 +51,29 @@ internal fun TrainingWeekPanel(week: TrainingWeek, offset: Int, onOffset: (Int) 
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, "Next training week")
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TrainingMetric("Sessions", week.sessions.toString(), Modifier.weight(1f))
-            TrainingMetric("Working sets", week.workingSets.toString(), Modifier.weight(1f))
-            TrainingMetric("Muscles", week.trainedMuscles.toString(), Modifier.weight(1f))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Bottom) {
+            TrainingCircle("Muscles", week.trainedMuscles, Modifier.weight(1f))
+            TrainingCircle("Sets", week.workingSets, Modifier.weight(1.5f), prominent = true)
+            TrainingCircle("Exercises", week.exercises, Modifier.weight(1f))
         }
-        val max = week.days.maxOfOrNull { it.sets }?.coerceAtLeast(1) ?: 1
-        Row(Modifier.fillMaxWidth().height(146.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
-            week.days.forEach { day ->
-                Column(Modifier.weight(1f).fillMaxHeight().semantics(mergeDescendants = true) {
-                    contentDescription = "${day.date}: ${day.sets} completed working sets"
-                }, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
-                        if (day.sets > 0) Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(day.sets.toString(), style = MaterialTheme.typography.labelSmall, color = OF.muted)
-                            Spacer(Modifier.height(6.dp))
-                            Box(Modifier.widthIn(max = 34.dp).fillMaxWidth().height((100f * day.sets / max).dp)
-                                .background(if (day.date == today) MaterialTheme.colorScheme.primary else OF.blue, RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp)))
+        if (week.workingSets > 0) {
+            val max = week.days.maxOfOrNull { it.sets }?.coerceAtLeast(1) ?: 1
+            Row(Modifier.fillMaxWidth().height(146.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
+                week.days.forEach { day ->
+                    Column(Modifier.weight(1f).fillMaxHeight().semantics(mergeDescendants = true) {
+                        contentDescription = "${day.date}: ${day.sets} completed working sets"
+                    }, horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+                            if (day.sets > 0) Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(day.sets.toString(), style = MaterialTheme.typography.labelSmall, color = OF.muted)
+                                Spacer(Modifier.height(6.dp))
+                                Box(Modifier.widthIn(max = 34.dp).fillMaxWidth().height((100f * day.sets / max).dp)
+                                    .background(if (day.date == today) MaterialTheme.colorScheme.primary else OF.blue, RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp)))
+                            }
                         }
+                        HorizontalDivider(color = OF.line)
+                        Text(day.date.dayOfWeek.name.take(1), Modifier.padding(top = 9.dp), style = MaterialTheme.typography.labelMedium, color = OF.muted)
                     }
-                    HorizontalDivider(color = OF.line)
-                    Text(day.date.dayOfWeek.name.take(1), Modifier.padding(top = 9.dp), style = MaterialTheme.typography.labelMedium, color = OF.muted)
                 }
             }
         }
@@ -78,10 +82,19 @@ internal fun TrainingWeekPanel(week: TrainingWeek, offset: Int, onOffset: (Int) 
 }
 
 @Composable
-private fun TrainingMetric(label: String, value: String, modifier: Modifier) {
-    Column(modifier.semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(value, style = MaterialTheme.typography.headlineMedium)
-        Text(label, style = MaterialTheme.typography.labelMedium, color = OF.muted)
+private fun TrainingCircle(label: String, count: Int, modifier: Modifier, prominent: Boolean = false) {
+    val line = OF.line
+    Column(modifier.semantics(mergeDescendants = true) {
+        contentDescription = "$count $label this training week"
+    }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.fillMaxSize()) {
+                val width = if (prominent) 3.dp.toPx() else 2.dp.toPx()
+                drawCircle(line, radius = (size.minDimension - width) / 2, style = Stroke(width))
+            }
+            Text(count.toString(), fontSize = if (prominent) 34.sp else 26.sp, fontWeight = FontWeight.Bold)
+        }
+        Text(label, style = MaterialTheme.typography.labelLarge, color = OF.muted, maxLines = 1)
     }
 }
 

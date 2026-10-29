@@ -77,6 +77,7 @@ fun ProgressPhotoHistory(
                         )
                         Icon(Icons.Rounded.Edit, null)
                     }
+                    if (record.notes.isNotBlank()) Text(record.notes, color = OF.muted, maxLines = 3)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         PhotoPosition.entries.forEach { position ->
                             Column(
@@ -119,23 +120,32 @@ fun ProgressPhotoEditor(
     vm: WorkoutViewModel,
     onBack: () -> Unit,
     onSaved: () -> Unit,
+    startWithCamera: Boolean = false,
 ) {
     val id = rememberSaveable { record?.id ?: newId() }
     var date by rememberSaveable { mutableStateOf((record?.date ?: LocalDate.now()).toString()) }
     var references by rememberSaveable {
         mutableStateOf(PhotoPosition.entries.map { record?.photos?.get(it) ?: "" })
     }
+    var notes by rememberSaveable { mutableStateOf(record?.notes ?: "") }
     var selected by rememberSaveable { mutableIntStateOf(0) }
+    var pendingCapture by rememberSaveable { mutableStateOf<String?>(null) }
+    var captureReady by rememberSaveable { mutableStateOf(false) }
+    var cameraStarted by rememberSaveable { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var viewing by remember { mutableStateOf<PhotoPosition?>(null) }
+    var photoMenu by remember { mutableIntStateOf(-1) }
     var choosingDate by rememberSaveable { mutableStateOf(false) }
     var proposedDate by rememberSaveable { mutableStateOf(date) }
     val scope = rememberCoroutineScope()
     val visibility = vm.data.collectAsState().value.preferences.dataVisibility
     val visiblePositions = PhotoPosition.entries.filter { visibility.isVisible(it.key + "Photo") }
     fun leave() {
+        pendingCapture?.let { vm.photoStore.discardCapture(it) }
+        pendingCapture = null
+        captureReady = false
         vm.cleanPhotos()
         onBack()
     }
@@ -161,8 +171,61 @@ fun ProgressPhotoEditor(
                 }
             }
         }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { captured ->
+        val name = pendingCapture
+        if (name != null) {
+            if (!captured) {
+                vm.photoStore.discardCapture(name)
+                pendingCapture = null
+                captureReady = false
+            } else captureReady = true
+        }
+    }
+    // The ready result and its stage filename survive recreation. Keep the source until the
+    // reference reaches saveable editor state; cancelling this coroutine must not consume it.
+    LaunchedEffect(pendingCapture, captureReady) {
+        val name = pendingCapture ?: return@LaunchedEffect
+        if (!captureReady) return@LaunchedEffect
+        busy = true
+        try {
+            val reference = withContext(Dispatchers.IO) { vm.photoStore.importCapture(name) }
+            references = references.mapIndexed { index, previous -> if (index == selected) reference else previous }
+            vm.cleanPhotos(references.filter(String::isNotEmpty))
+            vm.photoStore.discardCapture(name)
+            pendingCapture = null
+            captureReady = false
+            error = ""
+        } catch (failure: Exception) {
+            if (failure is kotlinx.coroutines.CancellationException) throw failure
+            vm.photoStore.discardCapture(name)
+            pendingCapture = null
+            captureReady = false
+            error = failure.message ?: "Could not save camera photo. Try again or choose from your library."
+        } finally { busy = false }
+    }
+    fun takePhoto(index: Int) {
+        if (busy || pendingCapture != null) return
+        selected = index
+        runCatching {
+            val name = vm.photoStore.createCapture()
+            captureReady = false
+            pendingCapture = name
+            camera.launch(vm.photoStore.captureUri(name))
+        }.onFailure {
+            pendingCapture?.let(vm.photoStore::discardCapture)
+            pendingCapture = null
+            captureReady = false
+            error = "No camera is available. Choose a photo from your library."
+        }
+    }
+    LaunchedEffect(startWithCamera) {
+        if (startWithCamera && !cameraStarted && record == null) {
+            cameraStarted = true
+            visibility.firstVisiblePhotoPosition()?.let { takePhoto(it.ordinal) }
+        }
+    }
     ModalBottomSheet(
-        onDismissRequest = { leave() },
+        onDismissRequest = { if (!busy && pendingCapture == null) leave() },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = OF.card,
         dragHandle = {
@@ -176,14 +239,14 @@ fun ProgressPhotoEditor(
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton({ leave() }) { Icon(Icons.Rounded.Close, "Close photos") }
+                IconButton({ leave() }, enabled = !busy && pendingCapture == null) { Icon(Icons.Rounded.Close, "Close photos") }
                 TextButton(
                     {
                         proposedDate = date
                         choosingDate = true
                     },
                     Modifier.weight(1f).semantics { contentDescription = "Change photo date" },
-                    enabled = !busy,
+                    enabled = !busy && pendingCapture == null,
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -202,7 +265,7 @@ fun ProgressPhotoEditor(
                     }
                 }
                 if (record != null)
-                    IconButton({ deleting = true }, enabled = !busy) {
+                    IconButton({ deleting = true }, enabled = !busy && pendingCapture == null) {
                         Icon(Icons.Rounded.DeleteOutline, "Delete photo record")
                     }
                 else Spacer(Modifier.width(48.dp))
@@ -254,8 +317,8 @@ fun ProgressPhotoEditor(
                                                     ),
                                             )
                                     }
-                                    .clickable(enabled = !busy) {
-                                        if (reference.isEmpty()) attach() else viewing = position
+                                    .clickable(enabled = !busy && pendingCapture == null) {
+                                        if (reference.isEmpty()) takePhoto(index) else viewing = position
                                     }
                                     .semantics {
                                         contentDescription =
@@ -279,27 +342,32 @@ fun ProgressPhotoEditor(
                                         Modifier.fillMaxSize(),
                                     )
                             }
-                            if (reference.isNotEmpty())
-                                Row {
-                                    IconButton({ attach() }, enabled = !busy) {
-                                        Icon(
-                                            Icons.Rounded.PhotoLibrary,
-                                            "Replace ${position.label} photo",
+                            Row {
+                                IconButton({ takePhoto(index) }, enabled = !busy && pendingCapture == null) {
+                                    Icon(Icons.Rounded.PhotoCamera, "Take ${position.label} photo")
+                                }
+                                Box {
+                                    IconButton({ photoMenu = index }, enabled = !busy && pendingCapture == null) {
+                                        Icon(Icons.Rounded.MoreHoriz, "${position.label} photo options")
+                                    }
+                                    DropdownMenu(photoMenu == index, { photoMenu = -1 }) {
+                                        DropdownMenuItem(
+                                            text = { Text(if (reference.isEmpty()) "Choose from library" else "Replace from library") },
+                                            leadingIcon = { Icon(Icons.Rounded.PhotoLibrary, null) },
+                                            onClick = { photoMenu = -1; attach() },
+                                        )
+                                        if (reference.isNotEmpty()) DropdownMenuItem(
+                                            text = { Text("Remove photo") },
+                                            leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
+                                            onClick = {
+                                                photoMenu = -1
+                                                references = references.mapIndexed { i, value -> if (i == index) "" else value }
+                                                error = ""
+                                            },
                                         )
                                     }
-                                    IconButton(
-                                        {
-                                            references =
-                                                references.mapIndexed { i, value ->
-                                                    if (i == index) "" else value
-                                                }
-                                            error = ""
-                                        },
-                                        enabled = !busy,
-                                    ) {
-                                        Icon(Icons.Rounded.Close, "Remove ${position.label} photo")
-                                    }
                                 }
+                            }
                         }
                     }
                     if (visiblePositions.isNotEmpty())
@@ -315,6 +383,11 @@ fun ProgressPhotoEditor(
                         color = OF.muted,
                         style = MaterialTheme.typography.bodySmall,
                     )
+                OutlinedTextField(
+                    notes, { if (it.length <= 4000) notes = it },
+                    modifier = Modifier.fillMaxWidth(), label = { Text("Notes") },
+                    minLines = 2, maxLines = 4, enabled = !busy && pendingCapture == null,
+                )
                 if (busy)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -329,7 +402,7 @@ fun ProgressPhotoEditor(
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            BodySaveFooter(error, enabled = !busy) {
+            BodySaveFooter(error, enabled = !busy && pendingCapture == null) {
                 runCatching {
                         val photos =
                             PhotoPosition.entries
@@ -340,7 +413,7 @@ fun ProgressPhotoEditor(
                                 }
                                 .toMap()
                         vm.saveProgressPhotos(
-                            ProgressPhotoRecord(id, LocalDate.parse(date), photos)
+                            ProgressPhotoRecord(id, LocalDate.parse(date), photos, notes.trim())
                         )
                         onSaved()
                     }

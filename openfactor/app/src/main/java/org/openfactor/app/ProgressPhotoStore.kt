@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.JsonReader
 import android.util.JsonToken
+import androidx.core.content.FileProvider
 import java.io.*
 import java.security.MessageDigest
 import java.util.Base64
@@ -15,6 +16,36 @@ import org.json.JSONObject
 class ProgressPhotoStore(private val context: Context) {
     private val directory = File(context.noBackupFilesDir, "progress-photos").apply { mkdirs() }
     private val staging = File(context.noBackupFilesDir, "photo-restore").apply { mkdirs() }
+
+    private val captures = File(context.cacheDir, "photo-captures").apply { mkdirs() }
+
+    /** Full-resolution camera output is private, temporary and separate from saved originals. */
+    fun createCapture(): String {
+        captures.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > 86_400_000L }
+            ?.forEach { it.delete() }
+        return File.createTempFile("capture-", ".jpg", captures).name
+    }
+
+    private fun captureFile(name: String): File {
+        require(name.matches(Regex("capture-[A-Za-z0-9_-]+\\.jpg"))) { "Invalid camera attachment" }
+        return File(captures, name)
+    }
+
+    fun captureUri(name: String): Uri =
+        FileProvider.getUriForFile(context, "${context.packageName}.files", captureFile(name))
+
+    /** Read without consuming: a recreated editor can retry an interrupted result handoff. */
+    fun importCapture(name: String): String = captureFile(name).inputStream().use { attach(it) }
+
+    fun attachCapture(name: String): String = try {
+        importCapture(name)
+    } finally {
+        discardCapture(name)
+    }
+
+    fun discardCapture(name: String) {
+        captureFile(name).delete()
+    }
 
     fun file(reference: String): File {
         require(reference.matches(Regex("[a-f0-9]{64}"))) { "Invalid photo reference" }

@@ -87,3 +87,19 @@ fun <T> List<T>.moveDashboardItem(index: Int, delta: Int): List<T> {
 
 fun <T> List<T>.toggleDashboardItem(item: T, selected: Boolean): List<T> =
     if (selected) (this + item).distinct() else filterNot { it == item }
+
+/** Omit empty lazy items as well as their content: otherwise item spacing leaves blank blocks. */
+internal fun AppData.hasVisibleDashboardSection(section: DashboardSection, today: java.time.LocalDate): Boolean {
+    val selected = preferences.dashboard.selected(section)
+    if (selected.isEmpty()) return false
+    return when (section) {
+        DashboardSection.INSIGHTS -> preferences.showInsights
+        DashboardSection.HABITS -> preferences.showHabits
+        DashboardSection.BODY -> bodyChartSeries().any { series ->
+            series.key in selected && preferences.dataVisibility.isVisible(series.key) &&
+                series.points.any { !it.date.isAfter(today) } &&
+                (series.key != "weight" || "trend" !in preferences.dashboard.insights || !preferences.showInsights)
+        }
+        else -> true
+    }
+}

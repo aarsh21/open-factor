@@ -101,7 +101,7 @@ fun DashboardScreen(
             }
         }
         item { Box(Modifier.padding(horizontal = 18.dp)) { TrainingMusclePanel(week, { detail = "workload" }) { detail = "muscle:$it" } } }
-        items(selection.sections, key = { it.name }) { section ->
+        items(selection.sections.filter { data.hasVisibleDashboardSection(it, today) }, key = { it.name }) { section ->
             DashboardTiles(data, exercises, section, { detail = it }, { chart = it }, onHistory, onBodyData, onStart, onHealthConnect, onLogWeight)
         }
         item {

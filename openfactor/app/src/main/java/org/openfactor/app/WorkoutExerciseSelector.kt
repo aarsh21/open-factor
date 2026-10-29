@@ -1,19 +1,22 @@
 package org.openfactor.app
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -28,7 +31,7 @@ fun SessionExercise.workoutExerciseProgress(): WorkoutExerciseProgress {
     return WorkoutExerciseProgress(sets.count { it.completed }, sets.size)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Session order stays visible and switching takes one tap, with no modal between sets. */
 @Composable
 fun WorkoutExerciseSelector(
     workout: Workout,
@@ -37,70 +40,51 @@ fun WorkoutExerciseSelector(
     onSelect: (String) -> Unit,
     onAdd: () -> Unit,
 ) {
-    var open by rememberSaveable(workout.id) { mutableStateOf(false) }
     val byId = remember(exercises) { exercises.associateBy { it.id } }
-    val exercise = selected?.let { byId[it.exerciseId] }
+    val listState = rememberLazyListState()
     val position = workout.exercises.indexOfFirst { it.id == selected?.id }
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Surface(
-            onClick = { open = true },
-            shape = RoundedCornerShape(12.dp), color = OF.top,
-            modifier = Modifier.weight(1f).semantics {
-                contentDescription = "Choose workout exercise${exercise?.let { ", ${it.title}, ${position + 1} of ${workout.exercises.size}" }.orEmpty()}"
-            },
-        ) {
-            Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (exercise != null) ExerciseImage(exercise, Modifier.size(36.dp, 44.dp))
-                else Icon(Icons.Rounded.FitnessCenter, null, Modifier.size(28.dp))
-                Text(exercise?.title ?: "Exercises", Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (position >= 0) Text("${position + 1} / ${workout.exercises.size}",
-                    style = MaterialTheme.typography.labelLarge, color = OF.muted)
-                Icon(Icons.Rounded.ExpandMore, null)
-            }
+    LaunchedEffect(workout.id, selected?.id, workout.exercises.map { it.id }) {
+        if (position < 0) return@LaunchedEffect
+        val layout = listState.layoutInfo
+        val item = layout.visibleItemsInfo.firstOrNull { it.index == position }
+        if (item == null || item.offset < layout.viewportStartOffset ||
+            item.offset + item.size > layout.viewportEndOffset) {
+            // Immediate selection, including auto-next and restored sessions; no delayed tab motion.
+            listState.scrollToItem(position)
         }
-        FilledTonalIconButton(onAdd, Modifier.size(48.dp)) { Icon(Icons.Rounded.Add, "Add exercise") }
     }
-    if (open) ModalBottomSheet(
-        onDismissRequest = { open = false },
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = OF.background,
-    ) {
-        Column(Modifier.fillMaxWidth().fillMaxHeight(.8f).navigationBarsPadding()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Exercises", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                IconButton({ open = false }) { Icon(Icons.Rounded.Close, "Close workout exercises") }
-            }
-            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(vertical = 8.dp)) {
-                itemsIndexed(workout.exercises, key = { _, entry -> entry.id }) { index, entry ->
-                    val item = byId[entry.exerciseId]
-                    val progress = entry.workoutExerciseProgress()
-                    val current = entry.id == selected?.id
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .selectable(current, role = Role.RadioButton) { onSelect(entry.id); open = false }
-                            .padding(horizontal = 18.dp, vertical = 14.dp)
-                            .semantics { contentDescription = "Select ${item?.title ?: "exercise"}, ${index + 1} of ${workout.exercises.size}, ${progress.complete} of ${progress.total} working sets complete" },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        if (item != null) ExerciseImage(item, Modifier.size(40.dp, 52.dp))
-                        Text(item?.title ?: "Exercise", Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text(progress.label, style = MaterialTheme.typography.labelLarge, color = OF.muted)
-                        if (current) Icon(Icons.Rounded.Check, "Current exercise")
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        LazyRow(
+            state = listState,
+            modifier = Modifier.weight(1f).selectableGroup(),
+            contentPadding = PaddingValues(start = 18.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            itemsIndexed(workout.exercises, key = { _, entry -> entry.id }) { index, entry ->
+                val exercise = byId[entry.exerciseId]
+                val current = entry.id == selected?.id
+                val progress = entry.workoutExerciseProgress()
+                Surface(
+                    onClick = { onSelect(entry.id) },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (current) MaterialTheme.colorScheme.primary else OF.background,
+                    contentColor = if (current) MaterialTheme.colorScheme.onPrimary else OF.muted,
+                    border = if (current) null else BorderStroke(1.dp, OF.line),
+                    modifier = Modifier.widthIn(max = 238.dp).heightIn(min = 48.dp).semantics {
+                        role = Role.Tab
+                        this.selected = current
+                        contentDescription = "Select ${exercise?.title ?: "exercise"}, ${index + 1} of ${workout.exercises.size}, ${progress.complete} of ${progress.total} working sets complete"
+                    },
+                ) {
+                    Box(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
+                        Text(exercise?.title ?: "Exercise", style = MaterialTheme.typography.labelLarge,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
-                    HorizontalDivider(Modifier.padding(start = 70.dp), color = OF.line)
                 }
             }
-            Box(Modifier.padding(18.dp)) {
-                PrimaryAction("Add exercise", { open = false; onAdd() }, icon = Icons.Rounded.Add)
-            }
+        }
+        IconButton(onAdd, Modifier.padding(end = 10.dp).size(48.dp)) {
+            Icon(Icons.Rounded.Add, "Add exercise")
         }
     }
 }

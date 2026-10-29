@@ -17,7 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 data class WorkoutDraft(
-    val name: String = "Empty",
+    val name: String = "Workout",
     val exercises: List<SessionExercise> = emptyList(),
     val gymId: String? = null,
     val notes: String = "",

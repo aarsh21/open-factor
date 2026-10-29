@@ -3,6 +3,9 @@ package org.openfactor.app
 import android.view.View
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
@@ -13,6 +16,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -93,12 +98,42 @@ fun ExerciseMedia(e: Exercise, viewportHeight: Dp = Dp.Infinity) {
         EmptyContent(Icons.Rounded.FitnessCenter, "${e.equipment} exercise", "No demonstration is available for this exercise.")
         return
     }
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Controls live outside the picture, above it: reachable before scrolling even on a
+        // short guide sheet. The portrait itself always uses the entire available width.
+        if (videos.isNotEmpty()) Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            listOf(1f to "1X", 2.5f to "2.5X", 5f to "5X").forEach { (rate, label) ->
+                TextButton({ speed = rate }, Modifier.width(52.dp).heightIn(min = 48.dp).semantics {
+                    contentDescription = "Playback speed $label"; this.selected = speed == rate
+                }, contentPadding = PaddingValues(0.dp), colors = ButtonDefaults.textButtonColors(
+                    containerColor = if (speed == rate) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                    contentColor = if (speed == rate) MaterialTheme.colorScheme.surface else OF.muted,
+                )) { Text(label) }
+            }
+            IconButton({
+                if (!requested) { requested = true; playing = true } else playing = !playing
+            }, enabled = playbackError == null, modifier = Modifier.semantics {
+                if (!requested) contentDescription = "Start playback"
+            }) {
+                Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    if (playing) "Pause exercise video" else if (requested) "Play exercise video" else null)
+            }
+            IconButton({ position = 0; player?.seekTo(0); requested = true; playing = true }, enabled = requested && playbackError == null) {
+                Icon(Icons.Rounded.Replay, "Replay exercise video")
+            }
+        }
+        playbackError?.let { error -> Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(error, Modifier.weight(1f), color = OF.muted)
+            TextButton({ playbackError = null; retry++; requested = true; playing = true }) { Text("Retry") }
+        } }
         BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             val original = e.frames.firstOrNull()?.startsWith("reference/") == true
             val ratio = if (original) 9f / 16f else 1f
-            val height = minOf(maxWidth / ratio, (viewportHeight - 152.dp).coerceAtLeast(120.dp))
-            Box(Modifier.size(height * ratio, height).clipToBounds(), contentAlignment = Alignment.Center) {
+            val height = maxWidth / ratio
+            Box(Modifier.fillMaxWidth().height(height).clipToBounds(), contentAlignment = Alignment.Center) {
                 AsyncImage(
                     e.frames.getOrNull(selected)?.let { "file:///android_asset/$it" }, e.name,
                     Modifier.fillMaxSize(), contentScale = ContentScale.Fit,
@@ -171,47 +206,34 @@ fun ExerciseMedia(e: Exercise, viewportHeight: Dp = Dp.Infinity) {
                         Icon(Icons.Rounded.PlayArrow, "Play exercise video", Modifier.size(32.dp))
                     }
                 }
-            }
-        }
-        if (cameras > 1) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            repeat(cameras) { camera ->
-                Column(
-                    Modifier.size(56.dp, 72.dp).selectable(selected == camera, role = Role.Tab, onClick = {
-                        if (selected != camera) {
-                            selected = camera; position = 0; playbackError = null
-                            val index = videos.indexOfFirst { it.camera == camera }
-                            if (index >= 0) player?.seekTo(index, 0) else requested = false
-                        }
-                    }).semantics {
-                        contentDescription = (if (e.frames.firstOrNull()?.startsWith("previews/") == true) "Preview " else "Camera view ") + (camera + 1)
-                    }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp),
+                if (cameras > 1) Column(
+                    Modifier.align(Alignment.TopEnd).padding(10.dp).width(48.dp)
+                        .heightIn(max = (minOf(height, viewportHeight) - 24.dp).coerceAtLeast(80.dp))
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    AsyncImage(e.frames.getOrNull(camera)?.let { "file:///android_asset/$it" }, null,
-                        Modifier.size(36.dp, 64.dp), contentScale = ContentScale.Crop)
-                    Box(Modifier.width(36.dp).height(2.dp).background(if (selected == camera) MaterialTheme.colorScheme.onSurface else Color.Transparent))
+                    repeat(cameras) { camera ->
+                        Box(
+                            Modifier.size(48.dp, 80.dp).clip(RoundedCornerShape(4.dp))
+                                .border(if (selected == camera) 2.dp else 0.dp,
+                                    if (selected == camera) Color.White else Color.Transparent, RoundedCornerShape(4.dp))
+                                .selectable(selected == camera, role = Role.Tab, onClick = {
+                                    if (selected != camera) {
+                                        selected = camera; position = 0; playbackError = null
+                                        val index = videos.indexOfFirst { it.camera == camera }
+                                        if (index >= 0) player?.seekTo(index, 0) else requested = false
+                                    }
+                                }).semantics {
+                                    contentDescription = (if (e.frames.firstOrNull()?.startsWith("previews/") == true) "Preview " else "Camera view ") + (camera + 1)
+                                }, contentAlignment = Alignment.Center,
+                        ) {
+                            AsyncImage(e.frames.getOrNull(camera)?.let { "file:///android_asset/$it" }, null,
+                                Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                        }
+                    }
                 }
             }
         }
-        if (requested && hasVideo && playbackError == null) Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
-        ) {
-            listOf(1f to "1X", 2.5f to "2.5X", 5f to "5X").forEach { (rate, label) ->
-                TextButton({ speed = rate }, Modifier.width(52.dp).heightIn(min = 48.dp).semantics {
-                    contentDescription = "Playback speed $label"; this.selected = speed == rate
-                }, contentPadding = PaddingValues(0.dp), colors = ButtonDefaults.textButtonColors(
-                    containerColor = if (speed == rate) MaterialTheme.colorScheme.onSurface else Color.Transparent,
-                    contentColor = if (speed == rate) MaterialTheme.colorScheme.surface else OF.muted,
-                )) { Text(label) }
-            }
-            IconButton({ playing = !playing }) {
-                Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (playing) "Pause exercise video" else "Play exercise video")
-            }
-            IconButton({ position = 0; player?.seekTo(0); playing = true }) { Icon(Icons.Rounded.Replay, "Replay exercise video") }
-        }
-        playbackError?.let { error -> Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(error, Modifier.weight(1f), color = OF.muted)
-            TextButton({ playbackError = null; retry++; requested = true; playing = true }) { Text("Retry") }
-        } }
     }
 }
 

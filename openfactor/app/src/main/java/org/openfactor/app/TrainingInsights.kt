@@ -19,6 +19,7 @@ data class TrainingWeek(
     val volumeKg: Double,
     val muscles: List<MuscleWorkload>,
     val includesActive: Boolean,
+    val exercises: Int,
 ) {
     val trainedMuscles: Int get() = muscles.count { it.weightedSets > 0 }
 }
@@ -40,7 +41,8 @@ fun AppData.trainingWeek(
     }
     return TrainingWeek(first, last, days, workouts.count { it.completedWorkingSets() > 0 },
         days.sumOf { it.sets }, days.sumOf { it.volumeKg }, muscles,
-        active?.let { a -> workouts.any { it.id == a.id } && a.completedWorkingSets() > 0 } == true)
+        active?.let { a -> workouts.any { it.id == a.id } && a.completedWorkingSets() > 0 } == true,
+        workouts.flatMap { it.exercises }.filter { it.completedWorkingSets() > 0 }.map { it.exerciseId }.distinct().size)
 }
 
 /** One contribution per muscle per logical set. A primary target never also counts as secondary. */

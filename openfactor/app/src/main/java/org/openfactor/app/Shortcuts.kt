@@ -38,7 +38,9 @@ private val WorkoutShortcut.icon: ImageVector get() = when (this) {
 @Composable
 internal fun ShortcutEditor(initial: ShortcutPreferences, onCancel: () -> Unit, onSave: (ShortcutPreferences) -> Unit) {
     val saver = remember { Saver<ShortcutPreferences, String>(save = { it.json().toString() }, restore = { ShortcutPreferences.decode(JSONObject(it)) }) }
-    var draft by rememberSaveable(stateSaver = saver) { mutableStateOf(initial) }
+    var draft by rememberSaveable(stateSaver = saver) {
+        mutableStateOf(initial.copy(order = initial.order.filter { it.availableInShortcuts }))
+    }
     var mode by rememberSaveable { mutableStateOf("Order") }
     var colorKey by rememberSaveable { mutableStateOf("") }
     BackHandler(onBack = onCancel)
@@ -54,7 +56,7 @@ internal fun ShortcutEditor(initial: ShortcutPreferences, onCancel: () -> Unit, 
                 }
             }
             Text("The first four enabled actions are top shortcuts. Save applies changes; Back or Cancel discards them.", color = OF.muted)
-            val visibleOrder = draft.order + WorkoutShortcut.entries.filterNot { it in draft.order }
+            val visibleOrder = (draft.order + WorkoutShortcut.entries.filterNot { it in draft.order }).filter { it.availableInShortcuts }
             visibleOrder.forEach { shortcut ->
                 val index = draft.order.indexOf(shortcut)
                 Surface(shape = OF.shape, color = OF.card) {
@@ -131,7 +133,8 @@ internal fun ShortcutSheet(p: Preferences, active: Workout?, onClose: () -> Unit
                 Text("Shortcuts", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
                 IconButton(onConfigure) { Icon(Icons.Rounded.Tune, "Configure shortcuts") }
             }
-            p.shortcuts.order.forEachIndexed { index, shortcut ->
+            val actions = p.shortcuts.order.filter { it.availableInShortcuts }
+            actions.forEachIndexed { index, shortcut ->
                 val label = if (shortcut == WorkoutShortcut.EMPTY_WORKOUT && active != null) "Resume Workout" else shortcut.label
                 ListItem(headlineContent = { Text(label) },
                     supportingContent = if (shortcut == WorkoutShortcut.EMPTY_WORKOUT && active != null) ({ Text("Started ${p.clockTime(active.startedAt)}") }) else null,
@@ -145,7 +148,7 @@ internal fun ShortcutSheet(p: Preferences, active: Workout?, onClose: () -> Unit
                         .semantics { stateDescription = if (index < 4) "Top shortcut ${index + 1}" else "More shortcuts" },
                     colors = ListItemDefaults.colors(containerColor = OF.top))
             }
-            if (p.shortcuts.order.isEmpty()) Text("No shortcuts selected. Use Configure shortcuts to add actions.", Modifier.padding(16.dp), color = OF.muted)
+            if (actions.isEmpty()) Text("No shortcuts selected. Use Configure shortcuts to add actions.", Modifier.padding(16.dp), color = OF.muted)
         }
     }
 }

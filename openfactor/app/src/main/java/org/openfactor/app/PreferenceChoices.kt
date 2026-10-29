@@ -12,7 +12,10 @@ enum class AppTheme(val label: String) { SYSTEM("System"), LIGHT("Light"), DARK(
 /** Source order from canonical ShortcutConfiguration, restricted to workout actions. */
 enum class WorkoutShortcut(val label: String) {
     WEIGHT("Log Weight"), PHOTOS("Log Photos"), MEASUREMENTS("Log Measurements"),
-    HISTORY("History"), EMPTY_WORKOUT("Empty Workout"), NEW_PROGRAM("New Program"), NEW_WORKOUT("New Workout");
+    HISTORY("History"), EMPTY_WORKOUT("Start workout"), NEW_PROGRAM("New Program"), NEW_WORKOUT("Create template");
+
+    // Retain the legacy enum for backup compatibility; programs have their own destination.
+    val availableInShortcuts: Boolean get() = this != NEW_PROGRAM
 }
 
 /** Color families in the source shortcut editor; rendering uses the local palette. */
@@ -22,7 +25,7 @@ enum class ShortcutColor(val label: String, val argb: Long) {
 }
 
 data class ShortcutPreferences(
-    val order: List<WorkoutShortcut> = WorkoutShortcut.entries.toList(),
+    val order: List<WorkoutShortcut> = WorkoutShortcut.entries.filter { it.availableInShortcuts },
     val colors: Map<WorkoutShortcut, ShortcutColor> = emptyMap(),
     val showUpNext: Boolean = true,
 ) {
@@ -36,7 +39,7 @@ data class ShortcutPreferences(
             if (j == null) return ShortcutPreferences()
             val order = j.optJSONArray("order")?.let { a ->
                 (0 until a.length()).map { WorkoutShortcut.valueOf(a.getString(it)) }
-            } ?: WorkoutShortcut.entries.toList()
+            } ?: ShortcutPreferences().order
             require(order.distinct().size == order.size) { "Duplicate shortcut" }
             val colors = j.optJSONObject("colors")?.let { c ->
                 c.keys().asSequence().associate { key -> WorkoutShortcut.valueOf(key) to ShortcutColor.valueOf(c.getString(key)) }

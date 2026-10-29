@@ -195,7 +195,7 @@ fun NuvioWorkoutNavigation(
                     .background(Color(0xFF1C1C1E))
                     .border(
                         1.dp,
-                        Brush.verticalGradient(listOf(Color(0xFF9B786E), Color(0xFF2E2929))),
+                        Color(0xFF414143),
                         RoundedCornerShape(50),
                     )
             ) {

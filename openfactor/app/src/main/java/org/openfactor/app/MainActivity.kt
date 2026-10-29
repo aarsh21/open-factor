@@ -87,6 +87,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     var programExit by remember { mutableStateOf(false) }
     var shortcuts by rememberSaveable { mutableStateOf(false) }
     var quickWeight by rememberSaveable { mutableStateOf(false) }
+    var photoStartWithCamera by rememberSaveable { mutableStateOf(false) }
     var configureShortcuts by rememberSaveable { mutableStateOf(false) }
     var workoutSettings by rememberSaveable { mutableStateOf(false) }
     var healthConnect by rememberSaveable { mutableStateOf(false) }
@@ -153,6 +154,9 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         route = "custom"
     }
     fun pickExercise(id: String, origin: String) {
+        // The first Add navigates away synchronously. Ignore any queued second tap from
+        // that departed picker/detail instead of adding the same exercise twice.
+        if (route != origin && !(route == "exercise" && previousRoute == origin)) return
         when (origin) {
             "program-picker" -> {
                 vm.editProgramDraft { plan ->
@@ -266,7 +270,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             data, bodyDataTab, { bodyDataTab = it }, { route = "" },
                             { detailId = it; route = "weight-entry" },
                             { detailId = it; bodyEntryReturn = "body-data"; route = "measurement-entry" },
-                            { detailId = it; bodyEntryReturn = "body-data"; route = "photo-entry" }, vm.photoStore,
+                            { detailId = it; photoStartWithCamera = it.isBlank(); bodyEntryReturn = "body-data"; route = "photo-entry" }, vm.photoStore,
                             {
                                 bodyChartMetric = if (bodyDataTab == 1) BodyMeasurement.NECK.key else "weight"
                                 route = "body-charts"
@@ -486,10 +490,21 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             },
                         )
                     "history" ->
-                        HistoryScreen(data.history, exercises, { route = "" }) {
-                            detailId = it
-                            route = "history-detail"
-                        }
+                        HistoryScreen(
+                            data.history, exercises, { route = "" },
+                            onDetail = { detailId = it; route = "history-detail" },
+                            prefs = data.preferences,
+                            onRepeat = if (data.active == null) ({ id ->
+                                data.history.find { it.id == id }?.let { workout ->
+                                    vm.start(workout.name, workout.exercises.map { it.exerciseId })
+                                    route = "session"
+                                }
+                            }) else null,
+                            onStart = {
+                                if (data.active != null) route = "session"
+                                else { vm.prepareWorkout(); route = "workout-draft" }
+                            },
+                        )
                     "history-detail" ->
                         data.history
                             .firstOrNull { it.id == detailId }
@@ -609,7 +624,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     }
     if (route == "photo-entry") key(detailId) {
         ProgressPhotoEditor(data.progressPhotos.find { it.id == detailId }, vm,
-            { route = bodyEntryReturn }, { bodyDataTab = 2; route = "body-data" })
+            { route = bodyEntryReturn }, { bodyDataTab = 2; route = "body-data" },
+            startWithCamera = photoStartWithCamera && detailId.isBlank())
     }
     if (programExit)
         AlertDialog(
@@ -660,17 +676,14 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                     detailId = ""; bodyDataTab = 1; bodyEntryReturn = route; route = "measurement-entry"
                 }
                 WorkoutShortcut.PHOTOS -> {
-                    detailId = ""; bodyDataTab = 2; bodyEntryReturn = route; route = "photo-entry"
+                    detailId = ""; photoStartWithCamera = true; bodyDataTab = 2; bodyEntryReturn = route; route = "photo-entry"
                 }
                 WorkoutShortcut.HISTORY -> route = "history"
                 WorkoutShortcut.EMPTY_WORKOUT -> {
                     if (data.active != null) route = "session"
                     else { vm.prepareWorkout(); route = "workout-draft" }
                 }
-                WorkoutShortcut.NEW_PROGRAM -> {
-                    if (data.programDraft != null) route = "program-editor"
-                    else { vm.beginProgram(TrainingProgram(name = "My Program")); route = "program-setup" }
-                }
+                WorkoutShortcut.NEW_PROGRAM -> route = "routine"
                 WorkoutShortcut.NEW_WORKOUT -> route = "routine"
             }
         }

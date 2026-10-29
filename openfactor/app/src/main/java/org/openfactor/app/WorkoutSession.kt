@@ -235,10 +235,9 @@ fun WorkoutSession(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Text(
-                                se.workoutExerciseProgress().label,
-                                Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = OF.muted,
-                            )
+                            ExerciseImage(e, Modifier.size(42.dp, 54.dp))
+                            Text(e.title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge,
+                                maxLines = 3, overflow = TextOverflow.Ellipsis)
                             TextButton({ focus.clearFocus(); guidanceExerciseId = e.id }) {
                                 Text("Guide")
                             }
@@ -752,66 +751,6 @@ private fun SetRow(
         "Remove Myo components?", "Changing this set type removes its additional component values on both sides. The main set is kept.",
         "Change set type", { pendingKind = null }, { onKind(kind, warmup); pendingKind = null },
     ) }
-}
-
-@Composable
-fun HistoryScreen(
-    history: List<Workout>,
-    exercises: List<Exercise>,
-    onBack: () -> Unit,
-    onDetail: (String) -> Unit,
-) {
-    Column(Modifier.fillMaxSize()) {
-        PageHeading("Workout History", onBack)
-        LazyColumn(
-            Modifier.weight(1f),
-            contentPadding = PaddingValues(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (history.isEmpty())
-                item {
-                    EmptyContent(
-                        Icons.Rounded.History,
-                        "No workouts yet",
-                        "Finish your first workout to see your history and records.",
-                    )
-                }
-            items(history, key = { it.id }) { w ->
-                Surface(
-                    Modifier.fillMaxWidth().clickable { onDetail(w.id) },
-                    shape = OF.shape,
-                    color = OF.card,
-                ) {
-                    Column(Modifier.padding(18.dp)) {
-                        Text(
-                            w.localDate().format(DateTimeFormatter.ofPattern("EEEE, d MMM yyyy")),
-                            color = OF.muted,
-                            fontSize = 12.sp,
-                        )
-                        Text(
-                            w.name,
-                            Modifier.padding(vertical = 8.dp),
-                            style = MaterialTheme.typography.titleLarge,
-                        )
-                        Text(
-                            "${w.exercises.size} ${if (w.exercises.size == 1) "exercise" else "exercises"} · ${w.completedSets()} ${if (w.completedSets() == 1) "set" else "sets"}",
-                            color = OF.muted,
-                        )
-                        Text(
-                            w.exercises
-                                .mapNotNull { se ->
-                                    exercises.find { it.id == se.exerciseId }?.name
-                                }
-                                .joinToString(", "),
-                            Modifier.padding(top = 12.dp),
-                            maxLines = 2,
-                            color = OF.muted,
-                        )
-                    }
-                }
-            }
-        }
-    }
 }
 
 @Composable

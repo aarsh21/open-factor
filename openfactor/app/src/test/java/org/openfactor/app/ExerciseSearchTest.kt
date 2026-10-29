@@ -35,7 +35,26 @@ class ExerciseSearchTest {
 
     @Test fun muscleEquipmentAndMovementCanMatchAcrossCatalogFields() {
         assertEquals("db", index.search("chest press DB").first().id)
+        assertEquals("db", index.search("chest prss DB").first().id)
+        assertEquals("db", index.search("chset press DB").first().id)
         assertTrue(index.search("quads chest DB press").isEmpty())
+    }
+
+    @Test fun templateScreenshotQueryAndItsReorderedVariantsResolveTheSameInclineExercise() {
+        listOf("bench press incline", "incline bench press", "press incline bench", "incl DB benhc press")
+            .forEach { query -> assertEquals(query, "incline", index.search(query).first().id) }
+        assertTrue(index.search("bench press incline").none { it.id == bench.id || it.id == dumbbell.id })
+    }
+
+    @Test fun actualCatalogSupportsTemplateSearchAndCommonGymLanguage() {
+        val catalog = catalog(File("src/main/assets/catalog.json"))
+        val catalogIndex = ExerciseSearchIndex(catalog)
+        listOf("bench press incline", "rear foot elevated split squat", "pec deck", "DB RDL", "pull down lat", "dumbell bench press")
+            .forEach { query -> assertTrue("Catalog query must return results: $query", catalogIndex.search(query).isNotEmpty()) }
+        val inclineMatches = catalogIndex.search("bench press incline")
+        assertTrue(inclineMatches.all { exercise -> (listOf(exercise.name) + exercise.aliases).any { it.contains("incline", true) } })
+        // Phrase-match scores can differ; membership must not depend on word order.
+        assertEquals(inclineMatches.map { it.id }.toSet(), catalogIndex.search("incline bench press").map { it.id }.toSet())
     }
 
     @Test fun typosAreBoundedAndEveryQueryWordMustBeAccountedFor() {

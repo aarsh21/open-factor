@@ -21,6 +21,7 @@ class TrainingInsightsTest {
         val week = data.trainingWeek(listOf(bench), today = today)
         assertEquals(1, week.workingSets)
         assertEquals(1, week.sessions)
+        assertEquals(1, week.exercises)
         assertEquals(400.0, week.volumeKg, 0.0)
         assertEquals(2, week.trainedMuscles)
         assertEquals(MuscleWorkload("Chest", 1, 0), week.muscles.single { it.muscle == "Chest" })
@@ -60,6 +61,16 @@ class TrainingInsightsTest {
         val week = AppData(history = listOf(workout("known"))).trainingWeek(emptyList(), today = today)
         assertEquals(1, week.workingSets)
         assertEquals(0, week.trainedMuscles)
+    }
+
+    @Test fun exerciseCircleCountsDistinctCompletedExercisesNotRowsOrWarmups() {
+        val completed = SessionExercise(exerciseId = bench.id, sets = listOf(LoggedSet(completed = true, reps = 8)))
+        val warmup = SessionExercise(exerciseId = "squat", sets = listOf(LoggedSet(completed = true, warmup = true, reps = 8)))
+        val incomplete = SessionExercise(exerciseId = "row", sets = listOf(LoggedSet(completed = false, reps = 8)))
+        val saved = workout("saved").copy(exercises = listOf(completed, completed.copy(), warmup, incomplete))
+        val week = AppData(history = listOf(saved, workout("second"))).trainingWeek(listOf(bench), today = today)
+        assertEquals(3, week.workingSets)
+        assertEquals(1, week.exercises)
     }
 
     @Test fun weightAverageUsesSevenCalendarDaysAndDoesNotFillMissingDatesWithZero() {

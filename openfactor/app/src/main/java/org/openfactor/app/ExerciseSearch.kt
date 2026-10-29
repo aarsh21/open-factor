@@ -25,8 +25,8 @@ class ExerciseSearchIndex(exercises: List<Exercise>) {
                 score(q, doc.name, 10_000, 8_500, 7_800, 7_000, 4_500),
                 doc.aliases.maxOfOrNull { score(q, it, 9_500, 8_000, 7_500, 6_700, 4_300) } ?: 0,
                 // Equipment/muscle words help discovery, but never outrank an exercise-name match.
-                score(q, doc.metadata, 3_600, 3_500, 3_400, 3_300, 0),
-                score(q, doc.combined, 3_000, 2_900, 2_800, 2_700, 0),
+                score(q, doc.metadata, 3_600, 3_500, 3_400, 3_300, 2_100),
+                score(q, doc.combined, 3_000, 2_900, 2_800, 2_700, 1_900),
             )
             if (score == 0) null else doc to score
         }.sortedWith(compareByDescending<Pair<Document, Int>> { it.second }

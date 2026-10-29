@@ -1,6 +1,6 @@
 # Recorded training and muscle workload
 
-Dashboard and Workout summarize recorded training instead of showing an empty Active Program comparison. Programs remain available from Workout. Weekly navigation shows Monday–Sunday bars, with actual values only through today. Sessions, working sets, volume and trained-muscle counts come from saved workouts and the current active session, deduplicated by workout ID and grouped by workout start date in the recorded time zone. Future workouts are excluded.
+Dashboard and Workout summarize recorded training instead of showing an empty Active Program comparison. Three circles show actual distinct muscles, completed working sets and distinct completed exercises for the selected week. History has a calendar and dated timeline with actual duration/exercise/set/volume metrics and muscle maps. Programs remain available from Workout. Weekly navigation shows Monday–Sunday bars, with actual values only through today. Sessions, working sets, volume and trained-muscle counts come from saved workouts and the current active session, deduplicated by workout ID and grouped by workout start date in the recorded time zone. Future workouts are excluded.
 
 Only completed logical working sets contribute to workload. Warmups, incomplete sets, unilateral sides and Myo segments do not add extra working sets. Completing, unchecking, editing, finishing or discarding the active session recomputes the values from durable app state. A session counts once it contains a completed working set. Habits count saved workouts only. History/completion summaries can describe completed warmups as well, so their all-set count can differ from working-set analytics.
 
@@ -22,7 +22,7 @@ Date-dependent summaries refresh on foreground resume and local-day changes. The
 
 ## Exercise and guidance coverage
 
-Search covers all **1,345 catalog exercises**, with ranked exact names and aliases, abbreviations, reordered terms, combined name/equipment/muscle words and bounded one-edit typo matching. All equipment is the explicit default; muscle/equipment filters can narrow results and clearing them preserves the query. The full ranked list remains available rather than hiding matches inside collapsed groups. Favorites, custom exercises and gym profiles remain available.
+All exercise pickers, including Create template, search all **1,345 catalog exercises**, with ranked exact names and aliases, abbreviations, reordered terms, combined name/equipment/muscle words and bounded one-edit typo matching. All equipment is the explicit default; muscle/equipment filters can narrow results and clearing them preserves the query. The full ranked list remains available rather than hiding matches inside collapsed groups. Favorites, custom exercises and gym profiles remain available.
 
 Original video guidance covers **619 exercises** with **1,831 original video objects**; catalog coverage does not imply every exercise has a demonstration. Static/full builds package recovered photos, anatomy and instructions where available. Frameless video starts only after Play, cycles the available camera angles in one repeating playlist and uses the bounded cache. See [media packaging](MEDIA-PACKAGING.md) for inventory and missing-media states.
 

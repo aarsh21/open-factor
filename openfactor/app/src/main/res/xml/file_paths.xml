@@ -1,1 +1,4 @@
-<paths><cache-path name="exports" path="exports/" /></paths>
+<paths>
+    <cache-path name="exports" path="exports/" />
+    <cache-path name="photo-captures" path="photo-captures/" />
+</paths>
