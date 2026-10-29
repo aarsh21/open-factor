@@ -137,6 +137,8 @@ The floating Nuvio navigation and grouped Settings remain part of the existing s
 
 The 0.6.0 behavior update follows `QuickStart.kt`, `ProfileSetup.kt`, `ProfileEditor.kt`, `Settings.kt`, `ExerciseMedia.kt`, `ExercisePlaybackState.kt` and the catalog/search repositories. The [0.6.0 release evidence](docs/open-factor/releases/v0.6.0.md) records builds, tests, actual-provider import, playback and startup observations. Its native visual review covers an API35 phone in dark theme at normal and 1.35 font scale. Earlier captures remain evidence of their own checkpoints. This documentation pass did not run builds, device automation or an HTML/CSS detector. Physical-device performance, TalkBack operation, tablets, light theme and other locales remain outside that visual review.
 
+The 0.6.1 extension follows `TemplateScreens.kt`, `TemplateData.kt`, `MainActivity.kt`, `HealthConnectPanel.kt`, `HealthConnectSyncCommitter.kt`, `Data.kt` and `ScopedDataExport.kt`. It preserves the recorded tokens, sidecar, palette, type and navigation motion. The [0.6.1 release evidence](docs/open-factor/releases/v0.6.1.md) and `inspection/release-evidence/v0.6.1/finish-review.md` record a ship disposition for candidate captures 01–19 on an API35 phone in dark theme at normal and 1.35 font scale. The finish review's sampled source and native captures establish this extension's checkpoint; they do not extend the earlier review's device or accessibility scope.
+
 ## Colors
 
 Frontmatter records the dark palette and the explicit light substitutions in `OpenFactorTheme`. `OF.top` and `OF.card` resolve to the theme surface; `OF.elevated` resolves to surface variant. Dark is the default; Light and System are available.
@@ -185,9 +187,17 @@ Shared cards use 16dp corners. `PrimaryAction` and exercise images use 8dp; nume
 
 First run uses three focused pages: “Make it yours” collects a required name and optional gender; “Your starting point” offers direct Health Connect plus optional weight/height and unit choices; “Ready, set, log.” collects weekly goal, effort rating and automatic rest/duration. Continue advances and Start training validates and saves the profile before opening Workout. Back preserves values; Skip for now opens Workout with the raw draft and current step retained. Setup progress survives restart. Existing completed installations are not forced through it again.
 
+The setup Health Connect action returns once to the starting-point form only after a successful import is saved. Denial, read/provider failure or save failure leaves feedback and retry in the panel; manual Settings sync stays there after success. Native consent alone and an existing Connected state do not navigate.
+
 Profile reuses the same fields in one scrolling editor with explicit Save, validation and discard confirmation. Review setup reopens the staged flow. Imported weight can refresh an untouched baseline while preserving its original date; typed input wins, and an unchanged imported or historical value is not saved as a new manual reading. These are local profile controls, not account creation or a return to the historical gym/program setup rail.
 
 Workout exposes Start workout or Resume workout first, a history header action, Programs and Templates. Starting opens exercise selection directly. A saved draft can be continued. The active program shows its name and up to four workout-day links when present. Template cards and recent history are conditional on actual saved data. Do not add explanatory captions beneath headings.
+
+### Templates and starter splits
+
+Templates uses native Your templates / Starter splits segments and seven ordered day cells. The four starter schedules are Upper / Lower / Push / Pull / Legs, Upper / Lower, Bro split and Full body; their exact workout/rest order is recorded in [PRODUCT.md](PRODUCT.md). A selected day shows its title, original target-muscle artwork in a horizontal row, exercise photos, counts and target summaries. Use split stays pinned below the scrolling preview and saves independent editable day copies. Saved workout days retain an Edit action and pinned Start named for the selected day; Rest is an explicit empty slot without Start. Compact selectable strips scroll horizontally when the available width cannot fit seven usable cells.
+
+The full-width template composer reuses the shared heading, tonal exercise rows, outlined fields and anchored Save template action. Target muscles sit above the exercise count; each row has its original photo, title, target summary, target controls and reorder/remove menu. Expanded targets edit sets, supported rep ranges and rest seconds. Raw input survives recreation; invalid values block Save and changed input has discard protection. Add exercises opens the shared top-search picker with multi-selection, muscle shortcuts, Resistance, Favorites and expanded equipment/gym, type, laterality and muscle filters. Exercise titles open the existing guide, returning to the retained selection. A new workout keeps prescriptions visibly separate from blank performed values, and an active workout blocks another template start. This extension introduces no new visual tokens or motion rules.
 
 ### Buttons
 

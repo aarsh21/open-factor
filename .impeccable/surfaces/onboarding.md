@@ -4,7 +4,7 @@ Mode: Operate. Platform: Android. Artifact: openfactor/app/.
 
 ## Current direction — 29 October 2026
 
-The 0.6.0 user direction supersedes the welcome/numbered rail and units-only setup. Preserve the charcoal/white identity, bundled DM Sans and existing native controls; no new visual world or raster comp applies.
+The 0.6.1 user direction supersedes the welcome/numbered rail and units-only setup. Preserve the charcoal/white identity, bundled DM Sans and existing native controls; no new visual world or raster comp applies.
 
 ## THESIS
 
@@ -16,13 +16,13 @@ Use large left-aligned DM Sans headings, sparse tonal fields, outlined inputs, n
 
 ## STORY
 
-“Make it yours” → “Your starting point” → “Ready, set, log.” → Workout. The pages collect name/optional gender; optional weight/height and their units; then weekly workout goal, effort rating, automatic rest and duration. The baseline page's Connect action opens Android Health Connect consent and automatically imports granted data. Manual entry and Continue remain available. Imported weight can fill an untouched baseline with its original date; typing wins and an unchanged older reading never becomes a fabricated weigh-in today.
+“Make it yours” → “Your starting point” → “Ready, set, log.” → Workout. The pages collect name/optional gender; optional weight/height and their units; then weekly workout goal, effort rating, automatic rest and duration. The baseline page's Connect action opens Android Health Connect consent and automatically imports granted data. Only this onboarding entry supplies the optional success callback: records and sync state save before returning once to the starting-point page. Consent alone or an old Connected state cannot return; denial, provider/read errors and save failure leave feedback and retry in the panel. Manual Settings Connect/Sync keeps the panel open after success. Manual entry and Continue remain available. Imported weight can fill an untouched baseline with its original date; typing wins and an unchanged older reading never becomes a fabricated weigh-in today.
 
 Back keeps values and returns one stage; Back/Close at the first stage and Skip defer setup. Draft values and stage survive restart. Settings → Profile reuses the fields with validation, explicit Save and discard protection; Review setup returns to the staged flow. Weekly goals feed Habits, and saved gender supplies the initial anatomy figure. Setup does not require gym/program creation or an account.
 
 ## FIRST VIEWPORT
 
-Show the Open Factor header with Back/Close and Skip for now, three horizontal progress segments, “Make it yours”, Name, optional gender choices and anchored Continue. Continue is disabled until the name is valid. The fourteen native PNGs in `inspection/release-evidence/v0.6.0/candidate-api35/` and the [0.6.0 release record](../../docs/open-factor/releases/v0.6.0.md) establish the current checkpoint. The reviewer inspected the API35 phone in dark theme at normal and 1.35 font scale; these captures do not certify all devices, themes, locales or accessibility operation.
+Show the Open Factor header with Back/Close and Skip for now, three horizontal progress segments, “Make it yours”, Name, optional gender choices and anchored Continue. Continue is disabled until the name is valid. The v0.6.1 native captures 01–03 in `inspection/release-evidence/v0.6.1/candidate-api35/` show starting point → native consent → automatic return with the imported baseline and source date; capture 19 shows manual Settings sync remaining open. The [finish review](../../inspection/release-evidence/v0.6.1/finish-review.md) is ship for the supplied 01–19 matrix, including template screens. The [0.6.0 release record](../../docs/open-factor/releases/v0.6.0.md) remains evidence of the earlier three-step/profile checkpoint. The reviewer inspected the API35 phone in dark theme at normal and 1.35 font scale; these captures do not certify all devices, themes, locales or accessibility operation.
 
 ## FORM
 
