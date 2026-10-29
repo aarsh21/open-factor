@@ -94,8 +94,10 @@ class ExerciseSearchIndex(exercises: List<Exercise>) {
             return Phrase(tokens.joinToString(" "), tokens)
         }
 
+        internal fun normalizedTokens(value: String): List<String> = phrase(value).tokens
+
         /** Exactly one insertion, deletion, replacement or adjacent transposition; no broad fuzzy fallback. */
-        private fun oneEditApart(a: String, b: String): Boolean {
+        internal fun oneEditApart(a: String, b: String): Boolean {
             if (b.length < 4 || kotlin.math.abs(a.length - b.length) > 1) return false
             if (a.length == b.length) {
                 val differences = a.indices.filter { a[it] != b[it] }

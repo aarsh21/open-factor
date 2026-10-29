@@ -64,8 +64,8 @@ android {
         applicationId = "org.openfactor.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "0.8.0"
+        versionCode = 17
+        versionName = "0.8.1"
         resValue("string", "app_name", "Open Factor")
         val mediaBaseUrl = providers.gradleProperty("exerciseMediaBaseUrl").getOrElse("https://factor-media.zabimaru.me/v1/")
         buildConfigField("String", "EXERCISE_MEDIA_BASE_URL", "\"${mediaBaseUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")

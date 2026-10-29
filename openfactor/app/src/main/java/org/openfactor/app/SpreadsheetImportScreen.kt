@@ -209,7 +209,7 @@ internal fun SpreadsheetImportLayout(
 @Composable
 internal fun SpreadsheetMatchDialog(
     name: String,
-    matcher: SpreadsheetExerciseMatcher?,
+    matcher: ImportExerciseSuggestions?,
     onDismiss: () -> Unit,
     onChoose: (Exercise) -> Unit,
 ) {
