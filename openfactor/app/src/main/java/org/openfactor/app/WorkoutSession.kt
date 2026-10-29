@@ -43,6 +43,7 @@ fun WorkoutSession(
     onFinished: (String) -> Unit,
     onWorkoutSettings: () -> Unit,
     onGymSettings: () -> Unit,
+    onOpenWorkout: ((String) -> Unit)? = null,
 ) {
     val focus = LocalFocusManager.current
     val context = LocalContext.current
@@ -67,6 +68,7 @@ fun WorkoutSession(
     var rename by remember { mutableStateOf(false) }
     var workoutNotes by remember { mutableStateOf(false) }
     var restSettings by remember { mutableStateOf(false) }
+    var rateExerciseId by rememberSaveable(workout.id) { mutableStateOf<String?>(null) }
     val selected =
         workout.exercises.find { it.id == workout.selectedExerciseId }
             ?: workout.exercises.firstOrNull()
@@ -220,7 +222,6 @@ fun WorkoutSession(
                     exercises.find { it.id == se.exerciseId }
                         ?: Exercise(se.exerciseId, "Exercise", "Other", "Other")
                 val metrics = remember(e) { e.loggingMetrics() }
-                val showRir = data.preferences.showRir && metrics.any { it.isReps }
                 var remove by remember { mutableStateOf(false) }
                 var exerciseMenu by remember { mutableStateOf(false) }
                 var exerciseNotes by remember { mutableStateOf(false) }
@@ -246,7 +247,10 @@ fun WorkoutSession(
                                 DropdownMenu(exerciseMenu, { exerciseMenu = false }) {
                                     DropdownMenuItem(text = { Text("Exercise guide") }, onClick = { exerciseMenu = false; focus.clearFocus(); guidanceExerciseId = e.id })
                                     DropdownMenuItem(text = { Text("Targets & rest") }, onClick = { exerciseMenu = false; targets = true })
-                                    if (metrics.any { it.isReps }) DropdownMenuItem(text = { Text(if (showRir) "Hide RIR" else "Show RIR") }, onClick = { exerciseMenu = false; vm.settings { it.copy(showRir = !it.showRir) } })
+                                    if (metrics.any { it.isReps }) DropdownMenuItem(
+                                        text = { Text(if (data.preferences.rateEffortAfterExercise) "Turn off effort prompt" else "Ask effort after exercise") },
+                                        onClick = { exerciseMenu = false; vm.settings { it.copy(rateEffortAfterExercise = !it.rateEffortAfterExercise) } },
+                                    )
                                     DropdownMenuItem(text = { Text("Exercise notes") }, onClick = { exerciseMenu = false; exerciseNotes = true })
                                     DropdownMenuItem(text = { Text(if (se.sets.any { it.side != null }) "Use left logs only…" else "Log left and right separately") }, onClick = {
                                         exerciseMenu = false
@@ -297,14 +301,6 @@ fun WorkoutSession(
                             metrics.forEach { metric ->
                                 Text(metric.label(data.preferences.pounds, data.preferences.distanceImperial), Modifier.weight(if (metric.isLoad) 1.3f else 1f), color = OF.muted, fontSize = 12.sp, textAlign = TextAlign.Center)
                             }
-                            if (showRir)
-                                Text(
-                                    "RIR",
-                                    Modifier.weight(0.65f),
-                                    color = OF.muted,
-                                    fontSize = 12.sp,
-                                    textAlign = TextAlign.Center,
-                                )
                             Spacer(Modifier.width(48.dp))
                         }
                         logicalSets.forEachIndexed { index, group ->
@@ -332,6 +328,29 @@ fun WorkoutSession(
                             if (group.root.kind == SetKind.MYO && !group.root.warmup) TextButton({ vm.addMyoComponent(se.id, group.root.id) }) {
                                 Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
                                 Text("Add Myo component", Modifier.padding(start = 6.dp))
+                            }
+                        }
+                        if (se.sets.any { !it.completed }) {
+                            val canLogAll = se.canLogAllSets(metrics)
+                            PrimaryAction(
+                                "Log all sets",
+                                { focus.clearFocus(); vm.logAllSets(se.id) },
+                                Modifier.padding(top = 16.dp),
+                                enabled = canLogAll,
+                                icon = Icons.Rounded.DoneAll,
+                            )
+                            if (!canLogAll) Text(
+                                "Enter valid values for every unfinished set.",
+                                Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodySmall, color = OF.muted,
+                            )
+                        } else se.lastEffortSet(metrics)?.let { last ->
+                            TextButton(
+                                { focus.clearFocus(); rateExerciseId = se.id },
+                                Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 8.dp),
+                            ) {
+                                Text(last.rir?.let { "Last set · $it RIR" } ?: "Rate last set")
+                                Spacer(Modifier.width(6.dp))
+                                Icon(Icons.Rounded.Edit, null, Modifier.size(16.dp))
                             }
                         }
                         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -375,6 +394,21 @@ fun WorkoutSession(
             }
         }
     }
+    val promptedExercise = workout.exercises.firstOrNull { entry ->
+        data.preferences.rateEffortAfterExercise && entry.pendingEffortSet(
+            exercises.find { it.id == entry.exerciseId }?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS),
+        ) != null
+    }
+    val ratedExercise = rateExerciseId?.let { id -> workout.exercises.find { it.id == id } } ?: promptedExercise
+    ratedExercise?.let { entry ->
+        val exercise = exercises.find { it.id == entry.exerciseId }
+        val set = entry.lastEffortSet(exercise?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS))
+        if (exercise != null && set != null) ExerciseEffortSheet(
+            exercise, set,
+            onDismiss = { vm.reviewExerciseEffort(entry.id, set.id, set.rir); rateExerciseId = null },
+            onSave = { vm.reviewExerciseEffort(entry.id, set.id, it); rateExerciseId = null },
+        )
+    }
     guidanceExerciseId?.let { id ->
         exercises.firstOrNull { it.id == id }?.let { exercise ->
             ModalBottomSheet(
@@ -389,6 +423,7 @@ fun WorkoutSession(
                         onBack = { guidanceExerciseId = null },
                         onAdd = null,
                         closeable = true,
+                        onOpenWorkout = onOpenWorkout,
                     )
                 }
             }
@@ -623,10 +658,6 @@ private fun SetRow(
     var remove by remember { mutableStateOf(false) }
     var options by remember { mutableStateOf(false) }
     var pendingKind by remember { mutableStateOf<Pair<SetKind, Boolean>?>(null) }
-    var rir by remember(set.id, set.rir) { mutableStateOf(set.rir?.toString() ?: "") }
-    val rirValue = rir.toIntOrNull()
-    val rirError = rir.isNotEmpty() && (rirValue == null || rirValue !in 0..10)
-    val showRir = prefs.showRir && metrics.any { it.isReps }
     val spokenKind = if (set.warmup) "warmup set" else "set"
     Row(
         Modifier.fillMaxWidth()
@@ -706,34 +737,11 @@ private fun SetRow(
                 )
             }
         }
-        if (showRir)
-            OutlinedTextField(
-                rir,
-                {
-                    rir = it
-                    val value = it.toIntOrNull()?.takeIf { n -> n in 0..10 }
-                    onChange(set.copy(rir = value, completed = set.completed && (it.isBlank() || value != null)))
-                },
-                Modifier.weight(0.65f).semantics {
-                    contentDescription = "$exerciseName $spokenKind $displayNumber reps in reserve"
-                    if (rirError) error("Enter RIR from 0 to 10, or leave empty")
-                },
-                supportingText =
-                    if (rirError) {
-                        { Text("Enter 0–10") }
-                    } else null,
-                singleLine = true,
-                isError = rirError,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
-                textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center),
-                shape = RoundedCornerShape(10.dp),
-            )
         IconButton(
             onComplete,
             Modifier.size(48.dp)
                 .background(if (set.completed) OF.green else OF.elevated, RoundedCornerShape(8.dp)),
-            enabled = set.completed || set.canComplete(metrics) && (!showRir || !rirError),
+            enabled = set.completed || set.canComplete(metrics),
         ) {
             Icon(
                 Icons.Rounded.Check,

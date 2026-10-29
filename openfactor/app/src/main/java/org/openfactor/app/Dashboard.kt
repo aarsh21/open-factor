@@ -54,7 +54,11 @@ fun DashboardScreen(
     var detailParent by rememberSaveable { mutableStateOf<String?>(null) }
     var chart by rememberSaveable { mutableStateOf<String?>(null) }
     var range by rememberSaveable { mutableStateOf(BodyChartRange.MONTH) }
-    var weekOffset by rememberSaveable { mutableIntStateOf(0) }
+    var trainingPeriod by rememberSaveable { mutableStateOf(TrainingPeriod.WEEK) }
+    var periodOffset by rememberSaveable { mutableIntStateOf(0) }
+    val training = remember(data.active, data.history, exercises, trainingPeriod, periodOffset, today) {
+        data.trainingPeriod(exercises, trainingPeriod, periodOffset, today)
+    }
     val detailState = rememberSaveableStateHolder()
     val selection = data.preferences.dashboard
     fun closeDetail() { detail = detailParent; detailParent = null }
@@ -75,20 +79,20 @@ fun DashboardScreen(
             onDismissTutorial = { vm.settings { it.copy(dismissedTutorials = it.dismissedTutorials + "bodyCharts") } }, onLogWeight = onLogWeight)
         return
     }
-    if (detail == "workload") {
+    if (detail == "workload" || detail?.startsWith("muscle:") == true) {
         LevelsScreen(data, exercises, { detail = null }, { detail = "exercise:$it" },
-            referenceDate = minOf(today, today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks(weekOffset.toLong()).plusDays(6)))
+            referenceDate = minOf(today, training.last), referenceStart = training.first,
+            initialMuscle = detail?.takeIf { it.startsWith("muscle:") }?.removePrefix("muscle:"))
         return
     }
     detail?.let { key ->
         detailState.SaveableStateProvider(key) {
             DashboardDetail(data.copy(preferences = data.preferences.copy(dashboardAllWorkouts = true)), exercises, key,
                 ::closeDetail, { detailParent = detail; detail = it },
-                today = minOf(today, today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks(weekOffset.toLong()).plusDays(6)))
+                today = minOf(today, training.last))
         }
         return
     }
-    val week = remember(data.active, data.history, exercises, weekOffset, today) { data.trainingWeek(exercises, weekOffset, today) }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 112.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item { PageHeading("Dashboard", actions = { RoundAction(Icons.Rounded.Tune, "Customize Dashboard", { customize = true }) }) }
         if (data.active != null) item {
@@ -96,11 +100,13 @@ fun DashboardScreen(
         }
         if (data.preferences.showWeeklyWorkouts && "weekly" in selection.focuses) item {
             Column(Modifier.padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                TrainingWeekPanel(week, weekOffset) { weekOffset = it }
-                if (week.workingSets == 0 && weekOffset == 0) PrimaryAction("Start workout", onStart, icon = Icons.Rounded.Add)
+                TrainingPeriodPanel(training, trainingPeriod, periodOffset,
+                    onPeriod = { trainingPeriod = it; periodOffset = 0 },
+                    onOffset = { periodOffset = it.coerceIn(-520, 0) })
+                if (training.workingSets == 0 && periodOffset == 0) PrimaryAction("Start workout", onStart, icon = Icons.Rounded.Add)
             }
         }
-        item { Box(Modifier.padding(horizontal = 18.dp)) { TrainingMusclePanel(week, { detail = "workload" }) { detail = "muscle:$it" } } }
+        item { Box(Modifier.padding(horizontal = 18.dp)) { TrainingMusclePanel(training, { detail = "workload" }) { detail = "muscle:$it" } } }
         items(selection.sections.filter { data.hasVisibleDashboardSection(it, today) }, key = { it.name }) { section ->
             DashboardTiles(data, exercises, section, { detail = it }, { chart = it }, onHistory, onBodyData, onStart, onHealthConnect, onLogWeight)
         }

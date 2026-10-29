@@ -68,6 +68,7 @@ data class SessionExercise(
     val notes: String = "",
     val restSeconds: Int? = null,
     val supersetId: String? = null,
+    val reviewedEffortSetIds: Set<String> = emptySet(),
 )
 
 data class Workout(
@@ -117,6 +118,7 @@ data class Preferences(
     // Local compatibility defaults, not claims about source installation defaults.
     val supersetAutoNext: Boolean = true,
     val restBetweenSidesPercent: Int = 100,
+    val rateEffortAfterExercise: Boolean = true,
 )
 
 data class AppData(
@@ -137,6 +139,7 @@ data class AppData(
     val progressPhotos: List<ProgressPhotoRecord> = emptyList(),
     val exerciseDefaults: Map<String, ExerciseDefaults> = emptyMap(),
     val healthConnect: HealthConnectSyncState = HealthConnectSyncState(),
+    val pastWorkoutEdit: PastWorkoutEdit? = null,
 )
 
 fun newId() = UUID.randomUUID().toString()
@@ -297,6 +300,7 @@ object DataCodec {
             .put("notes", notes)
             .put("restSeconds", restSeconds)
             .put("supersetId", supersetId)
+            .put("reviewedEffortSetIds", JSONArray(reviewedEffortSetIds.sorted()))
 
     private fun Workout.json() =
         JSONObject()
@@ -349,6 +353,9 @@ object DataCodec {
             .put("activeProgramId", d.activeProgramId)
             .put("programs", JSONArray(d.programs.map { ProgramCodec.encode(it) }))
             .put("programDraft", d.programDraft?.let { ProgramCodec.encode(it) })
+            .put("pastWorkoutEdit", d.pastWorkoutEdit?.let {
+                JSONObject().put("original", it.original.json()).put("edited", it.edited.json())
+            })
             .put("workoutDraft", d.workoutDraft?.let {
                 JSONObject()
                     .put("name", it.name)
@@ -405,7 +412,8 @@ object DataCodec {
                     .put("restAfterLastWarmupSet", d.preferences.restAfterLastWarmupSet)
                     .put("restBetweenExercises", d.preferences.restBetweenExercises)
                     .put("supersetAutoNext", d.preferences.supersetAutoNext)
-                    .put("restBetweenSidesPercent", d.preferences.restBetweenSidesPercent),
+                    .put("restBetweenSidesPercent", d.preferences.restBetweenSidesPercent)
+                    .put("rateEffortAfterExercise", d.preferences.rateEffortAfterExercise),
             )
             .toString(2)
 
@@ -449,6 +457,7 @@ object DataCodec {
             optString("notes"),
             if (isNull("restSeconds")) null else getInt("restSeconds"),
             supersetId = if (isNull("supersetId")) null else getString("supersetId").also { require(it.isNotBlank()) },
+            reviewedEffortSetIds = array("reviewedEffortSetIds").strings().toSet(),
         ).validateSetLinks()
 
     private fun JSONObject.workout(): Workout =
@@ -514,6 +523,7 @@ object DataCodec {
                     require(it is Number && it.toDouble() % 1.0 == 0.0 && it.toDouble() in 0.0..100.0) { "Side rest must be 0–100%" }
                     it.toInt()
                 },
+                rateEffortAfterExercise = p.optBoolean("rateEffortAfterExercise", true),
             ),
             j.optString("activeProgramId").takeIf { it.isNotBlank() && it != "null" },
             j.array("gyms").objects().map { GymCodec.decode(it) },
@@ -533,6 +543,9 @@ object DataCodec {
             progressPhotos = ProgressPhotoCodec.decode(j),
             exerciseDefaults = ExerciseDefaultsCodec.decode(j.optJSONObject("exerciseDefaults")),
             healthConnect = HealthConnectSyncCodec.decode(j.optJSONObject("healthConnect")),
+            pastWorkoutEdit = j.optJSONObject("pastWorkoutEdit")?.let {
+                PastWorkoutEdit(it.getJSONObject("original").workout(), it.getJSONObject("edited").workout())
+            },
         )
     }
 
@@ -1037,8 +1050,32 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun deleteWorkout(id: String) = update {
-        it.copy(history = it.history.filterNot { w -> w.id == id })
+        it.copy(history = it.history.filterNot { w -> w.id == id },
+            pastWorkoutEdit = it.pastWorkoutEdit?.takeUnless { edit -> edit.original.id == id })
     }
+
+    fun beginPastWorkoutEdit(id: String) = update { it.beginPastWorkoutEdit(id) }
+    fun editPastWorkout(block: (Workout) -> Workout) = update { d ->
+        d.copy(pastWorkoutEdit = d.pastWorkoutEdit?.let { it.copy(edited = block(it.edited)) })
+    }
+    fun discardPastWorkoutEdit() = update { it.copy(pastWorkoutEdit = null) }
+    fun savePastWorkoutEdit(): String? {
+        var error: String? = null
+        update { d ->
+            try { d.commitPastWorkoutEdit(exercises(d)) }
+            catch (e: IllegalArgumentException) { error = e.message; d }
+        }
+        return error
+    }
+
+    fun logAllSets(exerciseId: String) = update { d ->
+        val entry = d.active?.exercises?.find { it.id == exerciseId }
+        val metrics = exercises(d).find { it.id == entry?.exerciseId }?.loggingMetrics()
+            ?: listOf(SetMetric.WEIGHT, SetMetric.REPS)
+        d.copy(active = d.active?.withAllSetsCompleted(exerciseId, d.preferences, System.currentTimeMillis(), metrics))
+    }
+    fun reviewExerciseEffort(exerciseId: String, setId: String, rir: Int?) =
+        editSessionExercise(exerciseId) { it.withReviewedEffort(setId, rir) }
 
     fun saveRoutine(name: String, ids: List<String>) = update {
         it.copy(

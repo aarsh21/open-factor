@@ -100,6 +100,7 @@ object ScopedDataExport {
                 ExportCategory.WORKOUT_SETTINGS -> payload.put(category.key, JSONObject()
                     .put("pounds", data.preferences.pounds).put("restSeconds", data.preferences.restSeconds)
                     .put("autoRest", data.preferences.autoRest).put("showRir", data.preferences.showRir)
+                    .put("rateEffortAfterExercise", data.preferences.rateEffortAfterExercise)
                     .put("exerciseAutoNext", data.preferences.exerciseAutoNext)
                     .put("keepAlive", data.preferences.keepAlive).put("showWorkoutTimer", data.preferences.showWorkoutTimer)
                     .put("showBodyweightContribution", data.preferences.showBodyweightContribution)

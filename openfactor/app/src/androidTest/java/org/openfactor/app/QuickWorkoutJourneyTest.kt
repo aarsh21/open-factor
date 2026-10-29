@@ -64,6 +64,8 @@ class QuickWorkoutJourneyTest {
                 .performTextReplacement("9")
             compose.onNodeWithContentDescription("Complete set 1 for Barbell Bench Press")
                 .performClick()
+            awaitText("Rate your last set")
+            compose.onNodeWithContentDescription("Skip effort rating").performScrollTo().performClick()
             compose.onNodeWithText("Warmup").performScrollTo().performClick()
             compose.runOnIdle {
                 val session = store.load().active!!

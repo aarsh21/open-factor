@@ -49,11 +49,6 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle =
                 androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
-        coil3.SingletonImageLoader.setSafe { context ->
-            coil3.ImageLoader.Builder(context)
-                .components { add(coil3.svg.SvgDecoder.Factory()) }
-                .build()
-        }
         setContent {
             val vm: WorkoutViewModel = viewModel()
             val data by vm.data.collectAsState()
@@ -76,7 +71,7 @@ class MainActivity : ComponentActivity() {
 fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 0) {
     val data by vm.data.collectAsState()
     var tab by rememberSaveable { mutableIntStateOf(1) }
-    var route by rememberSaveable { mutableStateOf(if (data.active != null) "session" else "") }
+    var route by rememberSaveable { mutableStateOf(when { data.pastWorkoutEdit != null -> "history-edit"; data.active != null -> "session"; else -> "" }) }
     var detailId by rememberSaveable { mutableStateOf("") }
     var previousRoute by rememberSaveable { mutableStateOf("") }
     var exerciseInfo by rememberSaveable { mutableStateOf(false) }
@@ -403,6 +398,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                         exerciseSettingsReturnRoute = "exercise"
                                         route = "exercise-settings"
                                     },
+                                    onOpenWorkout = { detailId = it; route = "history-detail" },
                                 )
                             }
                     "picker" -> routeState.SaveableStateProvider("picker") {
@@ -483,6 +479,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                 gymsReturn = "session"
                                 route = "gyms"
                             },
+                            onOpenWorkout = { detailId = it; route = "history-detail" },
                             onFinished = {
                                 detailId = it
                                 route = "history-detail"
@@ -522,8 +519,17 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                         route = "history"
                                     },
                                     repeatLabel = if (data.active != null) "Resume active workout" else "Repeat workout",
+                                    onEdit = { vm.beginPastWorkoutEdit(w.id); route = "history-edit" },
                                 )
                             } ?: run { LaunchedEffect(Unit) { route = "history" } }
+                    "history-edit" -> data.pastWorkoutEdit?.let { edit ->
+                        PastWorkoutEditor(edit, exercises, data, vm,
+                            onChange = vm::editPastWorkout,
+                            onDiscard = { detailId = edit.original.id; vm.discardPastWorkoutEdit(); route = "history-detail" },
+                            onSave = vm::savePastWorkoutEdit,
+                            onSaved = { detailId = edit.original.id; route = "history-detail" },
+                        )
+                    } ?: run { LaunchedEffect(Unit) { route = "history" } }
                     "routine" ->
                         RoutineBuilder(exercises, { route = "" }) { name, ids ->
                             vm.saveRoutine(name, ids)

@@ -4,6 +4,8 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
 
+enum class TrainingPeriod(val label: String) { WEEK("Week"), MONTH("Month") }
+
 data class MuscleWorkload(val muscle: String, val directSets: Int = 0, val secondarySets: Int = 0) {
     val weightedSets: Double get() = directSets + secondarySets * .5
 }
@@ -30,12 +32,29 @@ fun AppData.trainingWeek(
     offset: Int = 0,
     today: LocalDate = LocalDate.now(),
 ): TrainingWeek {
-    val first = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks(offset.toLong())
-    val last = first.plusDays(6)
+    return trainingPeriod(catalog, TrainingPeriod.WEEK, offset, today)
+}
+
+/** Calendar periods, bounded to the present. Future-dated entries never inflate recorded totals. */
+fun AppData.trainingPeriod(
+    catalog: List<Exercise>,
+    period: TrainingPeriod,
+    offset: Int = 0,
+    today: LocalDate = LocalDate.now(),
+): TrainingWeek {
+    val boundedOffset = offset.coerceIn(-520, 0).toLong()
+    val first = when (period) {
+        TrainingPeriod.WEEK -> today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks(boundedOffset)
+        TrainingPeriod.MONTH -> today.withDayOfMonth(1).plusMonths(boundedOffset)
+    }
+    val last = when (period) {
+        TrainingPeriod.WEEK -> first.plusDays(6)
+        TrainingPeriod.MONTH -> first.with(TemporalAdjusters.lastDayOfMonth())
+    }
     val workouts = trainingWorkouts().filter { it.localDate() in first..last && !it.localDate().isAfter(today) }
     val muscles = muscleWorkloads(workouts, catalog)
-    val days = (0..6).map { day ->
-        val date = first.plusDays(day.toLong())
+    val days = (0L..java.time.temporal.ChronoUnit.DAYS.between(first, last)).map { day ->
+        val date = first.plusDays(day)
         val saved = workouts.filter { it.localDate() == date }
         TrainingDay(date, saved.sumOf { it.completedWorkingSets() }, saved.sumOf { it.volumeKg() })
     }

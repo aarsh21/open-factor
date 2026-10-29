@@ -203,7 +203,7 @@ Exercise thumbnails use 8dp corners. Static/full media modes preserve original e
 
 A horizontal row of native selected chips switches the active exercise without replacing the set list with media tiles. Completed exercises can show a check; Add exercise follows the chips. The selected exercise body sits on the page background. Its photo, title and Guide action open rich exercise guidance in a sheet above the current workout. Closing the sheet returns to the same selected exercise and values. Notes display when present, with pinned exercise notes distinct from session notes.
 
-For weight/reps exercises, quick setup produces the simple weight-and-reps path with RIR hidden. Other exercise metric families still use their actual required fields; settings may enable RIR. Set rows contain the set-options label, aligned numeric fields and a 48dp completion button. Weight uses a decimal keyboard; reps use a number keyboard. Invalid values receive visible and semantic errors and cannot complete the set. Completed controls turn green with black checks and the row receives an 8% green wash. Warmups display W, stay distinct from working-set numbers and remain addable alongside Add set.
+For weight/reps exercises, quick setup produces the simple weight-and-reps path with RIR hidden. Other exercise metric families still use their actual required fields. Settings can disable the default-on effort prompt after exercise completion. Set rows contain the set-options label, aligned numeric fields and a 48dp completion button. They do not contain an inline RIR field. Log all sets validates all unfinished rows before completing them atomically, then one optional effort sheet records reps left for the last working log. Done/Skip is durable and Rate last set supports correction. Weight uses a decimal keyboard; reps use a number keyboard. Invalid values receive visible and semantic errors and cannot complete the set. Completed controls turn green with black checks and the row receives an 8% green wash. Warmups display W, stay distinct from working-set numbers and remain addable alongside Add set.
 
 The timer row and optional rest strip remain above the scrolling fields. Rest exposes +30s and Skip. Overflow menus retain targets/rest, notes, set kinds, supersets and other advanced choices. Finish confirms the completed-set count, optionally saves a template and opens the saved workout summary/history journey.
 
@@ -213,7 +213,7 @@ Discovery opens the exercise guide directly; exercise settings are a secondary h
 
 The media frame uses a black 4:5 viewport with the original photo as its initial preview. Video fills the frame and starts only after Play; it has no seek bar. Numbered camera thumbnails retain original view order. Playback exposes 1X/2.5X/5X, pause and replay; errors retain the preview with status and Retry. Bundled clips take precedence; other clips use HTTPS and a 128 MiB least-recently-used cache. Opening guidance does not stream a video, and cache storage is not a permanent offline library. These are implemented paths, not a certification of server availability or every device codec.
 
-The Muscles tab gives original anatomy a full-width square reading area, a Male/Female segmented choice, and a horizontal row of selectable muscle chips with 48dp minimum height. The chosen muscle is labeled Primary or Secondary. Preserve the original human figures and readable scale; generic fallback icons only describe unavailable source-mode assets.
+The Muscles tab displays all targets in a noninteractive Primary/Secondary legend and original front/back figures side by side with simultaneous highlights. Male/Female remains the only segmented choice. Preserve the original human figures and readable scale; generic fallback icons only describe unavailable source-mode assets.
 
 ### Navigation and grouped Settings
 
@@ -237,3 +237,9 @@ Active sessions are saved durably after changes and can be resumed after process
 - **Don't** restore exact MacroFactor parity as the current release criterion.
 - **Don't** replace the intended original guidance with generic icons or confuse source-only fallback with a full content pack.
 - **Don't** infer TalkBack, physical performance, tablet or universal large-font certification from source or screenshots.
+
+## Review and correction in 0.5.2
+
+Exercise history shares the recorded-set table with workout summaries, filling the content width and retaining actual metric families, warmups, unilateral/Myo components and RIR. Its dated workout header opens the saved workout. Edit workout opens an isolated durable draft, with explicit Save and discard confirmation; it never reuses the active workout. Name, date, notes, actuals, completion and effort are editable; set/exercise additions and removals remain reversible until Save. Invalid inputs block Save; stale saved records cannot be overwritten.
+
+Dashboard uses Week/Month segments and calendar period arrows above its three counters; the repeated training bar chart is removed. Workload and its drilldown use the same selected range. Existing steps graphs are unchanged.

@@ -37,48 +37,45 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 @Composable
-internal fun TrainingWeekPanel(week: TrainingWeek, offset: Int, onOffset: (Int) -> Unit) {
-    val today = rememberToday()
-    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(if (offset == 0) "This week" else "Training week", style = MaterialTheme.typography.titleLarge)
-                Text("${week.first.format(DateTimeFormatter.ofPattern("d MMM"))} – ${week.last.format(DateTimeFormatter.ofPattern("d MMM"))}", color = OF.muted)
+internal fun TrainingPeriodPanel(
+    summary: TrainingWeek,
+    period: TrainingPeriod,
+    offset: Int,
+    onPeriod: (TrainingPeriod) -> Unit,
+    onOffset: (Int) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            TrainingPeriod.entries.forEachIndexed { index, value ->
+                SegmentedButton(
+                    selected = period == value,
+                    onClick = { onPeriod(value) },
+                    shape = SegmentedButtonDefaults.itemShape(index, TrainingPeriod.entries.size),
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) { Text(value.label) }
             }
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            val dateLabel = if (period == TrainingPeriod.MONTH) {
+                summary.first.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
+            } else {
+                val firstPattern = if (summary.first.year != summary.last.year) "d MMM yyyy" else "d MMM"
+                "${summary.first.format(DateTimeFormatter.ofPattern(firstPattern))} – ${summary.last.format(DateTimeFormatter.ofPattern("d MMM yyyy"))}"
+            }
+            Text(dateLabel, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
             IconButton({ onOffset(offset - 1) }, enabled = offset > -520) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, "Previous training week")
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, "Previous training ${period.label.lowercase()}")
             }
             IconButton({ onOffset(offset + 1) }, enabled = offset < 0) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, "Next training week")
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, "Next training ${period.label.lowercase()}")
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-            TrainingCircle("Muscles", week.trainedMuscles, Icons.Rounded.AccessibilityNew, Modifier.weight(1f))
-            TrainingCircle("Sets", week.workingSets, Icons.Rounded.Layers, Modifier.weight(1.4f), prominent = true)
-            TrainingCircle("Exercises", week.exercises, Icons.Rounded.FitnessCenter, Modifier.weight(1f))
+            TrainingCircle("Muscles", summary.trainedMuscles, Icons.Rounded.AccessibilityNew, Modifier.weight(1f))
+            TrainingCircle("Sets", summary.workingSets, Icons.Rounded.Layers, Modifier.weight(1.4f), prominent = true)
+            TrainingCircle("Exercises", summary.exercises, Icons.Rounded.FitnessCenter, Modifier.weight(1f))
         }
-        if (week.workingSets > 0) {
-            val max = week.days.maxOfOrNull { it.sets }?.coerceAtLeast(1) ?: 1
-            Row(Modifier.fillMaxWidth().height(146.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
-                week.days.forEach { day ->
-                    Column(Modifier.weight(1f).fillMaxHeight().semantics(mergeDescendants = true) {
-                        contentDescription = "${day.date}: ${day.sets} completed working sets"
-                    }, horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
-                            if (day.sets > 0) Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(day.sets.toString(), style = MaterialTheme.typography.labelSmall, color = OF.muted)
-                                Spacer(Modifier.height(6.dp))
-                                Box(Modifier.widthIn(max = 34.dp).fillMaxWidth().height((100f * day.sets / max).dp)
-                                    .background(if (day.date == today) MaterialTheme.colorScheme.primary else OF.blue, RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp)))
-                            }
-                        }
-                        HorizontalDivider(color = OF.line)
-                        Text(day.date.dayOfWeek.name.take(1), Modifier.padding(top = 9.dp), style = MaterialTheme.typography.labelMedium, color = OF.muted)
-                    }
-                }
-            }
-        }
-        if (week.includesActive) Text("Includes completed sets in your active workout", color = OF.muted, style = MaterialTheme.typography.bodySmall)
+        if (summary.includesActive) Text("Includes completed sets in your active workout", color = OF.muted, style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -91,7 +88,7 @@ private fun TrainingCircle(label: String, count: Int, icon: ImageVector, modifie
     val number = count.toString()
     val numberSize = (if (prominent) 40f else 30f) / (number.length / 3f).coerceAtLeast(1f)
     Column(modifier.semantics(mergeDescendants = true) {
-        contentDescription = "$count $label this training week"
+        contentDescription = "$count $label in selected training period"
     }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
             // These are counters, not goal rings: every keyline is complete and constant.

@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,11 +28,13 @@ fun WorkoutSummary(
     onRepeat: () -> Unit,
     onDelete: () -> Unit,
     repeatLabel: String = "Repeat workout",
+    onEdit: (() -> Unit)? = null,
 ) {
     var delete by remember { mutableStateOf(false) }
     val catalog = remember(exercises) { exercises.associateBy { it.id } }
     Column(Modifier.fillMaxSize()) {
         PageHeading("Workout Complete", onBack, actions = {
+            if (onEdit != null) IconButton(onEdit) { Icon(Icons.Rounded.Edit, "Edit workout") }
             IconButton({ delete = true }) { Icon(Icons.Rounded.DeleteOutline, "Delete workout") }
         })
         LazyColumn(
@@ -83,8 +86,6 @@ private fun SummaryStat(label: String, value: String, modifier: Modifier, spoken
 private fun SummaryExercise(entry: SessionExercise, exercise: Exercise?, prefs: Preferences) {
     val groups = remember(entry) { entry.logicalSets() }
     val recorded = groups.count { it.logs.any { log -> log.completed } }
-    val metrics = exercise?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS)
-    val showRir = groups.any { group -> group.logs.any { it.completed && it.rir != null } }
     Surface(
         modifier = Modifier.fillMaxWidth().testTag("summary-exercise-${entry.id}"),
         shape = OF.shape, color = OF.card,
@@ -99,34 +100,46 @@ private fun SummaryExercise(entry: SessionExercise, exercise: Exercise?, prefs: 
                 Text("$recorded ${if (recorded == 1) "set" else "sets"}", color = OF.muted, style = MaterialTheme.typography.labelMedium)
             }
             HorizontalDivider(color = OF.line)
-            if (recorded == 0) Text("No completed sets", color = OF.muted, style = MaterialTheme.typography.bodyMedium)
-            else {
-                // Keep every metric in catalog order. RIR is an actual, never inferred from set kind.
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                    Text("Set", Modifier.weight(1.25f), color = OF.muted, style = MaterialTheme.typography.labelMedium)
-                    metrics.forEach { metric ->
-                        Text(metric.label(prefs.pounds, prefs.distanceImperial), Modifier.weight(1f), color = OF.muted,
-                            style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.End)
-                    }
-                    if (showRir) Text("RIR", Modifier.weight(.7f), color = OF.muted, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.End)
-                }
-                var working = 0
-                groups.forEach { group ->
-                    if (!group.root.warmup) working++
-                    if (group.logs.any { it.completed }) {
-                        val label = if (group.root.warmup) "Warm-up" else "Set $working · ${group.root.kind.label}"
-                        group.components.forEachIndexed { component, logs ->
-                            logs.forEach { log ->
-                                val detail = listOfNotNull(if (component > 0) "Myo $component" else null, log.side?.label).joinToString(" · ")
-                                SummarySetRow(exercise?.title ?: "Exercise", label, detail, log, metrics, showRir, prefs)
-                            }
-                        }
-                    }
-                }
-            }
+            RecordedSetTable(entry, exercise, prefs)
             if (entry.notes.isNotBlank()) {
                 HorizontalDivider(color = OF.line)
                 Text(entry.notes, color = OF.muted, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+/** Shared recorded-set presentation for workout completion and per-exercise history. */
+@Composable
+internal fun RecordedSetTable(entry: SessionExercise, exercise: Exercise?, prefs: Preferences) {
+    val groups = remember(entry) { entry.logicalSets() }
+    val recorded = groups.count { it.logs.any { log -> log.completed } }
+    val metrics = exercise?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS)
+    val showRir = groups.any { group -> group.logs.any { it.completed && it.rir != null } }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (recorded == 0) Text("No completed sets", color = OF.muted, style = MaterialTheme.typography.bodyMedium)
+        else {
+            // Keep every metric in catalog order. RIR is an actual, never inferred from set kind.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+                Text("Set", Modifier.weight(1.25f), color = OF.muted, style = MaterialTheme.typography.labelMedium)
+                metrics.forEach { metric ->
+                    Text(metric.label(prefs.pounds, prefs.distanceImperial), Modifier.weight(1f), color = OF.muted,
+                        style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.End)
+                }
+                if (showRir) Text("RIR", Modifier.weight(.7f), color = OF.muted, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.End)
+            }
+            var working = 0
+            groups.forEach { group ->
+                if (!group.root.warmup) working++
+                if (group.logs.any { it.completed }) {
+                    val label = if (group.root.warmup) "Warm-up" else "Set $working · ${group.root.kind.label}"
+                    group.components.forEachIndexed { component, logs ->
+                        logs.forEach { log ->
+                            val detail = listOfNotNull(if (component > 0) "Myo $component" else null, log.side?.label).joinToString(" · ")
+                            SummarySetRow(exercise?.title ?: "Exercise", label, detail, log, metrics, showRir, prefs)
+                        }
+                    }
+                }
             }
         }
     }

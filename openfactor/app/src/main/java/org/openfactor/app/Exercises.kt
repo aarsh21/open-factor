@@ -44,6 +44,7 @@ fun ExerciseLibrary(
     performedIds: Set<String> = emptySet(),
     deprioritizedIds: Set<String> = emptySet(),
     modifiedIds: Set<String> = emptySet(),
+    allowCustom: Boolean = true,
 ) {
     var gymId by rememberSaveable { mutableStateOf("") }
     var gymMenu by remember { mutableStateOf(false) }
@@ -160,7 +161,7 @@ fun ExerciseLibrary(
             PageHeading(
                 if (picking) "Add Exercise" else "Exercises",
                 onBack,
-                actions = { RoundAction(Icons.Rounded.Add, "Create custom exercise", onCustom) },
+                actions = { if (allowCustom) RoundAction(Icons.Rounded.Add, "Create custom exercise", onCustom) },
             )
             searchField(Modifier)
             Row(
@@ -294,7 +295,7 @@ fun ExerciseLibrary(
                         if (hasActiveFilters) "Clear filters" else "Clear search",
                         { if (hasActiveFilters) clearFilters() else query = "" },
                     )
-                    TextButton(onCustom, Modifier.fillMaxWidth()) { Text("Create custom exercise") }
+                    if (allowCustom) TextButton(onCustom, Modifier.fillMaxWidth()) { Text("Create custom exercise") }
                 }
                 items(filtered, key = { it.id }) { e ->
                     Row(
@@ -413,9 +414,15 @@ fun ExerciseDetail(
     onAdd: (() -> Unit)?,
     closeable: Boolean = false,
     onSettings: (() -> Unit)? = null,
+    onOpenWorkout: ((String) -> Unit)? = null,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var collapsedSections by rememberSaveable(e.id) { mutableStateOf(emptyList<Int>()) }
+    val history = remember(data.history, e.id) {
+        data.history.filter { w -> w.exercises.any { entry ->
+            entry.exerciseId == e.id && entry.sets.any { it.completed }
+        } }.sortedByDescending { it.startedAt }
+    }
     val context = LocalContext.current
     val instructions =
         remember(e.id) {
@@ -533,7 +540,6 @@ fun ExerciseDetail(
                         Text("${(e.bodyweight*100).toInt()}%")
                     }
                 } else {
-                    val history = data.history.filter { w -> w.exercises.any { it.exerciseId == e.id } }
                     if (history.isEmpty())
                         item {
                             EmptyContent(
@@ -543,27 +549,7 @@ fun ExerciseDetail(
                             )
                         }
                     items(history, key = { it.id }) { w ->
-                        Surface(shape = OF.shape, color = OF.card) {
-                            Column(Modifier.padding(16.dp)) {
-                                Text(w.name, style = MaterialTheme.typography.titleMedium)
-                                Text(w.localDate().toString(), color = OF.muted)
-                                w.exercises
-                                    .filter { it.exerciseId == e.id }
-                                    .flatMap { it.logicalSets() }
-                                    .filter { it.logs.any { log -> log.completed } }
-                                    .forEachIndexed { index, group ->
-                                        Text("Set ${index + 1} · ${if (group.root.warmup) "Warm-up" else group.root.kind.label}", Modifier.padding(top = 8.dp), color = OF.muted)
-                                        group.components.forEachIndexed { componentIndex, logs -> logs.forEach { s ->
-                                            Text(
-                                                listOfNotNull(s.side?.label, if (componentIndex > 0) "Myo $componentIndex" else null).joinToString(" · ")
-                                                    .let { if (it.isEmpty()) "" else "$it: " } +
-                                                    if (s.completed) s.describe(e.loggingMetrics(), data.preferences.pounds, data.preferences.distanceImperial) else "Not completed",
-                                                Modifier.padding(top = 4.dp),
-                                            )
-                                        } }
-                                    }
-                            }
-                        }
+                        ExerciseHistoryCard(w, e, data.preferences, onOpenWorkout)
                     }
                 }
             }

@@ -77,15 +77,18 @@ fun LevelsScreen(
     onBack: (() -> Unit)? = null,
     onExercise: (String) -> Unit,
     referenceDate: LocalDate? = null,
+    referenceStart: LocalDate? = null,
+    initialMuscle: String? = null,
 ) {
     var days by rememberSaveable { mutableIntStateOf(7) }
     var back by rememberSaveable { mutableStateOf(false) }
-    var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    var selected by rememberSaveable { mutableStateOf(initialMuscle) }
     var exerciseDetail by rememberSaveable { mutableStateOf<String?>(null) }
     var policy by rememberSaveable { mutableStateOf(false) }
     val currentDate = rememberToday()
     val today = minOf(referenceDate ?: currentDate, currentDate)
-    val first = if (days == 7) today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY)) else today.minusDays(days - 1L)
+    val first = referenceStart?.coerceAtMost(today)
+        ?: if (days == 7) today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY)) else today.minusDays(days - 1L)
     val workouts = remember(data.active, data.history, first, today) { data.trainingWorkouts().filter { it.localDate() in first..today } }
     val totals = remember(workouts, exercises) { muscleWorkloads(workouts, exercises) }
     androidx.activity.compose.BackHandler(selected != null || exerciseDetail != null) {
@@ -100,7 +103,7 @@ fun LevelsScreen(
         item { PageHeading("Muscle workload", onBack, actions = { IconButton({ policy = true }) { Icon(Icons.Rounded.Info, "How muscle sets are counted") } }) }
         item {
             Column(Modifier.padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (referenceStart == null) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(7 to "Week", 30 to "30 days", 90 to "90 days").forEach { (value, label) ->
                         FilterChip(days == value, { days = value }, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp))
                     }

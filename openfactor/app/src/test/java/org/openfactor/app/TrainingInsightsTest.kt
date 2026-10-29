@@ -63,6 +63,43 @@ class TrainingInsightsTest {
         assertEquals(0, week.trainedMuscles)
     }
 
+    @Test fun calendarMonthIncludesEarlierWeeksButExcludesAdjacentMonthsAndFutureRecords() {
+        val data = AppData(history = listOf(
+            workout("september", LocalDate.of(2026, 9, 30)),
+            workout("first", LocalDate.of(2026, 10, 1)),
+            workout("earlier-week", LocalDate.of(2026, 10, 15)),
+            workout("today"),
+            workout("future", LocalDate.of(2026, 10, 30)),
+            workout("november", LocalDate.of(2026, 11, 1)),
+        ))
+        val month = data.trainingPeriod(listOf(bench), TrainingPeriod.MONTH, today = today)
+        assertEquals(LocalDate.of(2026, 10, 1), month.first)
+        assertEquals(LocalDate.of(2026, 10, 31), month.last)
+        assertEquals(31, month.days.size)
+        assertEquals(3, month.workingSets)
+        assertEquals(1200.0, month.volumeKg, 0.0)
+        assertEquals(3, month.muscles.single { it.muscle == "Chest" }.directSets)
+        assertEquals(1, data.trainingWeek(listOf(bench), today = today).workingSets)
+        val previous = data.trainingPeriod(listOf(bench), TrainingPeriod.MONTH, -1, today)
+        assertEquals(LocalDate.of(2026, 9, 1), previous.first)
+        assertEquals(LocalDate.of(2026, 9, 30), previous.last)
+        assertEquals(1, previous.workingSets)
+    }
+
+    @Test fun monthBoundariesHandleLeapYearsAndOffsetsCannotAdvanceBeyondPresent() {
+        val march = LocalDate.of(2024, 3, 1)
+        val data = AppData(active = workout("live", march))
+        val february = data.trainingPeriod(listOf(bench), TrainingPeriod.MONTH, -1, march)
+        assertEquals(LocalDate.of(2024, 2, 29), february.last)
+        assertEquals(29, february.days.size)
+        assertEquals(0, february.workingSets)
+        val current = data.trainingPeriod(listOf(bench), TrainingPeriod.MONTH, 100, march)
+        assertEquals(LocalDate.of(2024, 3, 1), current.first)
+        assertEquals(1, current.workingSets)
+        assertTrue(current.includesActive)
+        assertEquals(0, AppData().trainingPeriod(listOf(bench), TrainingPeriod.MONTH, today = today).workingSets)
+    }
+
     @Test fun exerciseCircleCountsDistinctCompletedExercisesNotRowsOrWarmups() {
         val completed = SessionExercise(exerciseId = bench.id, sets = listOf(LoggedSet(completed = true, reps = 8)))
         val warmup = SessionExercise(exerciseId = "squat", sets = listOf(LoggedSet(completed = true, warmup = true, reps = 8)))

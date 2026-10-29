@@ -361,8 +361,8 @@ fun WorkoutSettings(p: Preferences, vm: WorkoutViewModel, onDismiss: () -> Unit)
         title = { Text("Workout settings") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                PreferenceSwitch("Reps in reserve", "Show the optional RIR field; does not populate RIR automatically", p.showRir) { checked ->
-                    vm.settings { it.copy(showRir = checked) }
+                PreferenceSwitch("Rate effort after exercise", "Ask for reps left after all sets are logged", p.rateEffortAfterExercise) { checked ->
+                    vm.settings { it.copy(rateEffortAfterExercise = checked) }
                 }
                 PreferenceSwitch("Exercise Auto-Next", "Move to unfinished exercises after the last set", p.exerciseAutoNext) { checked ->
                     vm.settings { it.copy(exerciseAutoNext = checked) }
