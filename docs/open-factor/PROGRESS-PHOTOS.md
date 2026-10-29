@@ -33,7 +33,7 @@ their three-column size. If all slots are hidden, the editor explains the settin
 and still permits a date-only edit of an existing record. These responsive
 layouts are local adaptations; the hidden-slot source layout is unobserved.
 
-Quick Log Photos opens the device camera directly for a new record. The native
+Quick Log Photos first opens the Front, Side and Back pose slots. Choosing an empty slot or its camera button opens the camera for that pose; opening the editor never launches it automatically. The native
 camera writes a full-resolution image into a narrowly shared private cache URI;
 returning with a successful capture imports those exact bytes into private photo
 storage and opens the dated record for Save. Each visible pose has a camera
@@ -48,7 +48,7 @@ image validation and a successful import remove the temporary file. Pending
 capture identity, ready state and its selected pose survive activity recreation.
 An interrupted import can replay from the retained camera output; that output
 is consumed only after the reference reaches the editor's saveable state.
-Quick capture is skipped when every photo pose is hidden. Files left
+Hidden poses cannot be selected for capture. Files left
 by an interrupted process expire after one day when another capture begins.
 The camera receives access only to its temporary output URI. Original images
 are never saved to the public gallery by Open Factor.

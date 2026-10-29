@@ -99,32 +99,6 @@ fun ExerciseMedia(e: Exercise, viewportHeight: Dp = Dp.Infinity) {
         return
     }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // Controls live outside the picture, above it: reachable before scrolling even on a
-        // short guide sheet. The portrait itself always uses the entire available width.
-        if (videos.isNotEmpty()) Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            listOf(1f to "1X", 2.5f to "2.5X", 5f to "5X").forEach { (rate, label) ->
-                TextButton({ speed = rate }, Modifier.width(52.dp).heightIn(min = 48.dp).semantics {
-                    contentDescription = "Playback speed $label"; this.selected = speed == rate
-                }, contentPadding = PaddingValues(0.dp), colors = ButtonDefaults.textButtonColors(
-                    containerColor = if (speed == rate) MaterialTheme.colorScheme.onSurface else Color.Transparent,
-                    contentColor = if (speed == rate) MaterialTheme.colorScheme.surface else OF.muted,
-                )) { Text(label) }
-            }
-            IconButton({
-                if (!requested) { requested = true; playing = true } else playing = !playing
-            }, enabled = playbackError == null, modifier = Modifier.semantics {
-                if (!requested) contentDescription = "Start playback"
-            }) {
-                Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    if (playing) "Pause exercise video" else if (requested) "Play exercise video" else null)
-            }
-            IconButton({ position = 0; player?.seekTo(0); requested = true; playing = true }, enabled = requested && playbackError == null) {
-                Icon(Icons.Rounded.Replay, "Replay exercise video")
-            }
-        }
         playbackError?.let { error -> Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(error, Modifier.weight(1f), color = OF.muted)
             TextButton({ playbackError = null; retry++; requested = true; playing = true }) { Text("Retry") }
@@ -204,6 +178,42 @@ fun ExerciseMedia(e: Exercise, viewportHeight: Dp = Dp.Infinity) {
                 } else if (hasVideo && playbackError == null) {
                     FilledIconButton({ requested = true; playing = true }, Modifier.size(64.dp)) {
                         Icon(Icons.Rounded.PlayArrow, "Play exercise video", Modifier.size(32.dp))
+                    }
+                }
+                if (videos.isNotEmpty()) Box(
+                    Modifier.align(Alignment.TopStart).fillMaxWidth()
+                        .padding(start = 10.dp, top = 10.dp, end = if (cameras > 1) 68.dp else 10.dp),
+                ) {
+                    Surface(
+                        modifier = Modifier.widthIn(max = 260.dp).fillMaxWidth(),
+                        color = Color(0xEB202020), contentColor = Color.White,
+                        shape = RoundedCornerShape(50),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            listOf(1f to "1X", 2.5f to "2.5X", 5f to "5X").forEach { (rate, label) ->
+                                TextButton(
+                                    { speed = rate }, Modifier.weight(1f).heightIn(min = 48.dp).semantics {
+                                        contentDescription = "Playback speed $label"; this.selected = speed == rate
+                                    }, contentPadding = PaddingValues(0.dp),
+                                    colors = ButtonDefaults.textButtonColors(
+                                        containerColor = if (speed == rate) Color.White else Color.Transparent,
+                                        contentColor = if (speed == rate) Color.Black else Color.White,
+                                    ),
+                                ) { Text(label, style = MaterialTheme.typography.labelLarge) }
+                            }
+                            IconButton({
+                                if (!requested) { requested = true; playing = true } else playing = !playing
+                            }, modifier = Modifier.weight(1f).height(48.dp).semantics {
+                                if (!requested) contentDescription = "Start playback"
+                            }, enabled = playbackError == null) {
+                                Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                    if (playing) "Pause exercise video" else if (requested) "Play exercise video" else null)
+                            }
+                            IconButton({ position = 0; player?.seekTo(0); requested = true; playing = true },
+                                modifier = Modifier.weight(1f).height(48.dp), enabled = requested && playbackError == null) {
+                                Icon(Icons.Rounded.Replay, "Replay exercise video")
+                            }
+                        }
                     }
                 }
                 if (cameras > 1) Column(

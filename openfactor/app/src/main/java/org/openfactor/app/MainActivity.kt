@@ -87,7 +87,6 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     var programExit by remember { mutableStateOf(false) }
     var shortcuts by rememberSaveable { mutableStateOf(false) }
     var quickWeight by rememberSaveable { mutableStateOf(false) }
-    var photoStartWithCamera by rememberSaveable { mutableStateOf(false) }
     var configureShortcuts by rememberSaveable { mutableStateOf(false) }
     var workoutSettings by rememberSaveable { mutableStateOf(false) }
     var healthConnect by rememberSaveable { mutableStateOf(false) }
@@ -270,7 +269,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             data, bodyDataTab, { bodyDataTab = it }, { route = "" },
                             { detailId = it; route = "weight-entry" },
                             { detailId = it; bodyEntryReturn = "body-data"; route = "measurement-entry" },
-                            { detailId = it; photoStartWithCamera = it.isBlank(); bodyEntryReturn = "body-data"; route = "photo-entry" }, vm.photoStore,
+                            { detailId = it; bodyEntryReturn = "body-data"; route = "photo-entry" }, vm.photoStore,
                             {
                                 bodyChartMetric = if (bodyDataTab == 1) BodyMeasurement.NECK.key else "weight"
                                 route = "body-charts"
@@ -624,8 +623,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     }
     if (route == "photo-entry") key(detailId) {
         ProgressPhotoEditor(data.progressPhotos.find { it.id == detailId }, vm,
-            { route = bodyEntryReturn }, { bodyDataTab = 2; route = "body-data" },
-            startWithCamera = photoStartWithCamera && detailId.isBlank())
+            { route = bodyEntryReturn }, { bodyDataTab = 2; route = "body-data" })
     }
     if (programExit)
         AlertDialog(
@@ -676,7 +674,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                     detailId = ""; bodyDataTab = 1; bodyEntryReturn = route; route = "measurement-entry"
                 }
                 WorkoutShortcut.PHOTOS -> {
-                    detailId = ""; photoStartWithCamera = true; bodyDataTab = 2; bodyEntryReturn = route; route = "photo-entry"
+                    detailId = ""; bodyDataTab = 2; bodyEntryReturn = route; route = "photo-entry"
                 }
                 WorkoutShortcut.HISTORY -> route = "history"
                 WorkoutShortcut.EMPTY_WORKOUT -> {

@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -51,10 +52,10 @@ internal fun TrainingWeekPanel(week: TrainingWeek, offset: Int, onOffset: (Int) 
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, "Next training week")
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Bottom) {
-            TrainingCircle("Muscles", week.trainedMuscles, Modifier.weight(1f))
-            TrainingCircle("Sets", week.workingSets, Modifier.weight(1.5f), prominent = true)
-            TrainingCircle("Exercises", week.exercises, Modifier.weight(1f))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+            TrainingCircle("Muscles", week.trainedMuscles, Icons.Rounded.AccessibilityNew, Modifier.weight(1f))
+            TrainingCircle("Sets", week.workingSets, Icons.Rounded.Layers, Modifier.weight(1.4f), prominent = true)
+            TrainingCircle("Exercises", week.exercises, Icons.Rounded.FitnessCenter, Modifier.weight(1f))
         }
         if (week.workingSets > 0) {
             val max = week.days.maxOfOrNull { it.sets }?.coerceAtLeast(1) ?: 1
@@ -82,19 +83,41 @@ internal fun TrainingWeekPanel(week: TrainingWeek, offset: Int, onOffset: (Int) 
 }
 
 @Composable
-private fun TrainingCircle(label: String, count: Int, modifier: Modifier, prominent: Boolean = false) {
+private fun TrainingCircle(label: String, count: Int, icon: ImageVector, modifier: Modifier, prominent: Boolean = false) {
     val line = OF.line
+    val accent = OF.blue
+    val surface = OF.card
+    val foreground = MaterialTheme.colorScheme.onSurface
+    val number = count.toString()
+    val numberSize = (if (prominent) 40f else 30f) / (number.length / 3f).coerceAtLeast(1f)
     Column(modifier.semantics(mergeDescendants = true) {
         contentDescription = "$count $label this training week"
-    }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
+            // These are counters, not goal rings: every keyline is complete and constant.
+            // The larger center medallion carries the one accent; no invented completion ratio.
             Canvas(Modifier.fillMaxSize()) {
-                val width = if (prominent) 3.dp.toPx() else 2.dp.toPx()
-                drawCircle(line, radius = (size.minDimension - width) / 2, style = Stroke(width))
+                val width = if (prominent) 2.5.dp.toPx() else 1.5.dp.toPx()
+                val radius = (size.minDimension - width) / 2
+                drawCircle(if (prominent) accent.copy(alpha = .09f) else surface, radius = radius)
+                drawCircle(if (prominent) accent.copy(alpha = .85f) else line, radius = radius, style = Stroke(width))
+                drawCircle(if (prominent) accent.copy(alpha = .16f) else foreground.copy(alpha = .05f),
+                    radius = radius - 6.dp.toPx(), style = Stroke(.75.dp.toPx()))
             }
-            Text(count.toString(), fontSize = if (prominent) 34.sp else 26.sp, fontWeight = FontWeight.Bold)
+            Column(Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(if (prominent) 6.dp else 4.dp)) {
+                Icon(icon, null, Modifier.size(if (prominent) 18.dp else 16.dp),
+                    tint = if (prominent) accent else OF.muted)
+                Text(number, maxLines = 1, softWrap = false, color = if (count == 0) OF.muted else foreground,
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontSize = numberSize.sp, lineHeight = (numberSize + 2).sp,
+                        fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum",
+                        letterSpacing = (-.5).sp,
+                    ))
+            }
         }
-        Text(label, style = MaterialTheme.typography.labelLarge, color = OF.muted, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp, lineHeight = 18.sp),
+            color = if (prominent) foreground else OF.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

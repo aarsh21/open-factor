@@ -120,7 +120,6 @@ fun ProgressPhotoEditor(
     vm: WorkoutViewModel,
     onBack: () -> Unit,
     onSaved: () -> Unit,
-    startWithCamera: Boolean = false,
 ) {
     val id = rememberSaveable { record?.id ?: newId() }
     var date by rememberSaveable { mutableStateOf((record?.date ?: LocalDate.now()).toString()) }
@@ -131,7 +130,6 @@ fun ProgressPhotoEditor(
     var selected by rememberSaveable { mutableIntStateOf(0) }
     var pendingCapture by rememberSaveable { mutableStateOf<String?>(null) }
     var captureReady by rememberSaveable { mutableStateOf(false) }
-    var cameraStarted by rememberSaveable { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
@@ -216,12 +214,6 @@ fun ProgressPhotoEditor(
             pendingCapture = null
             captureReady = false
             error = "No camera is available. Choose a photo from your library."
-        }
-    }
-    LaunchedEffect(startWithCamera) {
-        if (startWithCamera && !cameraStarted && record == null) {
-            cameraStarted = true
-            visibility.firstVisiblePhotoPosition()?.let { takePhoto(it.ordinal) }
         }
     }
     ModalBottomSheet(
