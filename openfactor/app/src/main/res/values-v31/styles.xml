@@ -1,0 +1,13 @@
+<resources>
+    <style name="Theme.OpenFactor" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#131313</item>
+        <item name="android:navigationBarColor">#131313</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#131313</item>
+        <item name="android:colorBackground">#131313</item>
+        <item name="android:windowSplashScreenBackground">#131313</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_open_factor</item>
+    </style>
+</resources>

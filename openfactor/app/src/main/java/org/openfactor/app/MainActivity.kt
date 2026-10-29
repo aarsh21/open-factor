@@ -35,6 +35,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var workoutOpenRequest by mutableIntStateOf(0)
+    private var windowRevealed by mutableStateOf(android.os.Build.VERSION.SDK_INT < 31)
 
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
@@ -44,6 +45,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        windowRevealed = savedInstanceState != null || android.os.Build.VERSION.SDK_INT < 31
+        if (android.os.Build.VERSION.SDK_INT >= 31 && savedInstanceState == null) {
+            // Start the welcome after the system's starting surface is gone, not underneath it.
+            // No extra splash hold or timer: Android still decides when the first frame is ready.
+            splashScreen.setOnExitAnimationListener { splash ->
+                splash.remove()
+                windowRevealed = true
+            }
+        }
         if (intent.action == WorkoutNotifications.OPEN_WORKOUT) workoutOpenRequest++
         enableEdgeToEdge(
             statusBarStyle =
@@ -64,7 +74,9 @@ class MainActivity : ComponentActivity() {
                         isAppearanceLightNavigationBars = !dark
                     }
                 }
-                OpenFactorApp(vm, workoutOpenRequest)
+                CompositionLocalProvider(LocalAppWindowRevealed provides windowRevealed) {
+                    OpenFactorApp(vm, workoutOpenRequest)
+                }
             }
         }
     }

@@ -31,6 +31,7 @@ internal object AppMotion {
 }
 
 internal val LocalAppMotionEnabled = staticCompositionLocalOf { true }
+internal val LocalAppWindowRevealed = staticCompositionLocalOf { true }
 
 /** Updates while visible as well as after returning from Android accessibility settings. */
 @Composable

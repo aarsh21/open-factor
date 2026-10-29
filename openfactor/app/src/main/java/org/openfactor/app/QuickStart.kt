@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -51,16 +52,21 @@ fun QuickStartScreen(
     val keyboard = LocalSoftwareKeyboardController.current
     var saveError by remember { mutableStateOf<String?>(null) }
     val motion = LocalAppMotionEnabled.current
+    val windowFocused = LocalWindowInfo.current.isWindowFocused && LocalAppWindowRevealed.current
     val haptic = LocalHapticFeedback.current
     // Only the rare first page earns an entrance. Restored drafts and provider returns stay put.
     var introduced by rememberSaveable { mutableStateOf(stage != 0 || data.onboarding.profileDraft != null) }
     val entrance = remember { Animatable(if (introduced || !motion) 1f else 0f) }
-    LaunchedEffect(motion) {
-        if (!introduced) {
+    LaunchedEffect(motion, windowFocused) {
+        if (!motion) {
             introduced = true
-            if (motion) entrance.animateTo(1f, tween(AppMotion.Enter, easing = AppMotion.EaseOut))
-            else entrance.snapTo(1f)
-        } else if (!motion) entrance.snapTo(1f)
+            entrance.snapTo(1f)
+        } else if (windowFocused) {
+            if (!introduced) {
+                introduced = true
+                entrance.animateTo(1f, tween(AppMotion.Enter, easing = AppMotion.EaseOut))
+            } else entrance.snapTo(1f)
+        } else if (introduced) entrance.snapTo(1f)
     }
     LaunchedEffect(Unit) { vm.ensureProfileSetup() }
     LaunchedEffect(data.healthConnect.lastSyncedAtMillis) {
