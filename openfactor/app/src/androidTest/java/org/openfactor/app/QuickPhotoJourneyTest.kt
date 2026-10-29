@@ -30,6 +30,7 @@ class QuickPhotoJourneyTest {
                 compose.onNodeWithContentDescription("Add $pose photo").assertIsDisplayed()
                 compose.onNodeWithContentDescription("Take $pose photo").assertIsDisplayed()
             }
+            compose.onNode(hasSetTextAction()).assertIsNotFocused()
             assertEquals(Lifecycle.State.RESUMED, activity.state)
             assertTrue(store.load().progressPhotos.isEmpty())
             compose.onNodeWithContentDescription("Close photos").performClick()

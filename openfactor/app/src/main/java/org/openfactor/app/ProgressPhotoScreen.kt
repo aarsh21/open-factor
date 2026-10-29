@@ -17,6 +17,10 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -138,6 +142,8 @@ fun ProgressPhotoEditor(
     var choosingDate by rememberSaveable { mutableStateOf(false) }
     var proposedDate by rememberSaveable { mutableStateOf(date) }
     val scope = rememberCoroutineScope()
+    val entryFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
     val visibility = vm.data.collectAsState().value.preferences.dataVisibility
     val visiblePositions = PhotoPosition.entries.filter { visibility.isVisible(it.key + "Photo") }
     fun leave() {
@@ -226,12 +232,18 @@ fun ProgressPhotoEditor(
             }
         },
     ) {
+        // Start on the sheet's close control, never the Notes text field. Older Android
+        // windows otherwise restore input focus and open the keyboard over the pose choices.
+        LaunchedEffect(id) {
+            entryFocus.requestFocus()
+            keyboard?.hide()
+        }
         Column(Modifier.fillMaxWidth().heightIn(max = 720.dp).imePadding()) {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton({ leave() }, enabled = !busy && pendingCapture == null) { Icon(Icons.Rounded.Close, "Close photos") }
+                IconButton({ leave() }, modifier = Modifier.focusProperties { canFocus = true }.focusRequester(entryFocus), enabled = !busy && pendingCapture == null) { Icon(Icons.Rounded.Close, "Close photos") }
                 TextButton(
                     {
                         proposedDate = date
