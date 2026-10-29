@@ -34,7 +34,7 @@ internal fun DataPortabilityRows(onOpen: (String) -> Unit) {
 @Composable
 internal fun OfflineHelpRows(onOpen: (String) -> Unit) {
     SettingsRow(Icons.Rounded.School, "Tutorials", "Review local guidance and reset tutorials") { onOpen("tutorials") }
-    SettingsRow(Icons.Rounded.MenuBook, "Knowledge Base & Support", "Offline answers, backup safety and troubleshooting") { onOpen("help") }
+    SettingsRow(Icons.Rounded.MenuBook, "Help & support", "Offline answers, backup safety and troubleshooting") { onOpen("help") }
 }
 
 @Composable
@@ -45,21 +45,17 @@ internal fun PortabilityScreen(
     snackbar: SnackbarHostState,
     onClose: () -> Unit,
 ) {
-    var detail by rememberSaveable(route) { mutableStateOf("") }
-    val back = { if (detail.isNotEmpty()) detail = "" else onClose() }
-    BackHandler(onBack = back)
+    BackHandler(onBack = onClose)
     Column(Modifier.fillMaxSize()) {
         PageHeading(when {
-            detail == "body" -> "Body Metrics Visibility"
-            detail == "period" -> "Period Visibility"
             route == "export" -> "Data Export"
-            route == "visibility" -> "Data Visibility"
+            route == "visibility" -> "Metric visibility"
             route == "tutorials" -> "Tutorials"
-            else -> "Knowledge Base & Support"
-        }, back)
+            else -> "Help & support"
+        }, onClose)
         when (route) {
             "export" -> ScopedExportScreen(vm, snackbar)
-            "visibility" -> VisibilityScreen(detail, p, vm) { detail = it }
+            "visibility" -> VisibilityScreen(p, vm)
             "tutorials" -> TutorialsScreen(p, vm, snackbar)
             else -> OfflineHelpScreen()
         }
@@ -110,7 +106,7 @@ private fun ScopedExportScreen(vm: WorkoutViewModel, snackbar: SnackbarHostState
         }
     }
     val frame = ExportTimeFrame.valueOf(frameName)
-    val selected = ExportCategory.entries.filter { it.key in keys }.toSet()
+    val selected = ExportCategory.entries.filter { it.key in keys && it.unavailable == null }.toSet()
     val ready = !busy && pendingDate.isEmpty() && (quick || selected.isNotEmpty())
     Column(Modifier.fillMaxSize()) {
         TabRow(if (quick) 0 else 1) {
@@ -123,29 +119,26 @@ private fun ScopedExportScreen(vm: WorkoutViewModel, snackbar: SnackbarHostState
         ) {
             if (!quick) {
                 Text("Choose categories first, then the time frame. Only selected categories are written.", color = OF.muted)
-                ExportCategory.entries.groupBy { it.group }.forEach { (group, categories) ->
+                ExportCategory.entries.filter { it.unavailable == null }.groupBy { it.group }.forEach { (group, categories) ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(group, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                        val available = categories.filter { it.unavailable == null }
-                        val all = available.all { it.key in keys }
-                        TextButton({ keys = if (all) keys - available.map { it.key }.toSet() else (keys + available.map { it.key }).distinct() }) {
+                        val all = categories.all { it.key in keys }
+                        TextButton({ keys = if (all) keys - categories.map { it.key }.toSet() else (keys + categories.map { it.key }).distinct() }) {
                             Text(if (all) "Deselect All" else "Select All")
                         }
                     }
                     categories.forEach { category ->
                         Row(
                             Modifier.fillMaxWidth().heightIn(min = 52.dp)
-                                .toggleable(category in selected, enabled = category.unavailable == null,
-                                    role = Role.Checkbox, onValueChange = { checked ->
+                                .toggleable(category in selected, role = Role.Checkbox, onValueChange = { checked ->
                                         keys = if (checked) keys + category.key else keys - category.key
                                     }),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(Modifier.weight(1f)) {
-                                Text(category.label, color = if (category.unavailable == null) MaterialTheme.colorScheme.onSurface else OF.muted)
-                                category.unavailable?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = OF.muted) }
+                                Text(category.label)
                             }
-                            Checkbox(category in selected, null, enabled = category.unavailable == null)
+                            Checkbox(category in selected, null)
                         }
                         HorizontalDivider()
                     }
@@ -189,50 +182,28 @@ private fun ScopedExportScreen(vm: WorkoutViewModel, snackbar: SnackbarHostState
 }
 
 @Composable
-private fun VisibilityScreen(detail: String, p: Preferences, vm: WorkoutViewModel, onDetail: (String) -> Unit) {
+private fun VisibilityScreen(p: Preferences, vm: WorkoutViewModel) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp).padding(bottom = 112.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        if (detail.isEmpty()) {
-            Text("Hide metrics you do not use in Dashboard cards and new-entry editors. History, charts and exports keep every saved value. You can turn a metric back on at any time.")
-            ListItem(headlineContent = { Text("Body Metrics Visibility") }, trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
-                modifier = Modifier.clickable { onDetail("body") })
-            ListItem(headlineContent = { Text("Period Visibility") }, supportingContent = { Text("Tracking is not available in this build") },
-                trailingContent = { Icon(Icons.Rounded.ChevronRight, null) }, modifier = Modifier.clickable { onDetail("period") })
-        } else if (detail == "period") {
-            Text("The source app has a separate Period visibility control. Local period tracking is not implemented, so this control is unavailable. No records are changed.")
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Period", Modifier.weight(1f))
-                Switch(false, null, enabled = false)
-            }
-        } else {
-            Text("Hide editor fields without deleting data. Saved hidden values and photos remain in history, charts and complete backups. Editing an existing record preserves its hidden values.", color = OF.muted)
-            Text("Weight & Body Fat", style = MaterialTheme.typography.titleMedium)
-            var defaultInfo by remember { mutableStateOf(false) }
-            listOf("Scale Weight", "Visual Body Fat").forEach { label ->
-                ListItem(headlineContent = { Text(label) }, trailingContent = { Text("Default") }, modifier = Modifier.clickable { defaultInfo = true })
-            }
-            if (defaultInfo) InfoDialog("Default Metric", "Default metrics cannot be turned off. You can customize Dashboard cards to make them less prominent.") { defaultInfo = false }
-            val groups = linkedMapOf("Progress Photos" to listOf("frontPhoto" to "Front Photo", "sidePhoto" to "Side Photo", "backPhoto" to "Back Photo")) +
-                BodyMeasurement.entries.groupBy { it.group }.mapValues { (_, fields) -> fields.map { it.key to it.label } }
-            groups.forEach { (group, fields) ->
-                Text(group, style = MaterialTheme.typography.titleMedium)
-                fields.forEach { (key, label) ->
-                    val visible = p.dataVisibility.isVisible(key)
-                    Row(
-                        Modifier.fillMaxWidth().heightIn(min = 56.dp).toggleable(visible, role = Role.Switch, onValueChange = { checked ->
-                            vm.settings { it.copy(dataVisibility = it.dataVisibility.withVisible(key, checked)) }
-                        }), verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(label, Modifier.weight(1f))
-                        Switch(visible, null)
-                    }
-                    HorizontalDivider()
+        Text("Choose which fields appear when logging new body records. Saved readings stay in history, charts and backups.", color = OF.muted)
+        val groups = linkedMapOf("Progress photos" to listOf("frontPhoto" to "Front photo", "sidePhoto" to "Side photo", "backPhoto" to "Back photo")) +
+            BodyMeasurement.entries.groupBy { it.group }.mapValues { (_, fields) -> fields.map { it.key to it.label } }
+        groups.forEach { (group, fields) ->
+            Text(group, style = MaterialTheme.typography.titleMedium)
+            fields.forEach { (key, label) ->
+                val visible = p.dataVisibility.isVisible(key)
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 56.dp).toggleable(visible, role = Role.Switch, onValueChange = { checked ->
+                        vm.settings { it.copy(dataVisibility = it.dataVisibility.withVisible(key, checked)) }
+                    }), verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(label, Modifier.weight(1f))
+                    Switch(visible, null)
                 }
+                HorizontalDivider()
             }
-            Text("Ratios", style = MaterialTheme.typography.titleMedium)
-            Text("Waist-to-height and waist-to-hip ratio views are not available in this build.", color = OF.muted)
         }
     }
 }

@@ -3,6 +3,9 @@ package org.openfactor.app
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
@@ -119,6 +122,7 @@ data class Preferences(
     val supersetAutoNext: Boolean = true,
     val restBetweenSidesPercent: Int = 100,
     val rateEffortAfterExercise: Boolean = true,
+    val weeklyWorkoutGoal: Int? = null,
 )
 
 data class AppData(
@@ -413,7 +417,8 @@ object DataCodec {
                     .put("restBetweenExercises", d.preferences.restBetweenExercises)
                     .put("supersetAutoNext", d.preferences.supersetAutoNext)
                     .put("restBetweenSidesPercent", d.preferences.restBetweenSidesPercent)
-                    .put("rateEffortAfterExercise", d.preferences.rateEffortAfterExercise),
+                    .put("rateEffortAfterExercise", d.preferences.rateEffortAfterExercise)
+                    .put("weeklyWorkoutGoal", d.preferences.weeklyWorkoutGoal),
             )
             .toString(2)
 
@@ -524,6 +529,7 @@ object DataCodec {
                     it.toInt()
                 },
                 rateEffortAfterExercise = p.optBoolean("rateEffortAfterExercise", true),
+                weeklyWorkoutGoal = if (p.isNull("weeklyWorkoutGoal")) null else p.optInt("weeklyWorkoutGoal").takeIf { it in 1..7 },
             ),
             j.optString("activeProgramId").takeIf { it.isNotBlank() && it != "null" },
             j.array("gyms").objects().map { GymCodec.decode(it) },
@@ -698,25 +704,15 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun dismissStorageRecovery() {
         if (store.dismissRecovery()) _storageRecovery.value = null
     }
-    private val bundled =
-        runCatching {
-                application.assets.open("catalog.json").bufferedReader().use {
-                    DataCodec.catalog(it.readText())
-                }
-            }
-            .getOrElse { emptyList() }
-    private val imported =
-        runCatching {
-                application.assets.open("reference/catalog.json").bufferedReader().use {
-                    DataCodec.catalog(it.readText(), bundled)
-                }
-            }
-            .getOrElse { emptyList() }
-    val catalog: List<Exercise> = withLicensedExercisePreviews(application, imported.ifEmpty { bundled })
+    private val library = (application as? OpenFactorApplication)?.exerciseLibrary
+        ?: ExerciseLibraryRepository().also { it.load(application) }
+    private val _libraryReady = MutableStateFlow(false)
+    val libraryReady = _libraryReady.asStateFlow()
+    internal val libraryLoad = library.state
+    val catalog: List<Exercise> get() = library.snapshot?.catalog.orEmpty()
+    val equipmentCatalog: EquipmentCatalog get() = requireNotNull(library.snapshot) { "The library is still loading" }.equipment
 
-    val equipmentCatalog = EquipmentCatalog(application)
-
-    init {
+    private fun prepareLibrary(snapshot: LoadedExerciseLibrary) {
         if (_data.value.gyms.isEmpty())
             update {
                 it.copy(
@@ -724,11 +720,24 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                         listOf(
                             GymProfile(
                                 name = "Everything Gym",
-                                equipmentIds = equipmentCatalog.prefill("everything"),
+                                equipmentIds = snapshot.equipment.prefill("everything"),
                             )
                         )
                 )
             }
+        _libraryReady.value = true
+    }
+
+    fun retryLibrary() {
+        library.load(getApplication())
+        viewModelScope.launch { runCatching { library.await() }.onSuccess(::prepareLibrary) }
+    }
+
+    init {
+        // Production ViewModels are created on Main: never parse the catalog in their constructor.
+        // Direct model/device tests run on a worker and retain synchronous initialization semantics.
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) retryLibrary()
+        else prepareLibrary(runBlocking { library.await() })
         WorkoutNotifications.sync(application, _data.value)
     }
 
@@ -754,7 +763,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun exercises(d: AppData = _data.value) = catalog + d.customExercises
 
-    private fun update(block: (AppData) -> AppData) {
+    @Synchronized private fun update(block: (AppData) -> AppData) {
         val previous = _data.value
         val next = block(previous)
         if (next == previous) return
@@ -801,6 +810,22 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         it.copy(onboarding = block(it.onboarding))
     }
 
+    fun ensureProfileSetup() = update { d ->
+        if (d.onboarding.profileDraft != null) d else d.copy(onboarding = d.onboarding.copy(profileDraft = d.profileSetupDraft()))
+    }
+    fun editProfileSetup(block: (ProfileSetupDraft) -> ProfileSetupDraft) = update { d ->
+        d.copy(onboarding = d.onboarding.copy(profileDraft = block(d.onboarding.profileDraft ?: d.profileSetupDraft())))
+    }
+    fun completeProfileSetup(): String? = saveProfile(_data.value.onboarding.profileDraft ?: _data.value.profileSetupDraft())
+    fun saveProfile(draft: ProfileSetupDraft): String? {
+        draft.validationError()?.let { return it }
+        update { it.withProfileSetup(draft) }
+        return null
+    }
+    fun skipProfileSetup() = update { d ->
+        d.copy(onboarding = d.onboarding.copy(deferred = true, profileDraft = d.onboarding.profileDraft ?: d.profileSetupDraft()))
+    }
+
     fun restartOnboarding() = update { d ->
         val setup =
             if (d.onboarding.completed)
@@ -812,6 +837,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                     preset = "current",
                     gymName = d.gyms.firstOrNull()?.name ?: "Everything Gym",
                     gymId = null,
+                    profileDraft = d.profileSetupDraft(),
                 )
             else d.onboarding
         d.copy(onboarding = setup.copy(deferred = false))

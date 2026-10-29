@@ -2,7 +2,6 @@ package org.openfactor.app
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.net.TrafficStats
 import android.os.Build
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -20,7 +19,7 @@ import org.junit.runner.RunWith
 class ExerciseGuidanceFlowTest {
     @get:Rule val compose = createEmptyComposeRule()
 
-    @Test fun originalGuideAndAnatomyKeepTheCurrentSetAndDoNotAutoplay() {
+    @Test fun originalGuideAutoplayAndAnatomyKeepTheCurrentSet() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val pack = context.assets.open("media-pack.json").bufferedReader().use { JSONObject(it.readText()) }
@@ -38,9 +37,13 @@ class ExerciseGuidanceFlowTest {
             store.save(AppData(active = active, onboarding = OnboardingState(completed = true), preferences = Preferences(showRir = false)))
             activity = ActivityScenario.launch(MainActivity::class.java)
             compose.waitUntil(15_000) { compose.onAllNodesWithText("Guide").fetchSemanticsNodes().isNotEmpty() }
-            val rxBefore = TrafficStats.getUidRxBytes(android.os.Process.myUid())
             compose.onNodeWithText("Guide").performClick()
-            compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("Play exercise video").fetchSemanticsNodes().isNotEmpty() }
+            // Autoplay intent is visible immediately, including while the real stream buffers.
+            // A provider failure is an honest, recoverable result rather than a fake played frame.
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithContentDescription("Pause exercise video").fetchSemanticsNodes().isNotEmpty() ||
+                    compose.onAllNodesWithText("Retry").fetchSemanticsNodes().isNotEmpty()
+            }
             compose.onNodeWithText("Muscles").performClick()
             compose.onNodeWithContentDescription("Female anatomy figure").performClick()
             compose.onNodeWithContentDescription("Female anatomy figure").assertIsSelected()
@@ -49,8 +52,6 @@ class ExerciseGuidanceFlowTest {
             compose.onNodeWithContentDescription("Barbell Bench Press set 1 weight (kg)").assertTextContains("47.5")
             compose.onNodeWithContentDescription("Barbell Bench Press set 1 reps (Reps)").assertTextContains("8")
             assertEquals(active, store.load().active)
-            val rxAfter = TrafficStats.getUidRxBytes(android.os.Process.myUid())
-            if (rxBefore >= 0 && rxAfter >= 0) assertEquals("Opening a guide must not stream a video", rxBefore, rxAfter)
         } finally {
             activity?.close()
             store.save(before)

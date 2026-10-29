@@ -23,10 +23,10 @@ import java.nio.ByteBuffer
 
 /** Every target remains visible together; the two original figures supply front/back context. */
 @Composable
-fun ExerciseAnatomy(exercise: Exercise) {
+fun ExerciseAnatomy(exercise: Exercise, initialFigure: String = "male") {
     val primary = exercise.muscles.ifEmpty { listOf(exercise.muscle) }.filter(String::isNotBlank).distinct()
     val secondary = exercise.secondary.filter { it.isNotBlank() && it !in primary }.distinct()
-    var figure by rememberSaveable { mutableStateOf("male") }
+    var figure by rememberSaveable(exercise.id, initialFigure) { mutableStateOf(initialFigure) }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         val figureSelector: @Composable () -> Unit = {
             SingleChoiceSegmentedButtonRow {

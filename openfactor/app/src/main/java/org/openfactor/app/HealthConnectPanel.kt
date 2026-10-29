@@ -47,6 +47,7 @@ fun HealthConnectPanel(
     onImportWeights: (List<ScaleWeightRecord>) -> Unit,
     onClose: () -> Unit,
     onSync: ((HealthConnectSyncData) -> Unit)? = null,
+    autoConnectOnOpen: Boolean = false,
 ) {
     val context = LocalContext.current
     val transfers = remember(context) { HealthConnectTransfers(context.applicationContext) }
@@ -57,6 +58,7 @@ fun HealthConnectPanel(
     var busy by remember { mutableStateOf(false) }
     var waitingForPermission by rememberSaveable { mutableStateOf(false) }
     var message by rememberSaveable { mutableStateOf<String?>(null) }
+    var autoConnectConsumed by rememberSaveable { mutableStateOf(false) }
     val importSync by rememberUpdatedState(onSync)
     val importWeights by rememberUpdatedState(onImportWeights)
 
@@ -163,6 +165,12 @@ fun HealthConnectPanel(
         }
     }
 
+    LaunchedEffect(autoConnectOnOpen, checking, availability) {
+        if (autoConnectOnOpen && !checking && !autoConnectConsumed) {
+            autoConnectConsumed = true
+            connectOrSync()
+        }
+    }
     val state = data.healthConnect
     val connected = canSyncHealthConnect(grants)
     val pending = busy || waitingForPermission || checking

@@ -11,7 +11,7 @@ import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import java.io.File
 
-/** Only an explicitly played clip opens a data source. The least-used bytes are evicted at 128 MiB. */
+/** Visible guide playback opens a data source. The least-used bytes are evicted at 128 MiB. */
 @UnstableApi
 object ExerciseVideoCache {
     const val MAX_BYTES = 128L * 1024L * 1024L

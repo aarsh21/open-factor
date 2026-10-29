@@ -39,6 +39,7 @@ fun SettingsScreen(
     onHistory: () -> Unit,
     onGyms: () -> Unit,
     onBodyData: () -> Unit,
+    onProfile: (() -> Unit)? = null,
     integrationSettings: @Composable ColumnScope.() -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -108,6 +109,10 @@ fun SettingsScreen(
         }
         return
     }
+    if (dialog == "profile") {
+        ProfileEditor(data, vm) { dialog = "" }
+        return
+    }
     if (dialog == "units") {
         UnitsSettings(p, vm) { dialog = "" }
         return
@@ -131,74 +136,26 @@ fun SettingsScreen(
             fontWeight = FontWeight.Bold,
             letterSpacing = (-1).sp,
         )
-        SettingsSection("PROFILE") {
-            SettingsRow(
-                Icons.Rounded.Checklist,
-                "Set up Open Factor",
-                "Basics, gym equipment and program",
-            ) {
-                vm.restartOnboarding()
+        SettingsSection("YOU") {
+            SettingsRow(Icons.Rounded.AccountCircle, "Profile", "") {
+                if (onProfile != null) onProfile() else dialog = "profile"
             }
-            val height = data.onboarding.heightCm.toDoubleOrNull()
-            SettingsRow(Icons.Rounded.AccountCircle, "Profile",
-                p.displayName + (height?.let { " · ${p.heightLabel(it)}" } ?: "")) {
-                dialog = "profile"
-            }
-        }
-        SettingsSection("GENERAL") {
-            SettingsRow(
-                Icons.Rounded.Straighten,
-                "Units",
-                if (p.pounds) "Pounds (lb)" else "Kilograms (kg)",
-            ) {
-                dialog = "units"
-            }
-            SettingsRow(
-                Icons.Rounded.Timer,
-                "Rest Timer",
-                "${p.restSeconds/60} min ${p.restSeconds%60} sec · ${if(p.autoRest)"Automatic" else "Manual"}",
-            ) {
-                dialog = "rest"
-            }
-            SettingsRow(Icons.Rounded.FitnessCenter, "Workout", "Set logging and reps in reserve") {
-                dialog = "workout"
-            }
+            SettingsRow(Icons.Rounded.MonitorWeight, "Body data", "", onClick = onBodyData)
             integrationSettings()
-            SettingsRow(Icons.Rounded.AddCircle, "Shortcuts", "Order, colors and Up Next banner") {
-                dialog = "shortcuts"
-            }
-            SettingsRow(Icons.Rounded.Contrast, "Theme", p.theme.label) { dialog = "theme" }
-            SettingsRow(Icons.Rounded.Language, "Language", "English · other translations unavailable") {
-                dialog = "language"
-            }
-            SettingsRow(
-                Icons.Rounded.Search,
-                "Exercises",
-                "Browse the exercise library",
-                onClick = onExercises,
-            )
         }
-        SettingsSection("GYM PROFILES") {
-            SettingsRow(
-                Icons.Rounded.Warehouse,
-                "Gym Profiles",
-                "Equipment and weight selections",
-                onClick = onGyms,
-            )
+        SettingsSection("TRAINING") {
+            SettingsRow(Icons.Rounded.FitnessCenter, "Workout logging", "") { dialog = "workout" }
+            SettingsRow(Icons.Rounded.Timer, "Rest timer", "") { dialog = "rest" }
+            SettingsRow(Icons.Rounded.Warehouse, "Gym equipment", "", onClick = onGyms)
+            SettingsRow(Icons.Rounded.Search, "Exercise library", "", onClick = onExercises)
+            SettingsRow(Icons.Rounded.History, "Workout history", "", onClick = onHistory)
         }
-        SettingsSection("YOUR DATA") {
-            SettingsRow(
-                Icons.Rounded.MonitorWeight,
-                "Body Data",
-                "Weight, measurements and progress photos",
-                onClick = onBodyData,
-            )
-            SettingsRow(
-                Icons.Rounded.History,
-                "Workout History",
-                "Review your training",
-                onClick = onHistory,
-            )
+        SettingsSection("APP") {
+            SettingsRow(Icons.Rounded.Straighten, "Units", "") { dialog = "units" }
+            SettingsRow(Icons.Rounded.AddCircle, "Shortcuts", "") { dialog = "shortcuts" }
+            SettingsRow(Icons.Rounded.Contrast, "Appearance", "") { dialog = "theme" }
+        }
+        SettingsSection("DATA") {
             DataPortabilityRows(onOpen = { portabilityPage = it })
             SettingsRow(
                 Icons.Rounded.FileUpload,
@@ -215,7 +172,7 @@ fun SettingsScreen(
                 if (!backupBusy) import.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
             }
         }
-        SettingsSection("OPEN FACTOR") {
+        SettingsSection("ABOUT") {
             StorageRecoveryExportRow(vm, snackbar)
             OfflineHelpRows(onOpen = { portabilityPage = it })
             SettingsRow(Icons.Rounded.PhotoLibrary, "Exercise media credits", "") {
@@ -225,12 +182,10 @@ fun SettingsScreen(
                 dialog = "about"
             }
             SettingsRow(Icons.Rounded.Code, "Source Code", "aarsh21/open-factor") {
-                context.startActivity(
-                    android.content.Intent(
-                        android.content.Intent.ACTION_VIEW,
-                        android.net.Uri.parse("https://github.com/aarsh21/open-factor"),
-                    )
-                )
+                runCatching {
+                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
+                        android.net.Uri.parse("https://github.com/aarsh21/open-factor")))
+                }.onFailure { scope.launch { snackbar.showSnackbar("Couldn’t open the repository. Try again with a browser installed.") } }
             }
             SettingsRow(
                 Icons.Rounded.Description,
@@ -248,20 +203,10 @@ fun SettingsScreen(
         )
     }
     when (dialog) {
-        "profile" ->
-            NameDialog(
-                "Profile Name",
-                p.displayName,
-                { dialog = "" },
-                {
-                    vm.settings { p -> p.copy(displayName = it) }
-                    dialog = ""
-                },
-            )
         "theme" ->
             AlertDialog(
                 onDismissRequest = { dialog = "" },
-                title = { Text("Theme") },
+                title = { Text("Appearance") },
                 text = {
                     Column(Modifier.selectableGroup()) {
                         AppTheme.entries.forEach { theme ->
@@ -273,8 +218,6 @@ fun SettingsScreen(
                 },
                 confirmButton = { TextButton({ dialog = "" }) { Text("Done") } },
             )
-        "language" -> InfoDialog("Language",
-            "Open Factor currently provides English interface text. The source app's language picker includes Japanese, but that translation has not been recovered for this app. Device language still controls supported date formatting.") { dialog = "" }
         "rest" -> {
             var seconds by rememberSaveable { mutableStateOf(p.restSeconds.toString()) }
             var automatic by rememberSaveable { mutableStateOf(p.autoRest) }
@@ -322,7 +265,7 @@ fun SettingsScreen(
         "about" ->
             InfoDialog(
                 "Open Factor",
-                "An open source workout tracker built from the NuvioMobile fork. Your workouts and preferences are stored on this device.\n\nThis development build implements the training foundation. Source-app feature parity is still being verified.",
+                "Open Factor ${BuildConfig.VERSION_NAME}\n\nWorkouts, progress photos and preferences stay on this device. Exercise demonstrations can stream over HTTPS and use a local cache. Health Connect is optional.\n\nBuilt on NuvioMobile. Back up your data before uninstalling or clearing app storage.",
             ) {
                 dialog = ""
             }
@@ -364,17 +307,14 @@ fun WorkoutSettings(p: Preferences, vm: WorkoutViewModel, onDismiss: () -> Unit)
                 PreferenceSwitch("Rate effort after exercise", "Ask for reps left after all sets are logged", p.rateEffortAfterExercise) { checked ->
                     vm.settings { it.copy(rateEffortAfterExercise = checked) }
                 }
-                PreferenceSwitch("Exercise Auto-Next", "Move to unfinished exercises after the last set", p.exerciseAutoNext) { checked ->
+                PreferenceSwitch("Advance after exercise", "Move to unfinished exercises after the last set", p.exerciseAutoNext) { checked ->
                     vm.settings { it.copy(exerciseAutoNext = checked) }
                 }
-                PreferenceSwitch("Keep Alive", "Keep the screen on while the workout logger is visible", p.keepAlive) { checked ->
+                PreferenceSwitch("Keep screen on", "Keep the screen on while the workout logger is visible", p.keepAlive) { checked ->
                     vm.settings { it.copy(keepAlive = checked) }
                 }
-                PreferenceSwitch("Workout Timer", "Show elapsed time during workout sessions", p.showWorkoutTimer) { checked ->
+                PreferenceSwitch("Workout timer", "Show elapsed time during workout sessions", p.showWorkoutTimer) { checked ->
                     vm.settings { it.copy(showWorkoutTimer = checked) }
-                }
-                PreferenceSwitch("Bodyweight Contribution", "Display scale weight and bodyweight contribution during workout sessions", p.showBodyweightContribution) { checked ->
-                    vm.settings { it.copy(showBodyweightContribution = checked) }
                 }
             }
         },
@@ -494,10 +434,6 @@ private fun UnitsSettings(p: Preferences, vm: WorkoutViewModel, onClose: () -> U
                     PreferenceChoice("Kilometers and Meters", !p.distanceImperial) { vm.settings { it.copy(distanceImperial = false) } }
                     PreferenceChoice("Miles and Yards", p.distanceImperial) { vm.settings { it.copy(distanceImperial = true) } }
                 }
-            }
-            SettingsSection("ENERGY UNITS") {
-                Text("Energy logging is not available. No calorie estimate or energy-unit setting is applied to your workouts.",
-                    Modifier.padding(16.dp), color = OF.muted)
             }
         }
     }

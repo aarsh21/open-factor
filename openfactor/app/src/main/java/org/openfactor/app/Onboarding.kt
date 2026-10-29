@@ -34,6 +34,8 @@ data class OnboardingState(
     val preset: String = "current",
     val gymName: String = "Everything Gym",
     val gymId: String? = null,
+    val gender: ProfileGender = ProfileGender.UNSPECIFIED,
+    val profileDraft: ProfileSetupDraft? = null,
 ) {
     fun validBasics() =
         name.isNotBlank() &&
@@ -52,6 +54,8 @@ data class OnboardingState(
             .put("preset", preset)
             .put("gymName", gymName)
             .put("gymId", gymId)
+            .put("gender", gender.name)
+            .put("profileDraft", profileDraft?.json())
 
     companion object {
         // Old backups/installations are already usable; setup is available through Settings.
@@ -69,6 +73,8 @@ data class OnboardingState(
                     j.optString("preset", "current"),
                     j.optString("gymName"),
                     j.optString("gymId").takeIf { it.isNotBlank() && it != "null" },
+                    gender = ProfileGender.entries.find { it.name == j.optString("gender") } ?: ProfileGender.UNSPECIFIED,
+                    profileDraft = j.optJSONObject("profileDraft")?.let(ProfileSetupDraft::fromJson),
                 )
     }
 }

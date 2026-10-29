@@ -12,14 +12,15 @@ class ExerciseSearchIndex(exercises: List<Exercise>) {
             phrase((listOf(exercise.equipment) + exercise.equipmentOptions + exercise.muscles).joinToString(" ")),
             phrase((listOf(exercise.name, exercise.equipment) + exercise.aliases + exercise.equipmentOptions + exercise.muscles).joinToString(" ")))
     }
+    private val defaultOrder = documents.sortedWith(
+        compareByDescending<Document> { it.exercise.searchBoost }.thenBy { it.name.text }.thenBy { it.exercise.id },
+    ).map { it.exercise }
 
     fun search(query: String): List<Exercise> {
         val q = phrase(query)
         if (q.tokens.size > 12 || query.length > 160) return emptyList()
         if (q.tokens.isEmpty() && query.isNotBlank()) return emptyList()
-        if (q.tokens.isEmpty()) return documents.sortedWith(
-            compareByDescending<Document> { it.exercise.searchBoost }.thenBy { it.name.text }.thenBy { it.exercise.id },
-        ).map { it.exercise }
+        if (q.tokens.isEmpty()) return defaultOrder
         return documents.mapNotNull { doc ->
             val score = maxOf(
                 score(q, doc.name, 10_000, 8_500, 7_800, 7_000, 4_500),

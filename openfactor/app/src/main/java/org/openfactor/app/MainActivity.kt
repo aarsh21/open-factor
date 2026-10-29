@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.compose.ReportDrawnWhen
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -52,6 +53,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val vm: WorkoutViewModel = viewModel()
             val data by vm.data.collectAsState()
+            val libraryReady by vm.libraryReady.collectAsState()
+            ReportDrawnWhen { libraryReady }
             OpenFactorTheme(data.preferences.theme) {
                 val dark = isSystemInDarkTheme()
                 SideEffect {
@@ -70,6 +73,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 0) {
     val data by vm.data.collectAsState()
+    val libraryReady by vm.libraryReady.collectAsState()
+    val libraryLoad by vm.libraryLoad.collectAsState()
     var tab by rememberSaveable { mutableIntStateOf(1) }
     var route by rememberSaveable { mutableStateOf(when { data.pastWorkoutEdit != null -> "history-edit"; data.active != null -> "session"; else -> "" }) }
     var detailId by rememberSaveable { mutableStateOf("") }
@@ -85,6 +90,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     var configureShortcuts by rememberSaveable { mutableStateOf(false) }
     var workoutSettings by rememberSaveable { mutableStateOf(false) }
     var healthConnect by rememberSaveable { mutableStateOf(false) }
+    var autoConnectHealth by rememberSaveable { mutableStateOf(false) }
     var gymsReturn by rememberSaveable { mutableStateOf("") }
     var bodyDataTab by rememberSaveable { mutableIntStateOf(0) }
     var bodyChartMetric by rememberSaveable { mutableStateOf("weight") }
@@ -92,7 +98,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     var bodyEntryReturn by rememberSaveable { mutableStateOf("body-data") }
     val contentRoute =
         if (route == "measurement-entry" || route == "photo-entry") bodyEntryReturn else route
-    val exercises = remember(vm, data.customExercises) { vm.exercises(data) }
+    val exercises = remember(vm, data.customExercises, libraryReady) { vm.exercises(data) }
     val snackbar = remember { SnackbarHostState() }
     val routeState = rememberSaveableStateHolder()
     val context = LocalContext.current
@@ -181,8 +187,9 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         }
     }
     if (healthConnect) HealthConnectPanel(
-        data, vm::importHealthConnectWeights, onClose = { healthConnect = false },
+        data, vm::importHealthConnectWeights, onClose = { healthConnect = false; autoConnectHealth = false },
         onSync = vm::importHealthConnectSync,
+        autoConnectOnOpen = autoConnectHealth,
     )
     if (quickWeight) QuickWeightSheet(
         data.preferences.pounds,
@@ -190,7 +197,24 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         onSave = { vm.saveScaleWeight(it); quickWeight = false },
     )
     if (!data.onboarding.completed && !data.onboarding.deferred) {
-        QuickStartScreen(data, vm) { tab = 1 }
+        QuickStartScreen(data, vm, onConnect = { autoConnectHealth = true; healthConnect = true }) { tab = 1 }
+        return
+    }
+    if (!libraryReady) {
+        Surface(Modifier.fillMaxSize(), color = OF.background) {
+            Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
+                verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Open Factor", style = MaterialTheme.typography.headlineMedium)
+                Spacer(Modifier.height(24.dp))
+                val failure = libraryLoad as? ExerciseLibraryLoad.Failed
+                if (failure == null) CircularProgressIndicator()
+                else {
+                    Text(failure.message)
+                    Spacer(Modifier.height(16.dp))
+                    PrimaryAction("Try again", vm::retryLibrary)
+                }
+            }
+        }
         return
     }
     var scrollEnergy by remember { mutableFloatStateOf(0f) }
@@ -259,6 +283,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                     .background(OF.background)
             ) {
                 when (contentRoute) {
+                    "profile" -> ProfileEditor(data, vm) { route = "" }
                     "body-data" -> {
                         BodyDataScreen(
                             data, bodyDataTab, { bodyDataTab = it }, { route = "" },
@@ -590,6 +615,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                     data.preferences,
                                     vm,
                                     snackbar,
+                                    onProfile = { route = "profile" },
                                     onExercises = { tab = 2 },
                                     onHistory = { route = "history" },
                                     onBodyData = { route = "body-data" },
@@ -598,7 +624,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                         route = "gyms"
                                     },
                                     integrationSettings = {
-                                        HealthConnectSettingsRow { healthConnect = true }
+                                        if (healthConnectAvailability(context) != HealthConnectAvailability.UNAVAILABLE)
+                                            HealthConnectSettingsRow { autoConnectHealth = false; healthConnect = true }
                                     },
                                 )
                         }

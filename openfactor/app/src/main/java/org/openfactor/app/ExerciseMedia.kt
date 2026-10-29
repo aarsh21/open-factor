@@ -13,6 +13,7 @@ import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -46,21 +47,27 @@ import java.util.Locale
 
 private data class CameraVideo(val camera: Int, val location: ExerciseVideoLocation)
 
-/** One player loops the ordered camera playlist. A guide still never downloads before Play. */
+/** One muted player autoplays the visible guide and loops its ordered camera playlist. */
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
-fun ExerciseMedia(e: Exercise, viewportHeight: Dp = Dp.Infinity) {
+fun ExerciseMedia(e: Exercise, viewportHeight: Dp = Dp.Infinity, active: Boolean = true) {
     var selected by rememberSaveable(e.id) { mutableIntStateOf(0) }
-    var requested by remember(e.id) { mutableStateOf(false) }
-    var playing by remember(e.id) { mutableStateOf(false) }
+    var playback by rememberSaveable(e.id, stateSaver = listSaver<ExercisePlaybackState, Boolean>(
+        save = { listOf(it.requested, it.pausedByUser, it.failed) },
+        restore = { ExercisePlaybackState(requested = it[0], pausedByUser = it[1], failed = it[2]) },
+    )) { mutableStateOf(ExercisePlaybackState()) }
+    val requested = playback.shouldLoad
+    val playing = playback.shouldPlay
     var speed by rememberSaveable(e.id) { mutableFloatStateOf(1f) }
     var retry by remember(e.id) { mutableIntStateOf(0) }
     var position by rememberSaveable(e.id) { mutableLongStateOf(0L) }
-    var playbackError by remember(e.id) { mutableStateOf<String?>(null) }
+    var playbackError by rememberSaveable(e.id) { mutableStateOf<String?>(null) }
     var player by remember(e.id) { mutableStateOf<ExoPlayer?>(null) }
     var buffering by remember(e.id) { mutableStateOf(false) }
+    var actuallyPlaying by remember(e.id) { mutableStateOf(false) }
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val latestActive by rememberUpdatedState(active)
     val latestPlaying by rememberUpdatedState(playing)
     val latestSpeed by rememberUpdatedState(speed)
     val cameras = maxOf(e.frames.size, e.clips.size, if (e.video != null) 1 else 0)
@@ -79,21 +86,41 @@ fun ExerciseMedia(e: Exercise, viewportHeight: Dp = Dp.Infinity) {
     val videos = cameraVideos.orEmpty()
     val hasVideo = videos.any { it.camera == selected }
     LaunchedEffect(e.id, cameras) { if (selected >= cameras && cameras > 0) selected = 0 }
+    fun stopPlayback() {
+        player?.let { engine ->
+            position = engine.currentPosition.coerceAtLeast(0)
+            engine.pause()
+            engine.stop()
+            engine.release()
+            player = null
+            // A paused recomposer might never observe the intermediate unloaded state. A fresh
+            // generation prevents a released engine from being reused on the next foreground.
+            retry++
+        }
+        actuallyPlaying = false
+        buffering = false
+        playback = playback.background()
+    }
     DisposableEffect(lifecycle, e.id) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE) {
-                player?.let { position = it.currentPosition.coerceAtLeast(0); it.pause() }
-                playing = false
-            }
-            if (event == Lifecycle.Event.ON_STOP) {
-                player?.let { position = it.currentPosition.coerceAtLeast(0); it.stop() }
-                requested = false
+            if (event == Lifecycle.Event.ON_RESUME && latestActive) playback = playback.foreground()
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                // Stop loading immediately, even when the recomposer is already being paused.
+                stopPlayback()
             }
         }
         lifecycle.addObserver(observer)
+        if (active && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) playback = playback.foreground()
         onDispose { lifecycle.removeObserver(observer) }
     }
-    LaunchedEffect(player, playing, speed) { player?.let { it.setPlaybackSpeed(speed); it.playWhenReady = playing } }
+    LaunchedEffect(active) {
+        if (active && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) playback = playback.foreground()
+        else stopPlayback()
+    }
+    LaunchedEffect(player, playing, speed) { player?.let {
+        it.setPlaybackSpeed(speed)
+        it.playWhenReady = playing && active && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+    } }
     if (cameras == 0) {
         EmptyContent(Icons.Rounded.FitnessCenter, "${e.equipment} exercise", "No demonstration is available for this exercise.")
         return
@@ -101,13 +128,21 @@ fun ExerciseMedia(e: Exercise, viewportHeight: Dp = Dp.Infinity) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         playbackError?.let { error -> Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(error, Modifier.weight(1f), color = OF.muted)
-            TextButton({ playbackError = null; retry++; requested = true; playing = true }) { Text("Retry") }
+            TextButton({ playbackError = null; retry++; playback = playback.play() }) { Text("Retry") }
         } }
         BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             val original = e.frames.firstOrNull()?.startsWith("reference/") == true
             val ratio = if (original) 9f / 16f else 1f
             val height = maxWidth / ratio
-            Box(Modifier.fillMaxWidth().height(height).clipToBounds(), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().height(height).clipToBounds().semantics {
+                stateDescription = when {
+                    playbackError != null -> "Video unavailable"
+                    actuallyPlaying -> "Playing exercise video"
+                    buffering -> "Loading exercise video"
+                    playback.pausedByUser -> "Exercise video paused"
+                    else -> "Exercise video preview"
+                }
+            }, contentAlignment = Alignment.Center) {
                 AsyncImage(
                     e.frames.getOrNull(selected)?.let { "file:///android_asset/$it" }, e.name,
                     Modifier.fillMaxSize(), contentScale = ContentScale.Fit,
@@ -127,14 +162,21 @@ fun ExerciseMedia(e: Exercise, viewportHeight: Dp = Dp.Infinity) {
                         }
                         DisposableEffect(engine) {
                             val listener = object : Player.Listener {
-                                override fun onPlaybackStateChanged(state: Int) { buffering = state == Player.STATE_BUFFERING }
+                                override fun onPlaybackStateChanged(state: Int) {
+                                    buffering = state == Player.STATE_BUFFERING && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+                                }
+                                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                                    actuallyPlaying = isPlaying && latestActive && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+                                }
                                 override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
                                     item?.mediaId?.toIntOrNull()?.let { selected = it; position = 0 }
                                 }
                                 override fun onPlayerError(error: PlaybackException) {
+                                    if (!latestActive || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) || player !== engine) return
                                     position = engine.currentPosition.coerceAtLeast(0)
-                                    playing = false
+                                    playback = playback.fail()
                                     buffering = false
+                                    actuallyPlaying = false
                                     playbackError = exerciseVideoErrorMessage(error.errorCodeName)
                                 }
                             }
@@ -147,13 +189,19 @@ fun ExerciseMedia(e: Exercise, viewportHeight: Dp = Dp.Infinity) {
                                 MediaItem.Builder().setMediaId(camera.camera.toString()).setUri(camera.location.uri)
                                     .setCustomCacheKey(camera.location.cacheKey).build()
                             }, videos.indexOfFirst { it.camera == selected }.coerceAtLeast(0), position)
-                            engine.playWhenReady = latestPlaying
-                            engine.prepare()
+                            if (latestActive && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                                engine.playWhenReady = latestPlaying
+                                engine.prepare()
+                            } else playback = playback.background()
                             onDispose {
-                                position = engine.currentPosition.coerceAtLeast(0)
-                                engine.removeListener(listener)
-                                engine.release()
-                                if (player === engine) player = null
+                                if (player === engine) {
+                                    position = engine.currentPosition.coerceAtLeast(0)
+                                    engine.removeListener(listener)
+                                    engine.release()
+                                    player = null
+                                    actuallyPlaying = false
+                                    buffering = false
+                                }
                             }
                         }
                         AndroidView(
@@ -176,7 +224,7 @@ fun ExerciseMedia(e: Exercise, viewportHeight: Dp = Dp.Infinity) {
                     }
                     if (factory == null || buffering) CircularProgressIndicator(Modifier.size(44.dp).semantics { contentDescription = "Loading exercise video" })
                 } else if (hasVideo && playbackError == null) {
-                    FilledIconButton({ requested = true; playing = true }, Modifier.size(64.dp)) {
+                    FilledIconButton({ playback = playback.play() }, Modifier.size(64.dp)) {
                         Icon(Icons.Rounded.PlayArrow, "Play exercise video", Modifier.size(32.dp))
                     }
                 }
@@ -202,14 +250,14 @@ fun ExerciseMedia(e: Exercise, viewportHeight: Dp = Dp.Infinity) {
                                 ) { Text(label, style = MaterialTheme.typography.labelLarge) }
                             }
                             IconButton({
-                                if (!requested) { requested = true; playing = true } else playing = !playing
+                                playback = if (playing) playback.pause() else playback.play()
                             }, modifier = Modifier.weight(1f).height(48.dp).semantics {
                                 if (!requested) contentDescription = "Start playback"
                             }, enabled = playbackError == null) {
                                 Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                                     if (playing) "Pause exercise video" else if (requested) "Play exercise video" else null)
                             }
-                            IconButton({ position = 0; player?.seekTo(0); requested = true; playing = true },
+                            IconButton({ position = 0; player?.seekTo(0); playback = playback.play() },
                                 modifier = Modifier.weight(1f).height(48.dp), enabled = requested && playbackError == null) {
                                 Icon(Icons.Rounded.Replay, "Replay exercise video")
                             }
@@ -231,7 +279,8 @@ fun ExerciseMedia(e: Exercise, viewportHeight: Dp = Dp.Infinity) {
                                     if (selected != camera) {
                                         selected = camera; position = 0; playbackError = null
                                         val index = videos.indexOfFirst { it.camera == camera }
-                                        if (index >= 0) player?.seekTo(index, 0) else requested = false
+                                        playback = playback.selectCamera(index >= 0)
+                                        if (index >= 0) player?.seekTo(index, 0)
                                     }
                                 }).semantics {
                                     contentDescription = (if (e.frames.firstOrNull()?.startsWith("previews/") == true) "Preview " else "Camera view ") + (camera + 1)

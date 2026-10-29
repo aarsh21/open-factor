@@ -56,9 +56,9 @@ internal fun DashboardTiles(
                         selected.forEach { key ->
                             val dates =
                                 if (key == "weighIn") data.scaleWeights.map { it.date }.filter { !it.isAfter(today) }.toSet()
-                                else metrics.history.map { it.localDate() }.toSet()
+                                else data.history.filter { it.localDate() <= today && it.completedSets() > 0 }.map { it.localDate() }.toSet()
                             val monday =
-                                LocalDate.now()
+                                today
                                     .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
                             Column(
                                 Modifier.fillMaxWidth()
@@ -74,7 +74,10 @@ internal fun DashboardTiles(
                                         style = MaterialTheme.typography.titleMedium,
                                     )
                                     Text(
-                                        "${(0..6).count { monday.plusDays(it.toLong()) in dates }} ${if ((0..6).count { monday.plusDays(it.toLong()) in dates } == 1) "day" else "days"} this week",
+                                        if (key == "workouts" && data.preferences.weeklyWorkoutGoal != null) {
+                                            val count = data.history.distinctBy { it.id }.count { it.localDate() in monday..today && it.completedSets() > 0 }
+                                            "$count of ${data.preferences.weeklyWorkoutGoal} workouts"
+                                        } else "${(0..6).count { monday.plusDays(it.toLong()) in dates }} ${if ((0..6).count { monday.plusDays(it.toLong()) in dates } == 1) "day" else "days"} this week",
                                         color = OF.muted,
                                     )
                                 }

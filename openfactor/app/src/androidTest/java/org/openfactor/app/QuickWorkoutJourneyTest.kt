@@ -19,7 +19,7 @@ class QuickWorkoutJourneyTest {
 
     private fun awaitText(text: String) {
         compose.waitUntil(15_000) {
-            compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+            runCatching { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }.getOrDefault(false)
         }
     }
 
@@ -42,8 +42,13 @@ class QuickWorkoutJourneyTest {
             }
             store.save(AppData())
             activity = ActivityScenario.launch(MainActivity::class.java)
-            awaitText("Start training")
-            compose.onNodeWithText("Kilograms").performClick()
+            awaitText("Make it yours")
+            compose.onNodeWithContentDescription("Profile name").performTextInput("Synthetic Athlete")
+            compose.onNodeWithText("Continue").performClick()
+            awaitText("Your starting point")
+            compose.onNodeWithText("Kilograms").performScrollTo().performClick()
+            compose.onNodeWithText("Continue").performClick()
+            awaitText("Ready, set, log.")
             compose.onNodeWithText("Start training").performClick()
             awaitText("Start workout")
             assertTrue(store.load().onboarding.completed)

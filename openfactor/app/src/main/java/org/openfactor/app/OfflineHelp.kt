@@ -24,9 +24,9 @@ private val helpArticles = linkedMapOf(
     "Export only the data you need" to
         "Open Settings → Data Export. Quick Export includes muscle-group set records, your active program and completed workout history. Granular Export lets you select categories first, then a time frame. Choose Export to open Android's Save dialog. Cancel or Back creates no export in the app.\n\nDate boundaries are inclusive in the device time zone. Last 7 Days means today and the previous six dates. This Month ends today. Last Month includes the whole previous month. All Time includes all saved dates, including future-dated records. Libraries and settings are current snapshots. Photos and drafts are excluded. Hidden measurements still export. These files are for analysis, not Restore Backup.",
     "Hide a metric without losing it" to
-        "Open Settings → Data Visibility → Body Metrics Visibility. Turn off an unused measurement or photo position. Visibility changes the Dashboard and new-entry editors, not history, charts, exports or original photo files. Editing an existing record preserves hidden values. Turn the field on again to use it in new entries.\n\nScale Weight and Visual Body Fat are default fields and cannot be hidden. Period tracking and ratio views are not implemented in this build.",
+        "Open Settings → Data Visibility. Turn off an unused measurement or photo position. Visibility changes the Dashboard and new-entry editors, not history, charts, exports or original photo files. Editing an existing record preserves hidden values. Turn the field on again to use it in new entries.\n\nScale weight and visual body fat remain available by default.",
     "Read body charts" to
-        "Open Body Data, then Body Charts. Choose a metric and a calendar range. Tap a saved entry or a dot to inspect its exact date and value. Each reading remains separate, including readings on the same date. Blank fields are omitted, not plotted as zero. A recorded 0% body-fat value is retained.\n\nThese charts show raw local records. They do not calculate the source app's Weight Trend smoothing or body-fat estimates. Use the help icon on Body Charts at any time. Settings → Tutorials → Reset Tutorials makes the chart introduction appear on the next chart visit.",
+        "Open Body Data, then Body Charts. Choose a metric and a calendar range. Tap a saved entry or a dot to inspect its exact date and value. Each reading remains separate, including readings on the same date. Blank fields are omitted, not plotted as zero. A recorded 0% body-fat value is retained.\n\nCharts keep the original readings. Weight trend adds a trailing seven-day mean of available readings; missing dates are not zero-filled. Body-fat values are recorded, never estimated here. Use the help icon on Body Charts at any time. Settings → Tutorials → Reset Tutorials makes the chart introduction appear on the next chart visit.",
     "Log a workout offline" to
         "Start an empty workout or start a saved routine from Workouts. Add exercises, enter the actual values for each set and mark completed sets. Target values are separate from performed values. You can pause a session and continue later. Finish the workout to add it to history.\n\nProgress photos imported through Android's picker are copied into private app storage. The app keeps the original bytes; it does not upload them. Reference exercise media is separate from your private photos.",
     "Troubleshoot files and missing data" to
@@ -41,7 +41,6 @@ internal fun OfflineHelpScreen() {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp).padding(bottom = 112.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Offline help for this build. No account, connection or paid support service is required.", color = OF.muted)
         OutlinedTextField(query, { query = it }, label = { Text("Search help") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         val matches = helpArticles.filter { (title, body) -> title.contains(query.trim(), true) || body.contains(query.trim(), true) }
         if (matches.isEmpty()) Text("No matching articles. Try backup, photos, export, visibility or charts.")
@@ -76,7 +75,7 @@ internal fun TutorialsScreen(p: Preferences, vm: WorkoutViewModel, snackbar: Sna
         OutlinedButton({ reading = !reading }, Modifier.fillMaxWidth()) { Text(if (reading) "Close Introduction" else "Read Body Charts Introduction") }
         if (reading) Text(helpArticles.getValue("Read body charts"))
         Button({ reset = true }, Modifier.fillMaxWidth()) { Text("Reset Tutorials") }
-        Text("Reset changes only tutorial dismissal. It does not reset workouts, onboarding, preferences, visibility or body records. This local introduction explains raw charts, not the source app's Weight Trend algorithm.", color = OF.muted)
+        Text("Reset changes only tutorial dismissal. It does not reset workouts, onboarding, preferences, visibility or body records. This introduction explains reading and inspecting your saved body data.", color = OF.muted)
     }
     if (reset) ConfirmDialog(
         "Reset Tutorials?", "The body-chart introduction will appear on your next chart visit. Your saved data and other preferences will not change.",

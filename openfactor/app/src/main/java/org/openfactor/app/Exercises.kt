@@ -85,7 +85,7 @@ fun ExerciseLibrary(
     val muscleGroups = remember(exercises) {
         listOf("All muscles") + exercises.flatMap { it.muscles }.distinct().sorted()
     }
-    val searchIndex = remember(exercises) { ExerciseSearchIndex(exercises) }
+    val searchIndex = remember(exercises) { ExerciseSearchIndexes.forExercises(exercises) }
     val filtered =
         remember(
             exercises,
@@ -417,6 +417,10 @@ fun ExerciseDetail(
     onOpenWorkout: ((String) -> Unit)? = null,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    val detailListState = rememberLazyListState()
+    val mediaVisible by remember {
+        derivedStateOf { detailListState.layoutInfo.visibleItemsInfo.any { it.index == 0 } }
+    }
     var collapsedSections by rememberSaveable(e.id) { mutableStateOf(emptyList<Int>()) }
     val history = remember(data.history, e.id) {
         data.history.filter { w -> w.exercises.any { entry ->
@@ -459,11 +463,12 @@ fun ExerciseDetail(
             val mediaViewportHeight = maxHeight
             LazyColumn(
                 Modifier.fillMaxSize(),
+                state = detailListState,
                 contentPadding = if (tab == 0) PaddingValues(bottom = 18.dp) else PaddingValues(18.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 if (tab == 0) {
-                    item { ExerciseMedia(e, mediaViewportHeight) }
+                    item { ExerciseMedia(e, mediaViewportHeight, active = mediaVisible) }
                     if (instructions.isNotBlank())
                         markdownItems(instructions).forEachIndexed { index, (heading, text) ->
                             item {
@@ -490,7 +495,7 @@ fun ExerciseDetail(
                             }
                         }
                 } else if (tab == 1) {
-                    item { ExerciseAnatomy(e) }
+                    item { ExerciseAnatomy(e, if (data.onboarding.gender == ProfileGender.WOMAN) "female" else "male") }
                     if (e.properties.isNotEmpty())
                         item {
                             SectionTitle("Properties")
@@ -599,7 +604,7 @@ fun RoutineBuilder(
     var searching by remember { mutableStateOf(false) }
     var editNameRequest by remember { mutableIntStateOf(0) }
     val nameFocus = remember { FocusRequester() }
-    val searchIndex = remember(exercises) { ExerciseSearchIndex(exercises) }
+    val searchIndex = remember(exercises) { ExerciseSearchIndexes.forExercises(exercises) }
     val matches = remember(searchIndex, query) { searchIndex.search(query).filterNot { it.archived } }
     val listState = rememberLazyListState()
     LaunchedEffect(query) { listState.scrollToItem(0) }
