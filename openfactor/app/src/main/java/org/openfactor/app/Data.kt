@@ -358,6 +358,11 @@ object DataCodec {
     internal fun decodeHistory(text: String): List<Workout> = JSONArray(text).objects().map { it.workout() }
 
     fun encode(d: AppData, pretty: Boolean = true): String =
+        document(d).let { if (pretty) it.toString(2) else it.toString() }
+
+    internal fun workoutDocument(workout: Workout): JSONObject = workout.json()
+
+    internal fun document(d: AppData): JSONObject =
         JSONObject()
             .put("schemaVersion", 1)
             .put("activeProgramId", d.activeProgramId)
@@ -422,7 +427,6 @@ object DataCodec {
                     .put("rateEffortAfterExercise", d.preferences.rateEffortAfterExercise)
                     .put("weeklyWorkoutGoal", d.preferences.weeklyWorkoutGoal),
             )
-            .let { if (pretty) it.toString(2) else it.toString() }
 
     private fun JSONArray.objects() = (0 until length()).map { getJSONObject(it) }
 
@@ -485,8 +489,9 @@ object DataCodec {
             optString("gymId").takeIf { it.isNotBlank() && it != "null" },
         )
 
-    fun decode(text: String, historyOverride: List<Workout>? = null): AppData {
-        val j = JSONObject(text)
+    fun decode(text: String, historyOverride: List<Workout>? = null): AppData = decode(JSONObject(text), historyOverride)
+
+    internal fun decode(j: JSONObject, historyOverride: List<Workout>? = null): AppData {
         require(j.optInt("schemaVersion") == 1) { "Unsupported backup version" }
         require(!j.has("storageHistory") || historyOverride != null) { "Internal storage snapshot is not a restore backup" }
         val p = j.optJSONObject("preferences") ?: JSONObject()
