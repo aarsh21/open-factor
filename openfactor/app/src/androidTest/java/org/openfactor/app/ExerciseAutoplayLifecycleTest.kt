@@ -59,18 +59,9 @@ class ExerciseAutoplayLifecycleTest {
     }
 
     @Test fun visibleGuideAutoplaysRealFramesLoopsAnglesAndHonorsPauseAcrossBackground() {
-        try {
-            exercisePlaybackJourney()
-        } catch (failure: Throwable) {
-            android.util.Log.e("ComposeTestAutoplay", "Original test failure before activity teardown", failure)
-            throw failure
-        }
-    }
-
-    private fun exercisePlaybackJourney() {
         // Keep the shared image loader tied to the production application, not this test's asset wrapper.
         SingletonImageLoader.get(instrumentation.targetContext)
-        val context = TestVideoContext(instrumentation.targetContext, instrumentation.context.assets)
+        val context = TestVideoContext(instrumentation.targetContext, playbackAssets())
         val id = "00000000000000000000000000000001"
         val exercise = Exercise(id, "Synthetic playback fixture", "Other", "Other",
             frames = List(3) { "reference/previews/synthetic.svg" },
@@ -117,7 +108,20 @@ class ExerciseAutoplayLifecycleTest {
         compose.waitUntil(3_000) { currentFrame() == null }
     }
 
-    /** Assets come from the test APK, while cache/files and Coil's factory remain the real app's. */
+    /** Keep native view resources (including Media3 fonts on API 26) alongside test clips. */
+    private fun playbackAssets(): AssetManager {
+        val assets = AssetManager::class.java.getDeclaredConstructor().newInstance()
+        val addAssetPath = AssetManager::class.java.getMethod("addAssetPath", String::class.java)
+        listOf(instrumentation.targetContext, instrumentation.context).forEach { context ->
+            val app = context.applicationInfo
+            (listOf(app.sourceDir) + app.splitSourceDirs.orEmpty()).forEach { path ->
+                check(addAssetPath.invoke(assets, path) as Int != 0) { "Cannot load APK assets: $path" }
+            }
+        }
+        return assets
+    }
+
+    /** APK assets are combined, while cache/files and Coil's factory remain the real app's. */
     private class TestVideoContext(base: Context, private val videoAssets: AssetManager) :
         ContextWrapper(base), SingletonImageLoader.Factory {
         override fun getAssets(): AssetManager = videoAssets
