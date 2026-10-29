@@ -29,6 +29,7 @@ import kotlinx.coroutines.withContext
 internal fun DataPortabilityRows(onOpen: (String) -> Unit) {
     SettingsRow(Icons.Rounded.IosShare, "Data Export", "Quick or granular category and time selection") { onOpen("export") }
     SettingsRow(Icons.Rounded.TableChart, "Import spreadsheet", "Preview workout targets before appending new programs") { onOpen("spreadsheet") }
+    SettingsRow(Icons.Rounded.History, "Import Fitbod CSV", "Preview completed strength sets before appending history") { onOpen("fitbod") }
     SettingsRow(Icons.Rounded.Visibility, "Data Visibility", "Hide editor fields without deleting history") { onOpen("visibility") }
 }
 
@@ -51,6 +52,7 @@ internal fun PortabilityScreen(
         PageHeading(when {
             route == "export" -> "Data Export"
             route == "spreadsheet" -> "Import spreadsheet"
+            route == "fitbod" -> "Import Fitbod CSV"
             route == "visibility" -> "Metric visibility"
             route == "tutorials" -> "Tutorials"
             else -> "Help & support"
@@ -58,6 +60,7 @@ internal fun PortabilityScreen(
         when (route) {
             "export" -> ScopedExportScreen(vm, snackbar)
             "spreadsheet" -> SpreadsheetImportScreen(vm, snackbar)
+            "fitbod" -> FitbodImportScreen(vm, snackbar)
             "visibility" -> VisibilityScreen(p, vm)
             "tutorials" -> TutorialsScreen(p, vm, snackbar)
             else -> OfflineHelpScreen()

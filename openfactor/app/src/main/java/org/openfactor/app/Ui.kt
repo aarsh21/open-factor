@@ -391,29 +391,32 @@ fun EmptyContent(
     }
 }
 
+/** Compact previews fill their rounded frame; full demonstration media keeps its natural aspect. */
 @Composable
 fun ExerciseImage(
     exercise: Exercise,
     modifier: Modifier = Modifier,
     frame: Int = 0,
-    contentScale: androidx.compose.ui.layout.ContentScale = androidx.compose.ui.layout.ContentScale.Fit,
+    contentScale: androidx.compose.ui.layout.ContentScale = androidx.compose.ui.layout.ContentScale.Crop,
 ) {
+    val path = exercise.frames.getOrNull(frame.coerceIn(0, exercise.frames.lastIndex.coerceAtLeast(0)))
+    var failed by remember(path) { mutableStateOf(false) }
     Box(
         modifier.clip(RoundedCornerShape(8.dp)).background(
-            if (exercise.frames.firstOrNull()?.startsWith("previews/") == true) Color.White else OF.elevated
+            if (path?.startsWith("previews/") == true && !failed) Color.White else OF.elevated
         ),
         contentAlignment = Alignment.Center,
     ) {
-        if (exercise.frames.isNotEmpty())
-            AsyncImage(
-                model =
-                    "file:///android_asset/" +
-                        exercise.frames[frame.coerceIn(0, exercise.frames.lastIndex)],
-                contentDescription = exercise.name,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = contentScale,
-            )
-        else Icon(Icons.Rounded.FitnessCenter, null, Modifier.size(28.dp), tint = OF.muted)
+        if (path != null) AsyncImage(
+            model = "file:///android_asset/$path",
+            contentDescription = exercise.name,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = contentScale,
+            onSuccess = { failed = false },
+            onError = { failed = true },
+        )
+        if (path == null || failed)
+            Icon(Icons.Rounded.FitnessCenter, "Exercise image unavailable", Modifier.size(28.dp), tint = OF.muted)
     }
 }
 
