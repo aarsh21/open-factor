@@ -1,6 +1,10 @@
 # Performance and synthetic training data
 
-## Changes in this working tree
+## 0.7.0 release hardening
+
+The focused working-tree checks below were not the full CI matrix. The later full source CI exposed a large-backup OOM at a 192 MiB heap and a compact-screen import-entry failure. Release hardening streams workout JSON during export, decodes already-parsed backup metadata directly, and reserves the larger keyboard/navigation obstruction rather than both. The entry test verifies its real tap clears navigation, and a 320×560dp/1.4×-type layout test checks both actions and final-target scrolling. These fixes retain the dataset and safety assertions rather than enlarging the heap or skipping the checks. Final artifact and verification scope are recorded in [0.7.0 release notes](releases/v0.7.0.md).
+
+## Changes in the initial working-tree pass
 
 - Dashboard customization caches decoded draft state, option labels and metadata. Body-metric choices no longer construct chart series or traverse saved readings. Exercise search runs on a background dispatcher and reuses the library search index.
 - Customization uses compact section cards, one Edit action per section, checkbox selection, and contextual reorder/remove menus instead of two arrow controls beside every row. Save applies the draft; Back discards it; the draft survives recreation.

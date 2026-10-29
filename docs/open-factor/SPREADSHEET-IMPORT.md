@@ -101,4 +101,6 @@ The supplied workbook was inspected with isolated Python stdlib ZIP/XML reads (n
 
 No copyrighted workbook bytes or extracted source text were added to Git. During final lead integration, the real Android document picker on API 26 selected the supplied workbook, the preview showed three programs / 15 days, and Cancel returned without confirming an append. The actual catalog produced 44 distinct source names, with 33 requiring explicit choices; a full real-catalog Outlift append and correctness of all chosen movement variants are **not** claimed. The footer was corrected to clear both floating navigation and system bars, catalog lookups were memoized, and native `SpreadsheetImportJourneyTest` coverage passed for footer clearance, Back safety and platform XML parsing. See [the final working-tree verification record](PERFORMANCE.md).
 
-TalkBack, interrupted provider reads, persistence fault injection, full actual-catalog matching and physical-device performance remain unverified. No release artifact was published.
+Subsequent [0.7.0 release verification](releases/v0.7.0.md) also exercises a reviewed synthetic native append in the optimized signed APK: exact catalog matching, explicit set count, weekly targets, inactive program persistence and unchanged non-program data. That small happy path does not establish correct selection of every supplied Outlift variant.
+
+TalkBack, interrupted provider reads, persistence fault injection, full actual-catalog matching and physical-device performance remain unverified.

@@ -1,7 +1,18 @@
 package org.openfactor.app
 
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.ByteArrayOutputStream
@@ -24,10 +35,18 @@ class SpreadsheetImportJourneyTest {
             activity = ActivityScenario.launch(MainActivity::class.java)
             compose.waitUntil(15_000) { compose.onAllNodesWithText("Start workout").fetchSemanticsNodes().isNotEmpty() }
             compose.onAllNodesWithText("Settings").onLast().performClick()
-            compose.onNodeWithText("Import spreadsheet").performScrollTo().performClick()
-            val button = compose.onNodeWithText("Choose .xlsx document").assertIsDisplayed().getUnclippedBoundsInRoot()
+            // Scroll farther than the target: merely exposing it at the viewport bottom can
+            // leave its tap under the floating navigation or the API 26 system navigation bar.
+            compose.onNodeWithText("Restore Backup").performScrollTo()
+            val entry = compose.onNodeWithText("Import spreadsheet").assertIsDisplayed().getUnclippedBoundsInRoot()
             val navigation = compose.onNodeWithContentDescription("Quick actions").getUnclippedBoundsInRoot()
-            assertTrue("Document action must be above floating navigation", button.bottom <= navigation.top)
+            assertTrue("Import entry must be above floating navigation before tapping", entry.bottom <= navigation.top)
+            compose.onNodeWithText("Import spreadsheet").performClick()
+            compose.onNodeWithContentDescription("Back").assertIsDisplayed()
+            val button = compose.onNodeWithText("Choose .xlsx document").assertExists().assertIsDisplayed()
+                .assertIsEnabled().getUnclippedBoundsInRoot()
+            val importNavigation = compose.onNodeWithContentDescription("Quick actions").getUnclippedBoundsInRoot()
+            assertTrue("Document action must be above floating navigation", button.bottom <= importNavigation.top)
             compose.onNodeWithContentDescription("Back").performClick()
             val after = store.load()
             assertTrue(after.history.isEmpty())
@@ -65,5 +84,59 @@ class SpreadsheetImportJourneyTest {
         assertEquals(9, imported.programs.single().days.single().exercises.single().cycles.single().sets.first().repsMin)
         assertEquals(3, imported.programs.single().days.single().exercises.single().cycles.single().sets.size)
         assertTrue(preview.warnings.any { "Stored formula REPS" in it })
+    }
+}
+
+class SpreadsheetImportLayoutTest {
+    @get:Rule val compose = createComposeRule()
+
+    @Test fun narrowLargeTypePreviewKeepsBothActionsAndTargetsAboveKeyboardOrNavigation() {
+        var keyboard by mutableStateOf(false)
+        var appended = 0
+        var cancelled = 0
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.4f)) {
+                OpenFactorTheme {
+                    Column(Modifier.requiredSize(320.dp, 560.dp).testTag("import-viewport")) {
+                        PageHeading("Import spreadsheet", {})
+                        SpreadsheetImportLayout(
+                            navigationBars = WindowInsets(bottom = 48.dp),
+                            ime = WindowInsets(bottom = if (keyboard) 240.dp else 0.dp),
+                            content = {
+                                items(20) { week -> Text("Week ${week + 1}: 8–10 reps · RIR 2") }
+                            },
+                            actions = {
+                                Button({ appended++ }, Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                                    Text("Append 3 new programs")
+                                }
+                                OutlinedButton({ cancelled++ }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                                    Text("Cancel import")
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        val viewport = compose.onNodeWithTag("import-viewport").getUnclippedBoundsInRoot()
+        fun assertReachable(bottomInset: Int) {
+            val append = compose.onNodeWithText("Append 3 new programs").assertIsDisplayed().getUnclippedBoundsInRoot()
+            val cancel = compose.onNodeWithText("Cancel import").assertIsDisplayed().getUnclippedBoundsInRoot()
+            assertTrue("Append and cancel must not overlap", append.bottom <= cancel.top)
+            assertEquals("Actions must reserve only the larger bottom obstruction",
+                (viewport.bottom - bottomInset.dp).value, cancel.bottom.value, 0.5f)
+            val list = compose.onNode(hasScrollToIndexAction()).performScrollToIndex(19).getUnclippedBoundsInRoot()
+            val lastTarget = compose.onNodeWithText("Week 20: 8–10 reps · RIR 2").performScrollTo()
+                .assertIsDisplayed().getUnclippedBoundsInRoot()
+            assertTrue("Source targets must remain fully scrollable above the actions",
+                lastTarget.top >= list.top && lastTarget.bottom <= list.bottom && list.bottom <= append.top)
+        }
+        assertReachable(48 + 108)
+        compose.runOnIdle { keyboard = true }
+        assertReachable(240)
+        compose.onNodeWithText("Append 3 new programs").performClick()
+        compose.onNodeWithText("Cancel import").performClick()
+        compose.runOnIdle { assertEquals(1, appended); assertEquals(1, cancelled) }
     }
 }

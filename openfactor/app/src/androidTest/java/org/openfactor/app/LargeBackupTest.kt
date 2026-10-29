@@ -1,6 +1,7 @@
 package org.openfactor.app
 
 import android.util.JsonReader
+import android.util.JsonWriter
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -27,6 +28,22 @@ class LargeBackupTest {
         }
         val exported = ByteArrayOutputStream().also { photos.export(data, it) }.toByteArray()
         photos.prepare(ByteArrayInputStream(exported)).use { prepared -> assertEquals(data, prepared.data) }
+    }
+
+    @Test fun streamedBackupEscapesTextAndPreservesLegacyMetadata() {
+        val photos = ProgressPhotoStore(InstrumentationRegistry.getInstrumentation().targetContext)
+        val data = AppData(history = listOf(Workout(name = "Quotes: \"lift\"", notes = "Line one\nBackslash \\ · 日本語")),
+            preferences = Preferences(displayName = "A & B"))
+        val exported = ByteArrayOutputStream().also { photos.export(data, it) }.toByteArray()
+        assertEquals(data, DataCodec.decode(exported.toString(Charsets.UTF_8)))
+        photos.prepare(ByteArrayInputStream(exported)).use { assertEquals(data, it.data) }
+    }
+
+    @Test fun streamingMetadataStillRejectsAnExhaustedBudget() {
+        val writer = JsonWriter(java.io.StringWriter()).apply { beginObject() }
+        assertThrows(IllegalArgumentException::class.java) {
+            BackupMetadataWriter(writer, maxBudget = 128).field("array", org.json.JSONArray(listOf(1, 2, 3)))
+        }
     }
 
     @Test fun metadataStillRejectsAnExhaustedNodeBudget() {

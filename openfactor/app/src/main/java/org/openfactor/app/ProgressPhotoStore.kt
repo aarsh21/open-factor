@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.JsonReader
 import android.util.JsonToken
+import android.util.JsonWriter
 import androidx.core.content.FileProvider
 import java.io.*
 import java.security.MessageDigest
@@ -95,38 +96,39 @@ class ProgressPhotoStore(private val context: Context) {
         directory.listFiles()?.filter { it.name !in retained }?.forEach { it.delete() }
     }
 
-    /** Streams originals as Base64 so a complete backup does not hold all photos in memory. */
+    /** Stream one workout and one photo at a time; never duplicate the whole history as JSON trees. */
     fun export(data: AppData, output: OutputStream) {
         requireFiles(data)
-        val json = DataCodec.encode(data)
-        JsonReader(StringReader(json)).use { BackupMetadataReader(it).value() }
+        val bounded = BoundedBackupOutput(output)
+        val writer = JsonWriter(OutputStreamWriter(bounded, Charsets.UTF_8))
+        val values = BackupMetadataWriter(writer)
+        writer.beginObject()
+        val metadata = DataCodec.document(data.copy(history = emptyList()))
+        metadata.keys().forEach { key ->
+            if (key == "history") values.workouts(key, data.history)
+            else values.field(key, metadata.get(key))
+        }
+        // Flush the unfinished root before streaming Base64 directly; output belongs to the caller.
+        writer.flush()
         val references = data.photoReferences().sorted()
-        val size =
-            json.toByteArray().size.toLong() +
-                1024 +
-                references.sumOf { ((file(it).length() + 2) / 3) * 4 + 72 }
-        require(size <= MAX_BACKUP_BYTES) { "Backup exceeds the 1 GiB safety limit" }
-        output.write(json.dropLast(1).toByteArray())
         if (references.isNotEmpty()) {
-            output.write(",\"photoAssets\":{".toByteArray())
+            bounded.write(",\"photoAssets\":{".toByteArray())
             references.forEachIndexed { index, reference ->
-                if (index > 0) output.write(','.code)
-                output.write("\"$reference\":\"".toByteArray())
-                val nonClosing =
-                    object : FilterOutputStream(output) {
-                        override fun write(bytes: ByteArray, offset: Int, length: Int) =
-                            out.write(bytes, offset, length)
-
-                        override fun close() = flush()
-                    }
+                if (index > 0) bounded.write(','.code)
+                bounded.write("\"$reference\":\"".toByteArray())
+                val nonClosing = object : FilterOutputStream(bounded) {
+                    override fun write(bytes: ByteArray, offset: Int, length: Int) = out.write(bytes, offset, length)
+                    override fun close() = flush()
+                }
                 Base64.getEncoder().wrap(nonClosing).use { encoded ->
                     file(reference).inputStream().use { it.copyTo(encoded) }
                 }
-                output.write('"'.code)
+                bounded.write('"'.code)
             }
-            output.write('}'.code)
+            bounded.write('}'.code)
         }
-        output.write('}'.code)
+        bounded.write('}'.code)
+        bounded.flush()
     }
 
     /** Stages and verifies the entire backup before the caller can replace app data. */
@@ -170,7 +172,7 @@ class ProgressPhotoStore(private val context: Context) {
                 reader.endObject()
                 require(reader.peek() == JsonToken.END_DOCUMENT) { "Unexpected data after backup" }
             }
-            val data = DataCodec.decode(metadata.toString())
+            val data = DataCodec.decode(metadata)
             require(assets == data.photoReferences()) {
                 "Backup photo attachments are missing or unreferenced"
             }
@@ -231,6 +233,72 @@ internal constructor(val data: AppData, private val staging: File, private val d
 
     override fun close() {
         staging.deleteRecursively()
+    }
+}
+
+private class BoundedBackupOutput(output: OutputStream) : FilterOutputStream(output) {
+    private var written = 0L
+    override fun write(value: Int) {
+        require(written + 1 <= ProgressPhotoStore.MAX_BACKUP_BYTES) { "Backup exceeds the 1 GiB safety limit" }
+        out.write(value)
+        written++
+    }
+    override fun write(bytes: ByteArray, offset: Int, length: Int) {
+        require(written + length <= ProgressPhotoStore.MAX_BACKUP_BYTES) { "Backup exceeds the 1 GiB safety limit" }
+        out.write(bytes, offset, length)
+        written += length
+    }
+}
+
+internal class BackupMetadataWriter(
+    private val writer: JsonWriter,
+    private val maxBudget: Int = ProgressPhotoStore.MAX_METADATA_BUDGET,
+) {
+    private var size = 64
+
+    fun field(key: String, value: Any, depth: Int = 1) {
+        size += key.length
+        writer.name(key)
+        value(value, depth)
+    }
+
+    fun workouts(key: String, history: List<Workout>) {
+        size += key.length
+        node(1)
+        writer.name(key).beginArray()
+        history.forEach { value(DataCodec.workoutDocument(it), 2) }
+        writer.endArray()
+    }
+
+    private fun node(depth: Int) {
+        require(depth < 64) { "Backup nesting is too deep" }
+        size += 64
+        require(size < maxBudget) { "Backup metadata is too large" }
+    }
+
+    private fun value(value: Any, depth: Int) {
+        node(depth)
+        when (value) {
+            JSONObject.NULL -> writer.nullValue()
+            is JSONObject -> {
+                writer.beginObject()
+                value.keys().forEach { field(it, value.get(it), depth + 1) }
+                writer.endObject()
+            }
+            is JSONArray -> {
+                writer.beginArray()
+                repeat(value.length()) { value(value.get(it), depth + 1) }
+                writer.endArray()
+            }
+            is String -> {
+                size += value.length
+                require(size < maxBudget) { "Backup metadata is too large" }
+                writer.value(value)
+            }
+            is Number -> writer.value(value)
+            is Boolean -> writer.value(value)
+            else -> error("Invalid backup value")
+        }
     }
 }
 
