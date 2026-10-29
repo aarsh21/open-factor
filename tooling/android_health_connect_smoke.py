@@ -207,9 +207,10 @@ try:
         inspect_panel(f'{name}-onboarding-panel')
         target('Optionally sync your data', scroll=False)
         current = ET.fromstring(adb('shell', 'run-as', package, 'cat', 'shared_prefs/open_factor.xml'))
-        data = json.loads(next(n.text for n in current if n.get('name') == 'data'))
+        from storage_snapshot import snapshot_data
+        data = snapshot_data(current, adb, package)
         assert data['onboarding']['step'] == 2 and not data['onboarding']['completed']
-        original_data = json.loads(next(n.text for n in ET.fromstring(original) if n.get('name') == 'data'))
+        original_data = snapshot_data(ET.fromstring(original), adb, package)
         assert {k: v for k, v in data.items() if k != 'onboarding'} == {
             k: v for k, v in original_data.items() if k != 'onboarding'}
 

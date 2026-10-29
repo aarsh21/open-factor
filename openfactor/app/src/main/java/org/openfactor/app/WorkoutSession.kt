@@ -36,7 +36,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +59,9 @@ fun WorkoutSession(
     val focus = LocalFocusManager.current
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    var finishing by remember { mutableStateOf(false) }
+    var finishError by remember { mutableStateOf<String?>(null) }
     var timerSettingsError by remember { mutableStateOf(false) }
     val workout = data.active
     if (workout == null) {
@@ -542,30 +549,42 @@ fun WorkoutSession(
         )
     if (confirm == "finish")
         AlertDialog(
-            onDismissRequest = { confirm = "" },
+            onDismissRequest = { if (!finishing) confirm = "" },
             title = { Text("Finish Workout?") },
             text = {
                 Column {
                     Text("Save ${workout.completedSets()} completed sets to history?")
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(saveTemplate, { saveTemplate = it })
+                        Checkbox(saveTemplate, { saveTemplate = it }, enabled = !finishing)
                         Text("Save as workout template")
                     }
+                    if (finishing) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    finishError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 }
             },
             confirmButton = {
                 TextButton({
-                    if (saveTemplate)
-                        vm.saveRoutine(workout.name, workout.exercises.map { it.exerciseId })
+                    finishing = true
+                    finishError = null
                     val id = workout.id
-                    vm.finish()
-                    confirm = ""
-                    onFinished(id)
-                }) {
-                    Text("Finish")
+                    val includeTemplate = saveTemplate
+                    scope.launch {
+                        try {
+                            withContext(Dispatchers.IO) { vm.finish(includeTemplate) }
+                            confirm = ""
+                            onFinished(id)
+                        } catch (failure: Exception) {
+                            if (failure is CancellationException) throw failure
+                            finishError = "Could not save workout. Please try again."
+                        } finally {
+                            finishing = false
+                        }
+                    }
+                }, enabled = !finishing) {
+                    Text(if (finishing) "Saving…" else "Finish")
                 }
             },
-            dismissButton = { TextButton({ confirm = "" }) { Text("Keep Training") } },
+            dismissButton = { TextButton({ confirm = "" }, enabled = !finishing) { Text("Keep Training") } },
         )
 }
 

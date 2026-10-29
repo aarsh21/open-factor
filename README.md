@@ -50,6 +50,7 @@ The debug APK is `openfactor/app/build/outputs/apk/debug/app-debug.apk`, package
 - Gym profiles, literal equipment preset prefills, weight lists and gym-aware exercise filtering.
 - Four editable starter splits: Upper/Lower/Push/Pull/Legs, Upper/Lower, Bro split and Full body. Preview all seven days including rest days, then copy the split into your templates. Edit exercise order, sets, rep targets and rest; choose exercises using the shared search and filters. Starting a day creates blank actual weight/reps with its targets shown separately.
 - Custom exercises, reusable templates, and manual programs with rest/workout days, gym selection and variable-cycle targets. Programs remain accessible from Workout.
+- Settings → Import spreadsheet previews the supplied Outlift-style Phase 1/2/3 XLSX layout and appends inactive weekly programs after explicit set-count, exercise-match and omission review. It does not fabricate training history or evaluate formulas. See [supported layout and import limitations](docs/open-factor/SPREADSHEET-IMPORT.md); this is not a lossless/general-purpose spreadsheet importer.
 - Program-day launches with rep/RIR targets and per-exercise rest overrides; weekly recorded training graphs, front/back anatomy and direct/indirect muscle-set counts over week/30-day/90-day windows.
 - Persist active workouts, selected exercise, pause/resume, weight, reps, optional RIR, warmups and notes.
 - Optional workout/rest notifications. Precise background timing requires Android special access; force-stop suppresses reminders until reopening.
@@ -87,4 +88,8 @@ Source-only builds retain [44 attributed Everkinetic illustrations covering 21 r
 
 Thanks to **[NuvioMedia and the NuvioMobile contributors](https://github.com/NuvioMedia/NuvioMobile)** for the base application and the navigation/settings foundation. See [CREDITS.md](CREDITS.md).
 
-Code remains [GPLv3](LICENSE), preserving Nuvio's license, copyright notices and attribution. Media licenses are separate. The upstream media application remains in `composeApp/`, `androidApp/`, and `iosApp/`; [the original upstream README](docs/upstream/NUVIO-README.md) documents those targets. Open Factor's Android entry point is `openfactor/app/`.
+Code remains [GPLv3](LICENSE), preserving Nuvio's license, copyright notices and attribution. Media licenses are separate. The unused upstream media-player targets and their release pipelines have been removed; [the original upstream README](docs/upstream/NUVIO-README.md) is retained as historical attribution, not current build instructions. Open Factor's Android entry point is `openfactor/app/`.
+
+## Performance and test data
+
+Dashboard customization uses cached options and background exercise search. Weekly summaries aggregate dates once; seven-day weight means use a sliding window. Unchanged workout history is stored in a separate atomic archive, so logger edits rewrite only a small live snapshot. Full exported backups remain self-contained and old inline storage migrates on the next save. See [performance checks, synthetic datasets, and storage details](docs/open-factor/PERFORMANCE.md). No universal device/frame-time claim is implied.

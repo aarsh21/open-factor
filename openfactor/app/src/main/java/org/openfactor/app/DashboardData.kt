@@ -95,10 +95,15 @@ internal fun AppData.hasVisibleDashboardSection(section: DashboardSection, today
     return when (section) {
         DashboardSection.INSIGHTS -> preferences.showInsights
         DashboardSection.HABITS -> preferences.showHabits
-        DashboardSection.BODY -> bodyChartSeries().any { series ->
-            series.key in selected && preferences.dataVisibility.isVisible(series.key) &&
-                series.points.any { !it.date.isAfter(today) } &&
-                (series.key != "weight" || "trend" !in preferences.dashboard.insights || !preferences.showInsights)
+        DashboardSection.BODY -> selected.any { key ->
+            preferences.dataVisibility.isVisible(key) && when (key) {
+                "weight" -> ("trend" !in preferences.dashboard.insights || !preferences.showInsights) &&
+                    scaleWeights.any { !it.date.isAfter(today) }
+                "visualBodyFat" -> bodyMeasurements.any { !it.date.isAfter(today) && it.visualBodyFatPercent != null }
+                else -> BodyMeasurement.entries.find { it.key == key }?.let { field ->
+                    bodyMeasurements.any { !it.date.isAfter(today) && field in it.centimeters }
+                } == true
+            }
         }
         else -> true
     }

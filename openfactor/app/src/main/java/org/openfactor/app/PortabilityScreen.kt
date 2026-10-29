@@ -28,6 +28,7 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun DataPortabilityRows(onOpen: (String) -> Unit) {
     SettingsRow(Icons.Rounded.IosShare, "Data Export", "Quick or granular category and time selection") { onOpen("export") }
+    SettingsRow(Icons.Rounded.TableChart, "Import spreadsheet", "Preview workout targets before appending new programs") { onOpen("spreadsheet") }
     SettingsRow(Icons.Rounded.Visibility, "Data Visibility", "Hide editor fields without deleting history") { onOpen("visibility") }
 }
 
@@ -49,12 +50,14 @@ internal fun PortabilityScreen(
     Column(Modifier.fillMaxSize()) {
         PageHeading(when {
             route == "export" -> "Data Export"
+            route == "spreadsheet" -> "Import spreadsheet"
             route == "visibility" -> "Metric visibility"
             route == "tutorials" -> "Tutorials"
             else -> "Help & support"
         }, onClose)
         when (route) {
             "export" -> ScopedExportScreen(vm, snackbar)
+            "spreadsheet" -> SpreadsheetImportScreen(vm, snackbar)
             "visibility" -> VisibilityScreen(p, vm)
             "tutorials" -> TutorialsScreen(p, vm, snackbar)
             else -> OfflineHelpScreen()

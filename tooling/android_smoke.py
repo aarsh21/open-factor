@@ -47,7 +47,8 @@ def enter(value,text,attr='text'):
 def launch():adb('shell','am','start','-n','org.openfactor.app/.MainActivity')
 def persisted():
  xml=ET.fromstring(adb('shell','run-as','org.openfactor.app','cat','shared_prefs/open_factor.xml'))
- return json.loads(next(n.text for n in xml if n.get('name')=='data'))
+ from storage_snapshot import snapshot_data
+ return snapshot_data(xml, adb)
 def open_shortcuts():
  tap('Shortcuts','content-desc')
  handle=find('Drag handle','content-desc')[0]

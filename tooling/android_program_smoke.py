@@ -61,7 +61,8 @@ def enter(t,value,attr='text'):
 def capture(name):
  nodes();(a.output/(name+'.png')).write_bytes(adb('exec-out','screencap','-p',raw=True));(a.output/(name+'.xml')).write_text(adb('shell','cat','/sdcard/of-program.xml'))
 def state():
- root=E.fromstring(adb('shell','run-as','org.openfactor.app','cat','shared_prefs/open_factor.xml'));return json.loads(next(n.text for n in root if n.get('name')=='data'))
+ from storage_snapshot import snapshot_data
+ root=E.fromstring(adb('shell','run-as','org.openfactor.app','cat','shared_prefs/open_factor.xml'));return snapshot_data(root, adb)
 def launch():
  adb('shell','am','force-stop','org.openfactor.app');adb('shell','am','start','-n','org.openfactor.app/.MainActivity')
 def library():

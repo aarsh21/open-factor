@@ -92,7 +92,8 @@ def enter(label, value, attr='text', last=False):
 
 def state():
     root = ET.fromstring(adb('shell', 'run-as', 'org.openfactor.app', 'cat', 'shared_prefs/open_factor.xml'))
-    return json.loads(next(n.text for n in root if n.get('name') == 'data'))
+    from storage_snapshot import snapshot_data
+    return snapshot_data(root, adb)
 
 
 def private(reference):

@@ -607,7 +607,6 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                     onHistory = { route = "history" },
                                     onStart = { shortcuts = true },
                                     onResume = { route = "session" },
-                                    onLevels = { route = "levels" },
                                     onBodyData = {
                                         bodyDataTab = 0
                                         route = "body-data"

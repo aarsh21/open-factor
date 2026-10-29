@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -26,7 +27,6 @@ internal fun DashboardTiles(
     onChart: (String) -> Unit,
     onHistory: () -> Unit,
     onBodyData: () -> Unit,
-    onStart: () -> Unit,
     onHealthConnect: (() -> Unit)? = null,
     onLogWeight: (() -> Unit)? = null,
 ) {
@@ -38,7 +38,6 @@ internal fun DashboardTiles(
     )
         return
     val today = rememberToday()
-    val metrics = data.copy(preferences = data.preferences.copy(dashboardAllWorkouts = true)).dashboardMetrics(exercises, today)
     Column(Modifier.padding(horizontal = 18.dp)) {
         when (section) {
             DashboardSection.INSIGHTS -> {
@@ -54,9 +53,10 @@ internal fun DashboardTiles(
                 Surface(shape = OF.shape, color = OF.card) {
                     Column {
                         selected.forEach { key ->
-                            val dates =
+                            val dates = remember(data.scaleWeights, data.history, today, key) {
                                 if (key == "weighIn") data.scaleWeights.map { it.date }.filter { !it.isAfter(today) }.toSet()
                                 else data.history.filter { it.localDate() <= today && it.completedSets() > 0 }.map { it.localDate() }.toSet()
+                            }
                             val monday =
                                 today
                                     .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
@@ -110,15 +110,13 @@ internal fun DashboardTiles(
                 }
             }
             DashboardSection.BODY -> {
-                val series =
-                    data
-                        .bodyChartSeries()
-                        .filter {
-                            it.key in selected && data.preferences.dataVisibility.isVisible(it.key) &&
-                                it.points.any { point -> !point.date.isAfter(today) } &&
-                                (it.key != "weight" || "trend" !in data.preferences.dashboard.insights || !data.preferences.showInsights)
-                        }
-                        .sortedBy { selected.indexOf(it.key) }
+                val series = remember(data.scaleWeights, data.bodyMeasurements, data.preferences, selected, today) {
+                    data.bodyChartSeries().filter {
+                        it.key in selected && data.preferences.dataVisibility.isVisible(it.key) &&
+                            it.points.any { point -> !point.date.isAfter(today) } &&
+                            (it.key != "weight" || "trend" !in data.preferences.dashboard.insights || !data.preferences.showInsights)
+                    }.sortedBy { selected.indexOf(it.key) }
+                }
                 if (series.isNotEmpty()) {
                     SectionTitle(section.label, "History", onBodyData)
                     Surface(shape = OF.shape, color = OF.card) {
@@ -142,14 +140,16 @@ internal fun DashboardTiles(
                 }
             }
             DashboardSection.MUSCLES -> {
+                val counts = remember(data.active, data.history, exercises, today) {
+                    val monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                    muscleWorkloads(data.trainingWorkouts().filter { it.localDate() in monday..today }, exercises)
+                        .associate { it.muscle to it.weightedSets }
+                }
                 SectionTitle(section.label)
                 Surface(shape = OF.shape, color = OF.card) {
                     Column {
                         selected.forEach { muscle ->
-                            val count =
-                                muscleContributions(metrics.weekly, exercises, 7, muscle, today).sumOf {
-                                    it.weightedSets
-                                }
+                            val count = counts[muscle] ?: 0.0
                             DashboardRow(muscle, "${count.bodyNumber()} weighted sets this week") {
                                 onDetail("muscle:$muscle")
                             }
@@ -158,17 +158,14 @@ internal fun DashboardTiles(
                 }
             }
             DashboardSection.EXERCISES -> {
-                val catalog = exercises.associateBy { it.id }
+                val catalog = remember(exercises) { exercises.associateBy { it.id } }
+                val counts = remember(data.history, today) { recordedExerciseSets(data.history, today) }
                 SectionTitle(section.label)
                 Surface(shape = OF.shape, color = OF.card) {
                     Column {
                         selected.forEach { id ->
                             val exercise = catalog[id]
-                            val sets =
-                                metrics.history
-                                    .flatMap { it.exercises }
-                                    .filter { it.exerciseId == id }
-                                    .sumOf { it.completedWorkingSets() }
+                            val sets = counts[id] ?: 0
                             DashboardRow(
                                 exercise?.title ?: "Unavailable exercise",
                                 "$sets recorded working sets",

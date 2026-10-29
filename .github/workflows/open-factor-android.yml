@@ -28,6 +28,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
       - run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug -PopenfactorMediaMode=source
+      - name: Test synthetic fixtures and storage snapshot resolver
+        working-directory: .
+        run: python3 -I -m unittest discover -s tooling -p 'test_*.py' -v
       - name: Verify public APK
         working-directory: .
         run: python3 tooling/verify_public_apk.py openfactor/app/build/outputs/apk/debug/app-debug.apk --output openfactor/app/build/reports/public-apk.json

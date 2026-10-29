@@ -31,6 +31,9 @@ fun WorkoutHome(
     onDraft: () -> Unit,
 ) {
     var delete by remember { mutableStateOf<Routine?>(null) }
+    val today = rememberToday()
+    val week = remember(data.active, data.history, exercises, today) { data.trainingWeek(exercises, today = today) }
+    val catalog = remember(exercises) { exercises.associateBy { it.id } }
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 112.dp),
@@ -56,23 +59,7 @@ fun WorkoutHome(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     TextButton(onPrograms) { Icon(Icons.Rounded.CalendarMonth, null); Spacer(Modifier.width(8.dp)); Text("Programs") }
                 }
-                val week = remember(data.active, data.history, exercises) { data.trainingWeek(exercises) }
-                Surface(Modifier.fillMaxWidth(), shape = OF.shape, color = OF.top) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("This week", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                            TextButton(onHistory) { Text("History"); Icon(Icons.Rounded.ChevronRight, null) }
-                        }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            listOf(week.sessions to "Sessions", week.workingSets to "Working sets", week.trainedMuscles to "Muscles").forEach { (count, label) ->
-                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text(count.toString(), style = MaterialTheme.typography.headlineSmall)
-                                    Text(label, style = MaterialTheme.typography.labelMedium, color = OF.muted)
-                                }
-                            }
-                        }
-                    }
-                }
+                WeeklyWorkoutCard(week, onHistory)
                 SectionTitle("Templates", "Browse", onTemplates)
             }
         }
@@ -97,7 +84,7 @@ fun WorkoutHome(
                         }
                     }
                     routine.exerciseIds.take(4).forEach { id ->
-                        exercises.firstOrNull { it.id == id }?.let { exercise ->
+                        catalog[id]?.let { exercise ->
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 ExerciseImage(exercise, Modifier.size(40.dp))
                                 Text(exercise.title, maxLines = 2, overflow = TextOverflow.Ellipsis)

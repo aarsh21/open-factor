@@ -353,7 +353,11 @@ object DataCodec {
                 }
             }
 
-    fun encode(d: AppData): String =
+    internal fun encodeHistory(history: List<Workout>): String = JSONArray(history.map { it.json() }).toString()
+
+    internal fun decodeHistory(text: String): List<Workout> = JSONArray(text).objects().map { it.workout() }
+
+    fun encode(d: AppData, pretty: Boolean = true): String =
         JSONObject()
             .put("schemaVersion", 1)
             .put("activeProgramId", d.activeProgramId)
@@ -418,7 +422,7 @@ object DataCodec {
                     .put("rateEffortAfterExercise", d.preferences.rateEffortAfterExercise)
                     .put("weeklyWorkoutGoal", d.preferences.weeklyWorkoutGoal),
             )
-            .toString(2)
+            .let { if (pretty) it.toString(2) else it.toString() }
 
     private fun JSONArray.objects() = (0 until length()).map { getJSONObject(it) }
 
@@ -481,9 +485,10 @@ object DataCodec {
             optString("gymId").takeIf { it.isNotBlank() && it != "null" },
         )
 
-    fun decode(text: String): AppData {
+    fun decode(text: String, historyOverride: List<Workout>? = null): AppData {
         val j = JSONObject(text)
         require(j.optInt("schemaVersion") == 1) { "Unsupported backup version" }
+        require(!j.has("storageHistory") || historyOverride != null) { "Internal storage snapshot is not a restore backup" }
         val p = j.optJSONObject("preferences") ?: JSONObject()
         val programs = j.array("programs").objects().map { ProgramCodec.decode(it) }
         require(programs.map { it.id }.distinct().size == programs.size) { "Duplicate program" }
@@ -491,7 +496,7 @@ object DataCodec {
         require(routines.map { it.id }.distinct().size == routines.size) { "Duplicate template" }
         return AppData(
             j.optJSONObject("active")?.workout(),
-            j.array("history").objects().map { it.workout() },
+            historyOverride ?: j.array("history").objects().map { it.workout() },
             routines,
             j.array("favorites").strings().toSet(),
             j.array("customExercises").objects().map { it.exercise(custom = true) },
@@ -606,6 +611,9 @@ object DataCodec {
 data class StorageRecovery(val restoredPreviousData: Boolean, val originalCount: Int)
 
 class WorkoutStore(context: Context, preferencesName: String = "open_factor") {
+    private val storageLock = storageLocks.computeIfAbsent("${context.filesDir.absolutePath}/$preferencesName") { Any() }
+    private inline fun <T> locked(block: () -> T): T = synchronized(storageLock, block)
+    private val historyArchive = WorkoutHistoryArchive(context, preferencesName)
     private val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
     // SharedPreferences rewrites its whole XML on commit: keep large checkpoints outside the hot file.
     private val recoveryPrefs = context.getSharedPreferences("${preferencesName}_recovery", Context.MODE_PRIVATE)
@@ -613,10 +621,10 @@ class WorkoutStore(context: Context, preferencesName: String = "open_factor") {
     private var restoredPreviousData = false
 
     private fun decode(raw: String?): AppData? = raw?.let {
-        try { DataCodec.decode(it) } catch (_: Exception) { null }
+        try { historyArchive.decode(it) } catch (_: Exception) { null }
     }
 
-    fun load(): AppData {
+    fun load(): AppData = locked {
         val raw = prefs.getString("data", null) ?: return AppData()
         val decoded = decode(raw)
         if (decoded != null) {
@@ -646,14 +654,16 @@ class WorkoutStore(context: Context, preferencesName: String = "open_factor") {
         return editor
     }
 
-    fun save(data: AppData) {
-        check(preserveUnreadable(prefs.edit()).putString("data", DataCodec.encode(data)).commit()) {
+    fun save(data: AppData) = locked {
+        val raw = historyArchive.encode(data)
+        check(preserveUnreadable(prefs.edit()).putString("data", raw).commit()) {
             "Could not save workout data"
         }
         unreadablePrimary = null
+        historyArchive.prune(raw, recoveryPrefs.getString("data_last_good", null), hasRecoveryPayloads())
     }
 
-    fun recovery(): StorageRecovery? {
+    fun recovery(): StorageRecovery? = locked {
         val pending = when {
             prefs.getBoolean("recovery_pending", false) -> prefs
             recoveryPrefs.getBoolean("recovery_pending", false) -> recoveryPrefs
@@ -667,7 +677,7 @@ class WorkoutStore(context: Context, preferencesName: String = "open_factor") {
         .associate { it.key.removePrefix("recovery_raw_") to it.value as String }.toSortedMap()
 
     /** Archive the exact original strings; damaged/newer JSON must not be decoded and rewritten. */
-    fun exportRecovery(output: OutputStream) {
+    fun exportRecovery(output: OutputStream) = locked {
         val originals = recoveryPayloads()
         check(originals.isNotEmpty()) { "No original storage payload is available" }
         ZipOutputStream(output).use { zip ->
@@ -676,17 +686,23 @@ class WorkoutStore(context: Context, preferencesName: String = "open_factor") {
                 zip.write(raw.toByteArray(Charsets.UTF_8))
                 zip.closeEntry()
             }
+            historyArchive.exportRecovery(zip)
         }
     }
 
     /** Acknowledgment hides the notice, while original payloads stay available for later export. */
-    fun dismissRecovery(): Boolean {
+    fun dismissRecovery(): Boolean = locked {
         val primary = prefs.edit().putBoolean("recovery_pending", false).commit()
         val archive = recoveryPrefs.edit().putBoolean("recovery_pending", false).commit()
         return primary && archive
     }
 
-    fun hasRecoveryPayloads(): Boolean = recoveryPayloads().isNotEmpty()
+    fun hasRecoveryPayloads(): Boolean = locked { recoveryPayloads().isNotEmpty() }
+
+    private companion object {
+        // A reader must finish before another store can prune the archive it just referenced.
+        val storageLocks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+    }
 }
 
 class WorkoutViewModel(application: Application) : AndroidViewModel(application) {
@@ -918,6 +934,10 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         d.copy(programDraft = d.programDraft?.let(block))
     }
 
+    internal fun appendSpreadsheetPrograms(programs: List<TrainingProgram>) = update { data ->
+        data.withSpreadsheetPrograms(programs, exercises(data))
+    }
+
     fun beginProgram(program: TrainingProgram) = update { it.copy(programDraft = program) }
 
     fun discardProgramDraft() = update { it.copy(programDraft = null) }
@@ -1062,16 +1082,16 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun discard() = update { it.copy(active = null) }
 
-    fun finish() {
-        val w = _data.value.active ?: return
-        if (w.completedSets() == 0) return
+    fun finish(saveTemplate: Boolean = false) = update { data ->
+        val workout = data.active ?: return@update data
+        if (workout.completedSets() == 0) return@update data
         val now = System.currentTimeMillis()
-        update {
-            it.copy(
-                active = null,
-                history = listOf(w.withPause(false, now).copy(finishedAt = now)) + it.history,
-            )
-        }
+        data.copy(
+            active = null,
+            history = listOf(workout.withPause(false, now).copy(finishedAt = now)) + data.history,
+            routines = if (saveTemplate) data.routines + Routine(name = workout.name.trim().ifBlank { "Routine" },
+                exerciseIds = workout.exercises.map { it.exerciseId }) else data.routines,
+        )
     }
 
     fun deleteWorkout(id: String) = update {

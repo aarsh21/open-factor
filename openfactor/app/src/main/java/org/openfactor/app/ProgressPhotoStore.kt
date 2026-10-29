@@ -184,6 +184,8 @@ class ProgressPhotoStore(private val context: Context) {
     companion object {
         const val MAX_PHOTO_BYTES = 20 * 1024 * 1024
         const val MAX_BACKUP_BYTES = 1024L * 1024 * 1024
+        // Includes per-node overhead, not just JSON bytes: multi-year set histories need headroom.
+        internal const val MAX_METADATA_BUDGET = 64 * 1024 * 1024
 
         private fun digest(bytes: ByteArray) =
             MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") {
@@ -232,7 +234,10 @@ internal constructor(val data: AppData, private val staging: File, private val d
     }
 }
 
-private class BackupMetadataReader(private val reader: JsonReader) {
+internal class BackupMetadataReader(
+    private val reader: JsonReader,
+    private val maxBudget: Int = ProgressPhotoStore.MAX_METADATA_BUDGET,
+) {
     private var size = 0
 
     fun field(key: String, depth: Int = 0): Any {
@@ -243,7 +248,7 @@ private class BackupMetadataReader(private val reader: JsonReader) {
     fun value(depth: Int = 0): Any {
         require(depth < 64) { "Backup nesting is too deep" }
         size += 64
-        require(size < 10_000_000) { "Backup metadata is too large" }
+        require(size < maxBudget) { "Backup metadata is too large" }
         return when (reader.peek()) {
             JsonToken.BEGIN_OBJECT ->
                 JSONObject().apply {
@@ -264,7 +269,7 @@ private class BackupMetadataReader(private val reader: JsonReader) {
             JsonToken.STRING ->
                 reader.nextString().also {
                     size += it.length
-                    require(size < 10_000_000) { "Backup metadata is too large" }
+                    require(size < maxBudget) { "Backup metadata is too large" }
                 }
             JsonToken.NUMBER ->
                 reader.nextString().let {

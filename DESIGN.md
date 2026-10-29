@@ -139,6 +139,12 @@ The 0.6.0 behavior update follows `QuickStart.kt`, `ProfileSetup.kt`, `ProfileEd
 
 The 0.6.1 extension follows `TemplateScreens.kt`, `TemplateData.kt`, `MainActivity.kt`, `HealthConnectPanel.kt`, `HealthConnectSyncCommitter.kt`, `Data.kt` and `ScopedDataExport.kt`. It preserves the recorded tokens, sidecar, palette, type and navigation motion. The [0.6.1 release evidence](docs/open-factor/releases/v0.6.1.md) and `inspection/release-evidence/v0.6.1/finish-review.md` record a ship disposition for candidate captures 01–19 on an API35 phone in dark theme at normal and 1.35 font scale. The finish review's sampled source and native captures establish this extension's checkpoint; they do not extend the earlier review's device or accessibility scope.
 
+## Working-tree dashboard and import update
+
+Dashboard customization now groups ordered tiles into compact section cards with one Edit action, a selected count, and contextual reorder/remove menus. Choice sheets use one checkbox action per row; exercise search runs off the UI thread. Draft changes still apply only on Save. The Workout home weekly card uses one prominent working-set count, an explicit date range, secondary session/muscle totals and a whole-card History action—no invented progress ring or percentage. The charcoal/light surfaces, DM Sans, 18dp page gutter, 16dp card shape and floating navigation are unchanged.
+
+Spreadsheet import uses the native document picker and a preview with explicit exercise choices, set count, omissions and confirmation. Its pinned actions reserve clearance for floating navigation and system bars. The [performance/verification record](docs/open-factor/PERFORMANCE.md) distinguishes final native checks and large synthetic data from physical-device/frame-time claims; [spreadsheet scope](docs/open-factor/SPREADSHEET-IMPORT.md) records partial-target limitations. These working-tree changes do not extend the published 0.6.2 release evidence.
+
 ## Colors
 
 Frontmatter records the dark palette and the explicit light substitutions in `OpenFactorTheme`. `OF.top` and `OF.card` resolve to the theme surface; `OF.elevated` resolves to surface variant. Dark is the default; Light and System are available.

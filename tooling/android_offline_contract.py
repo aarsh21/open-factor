@@ -101,7 +101,8 @@ class UI:
 
     def state(self):
         root = ET.fromstring(self.adb('exec-out', 'run-as', PACKAGE, 'cat', 'shared_prefs/open_factor.xml'))
-        return json.loads(next(n.text for n in root if n.get('name') == 'data'))
+        from storage_snapshot import snapshot_data
+        return snapshot_data(root, self.adb, PACKAGE)
 
     def launch(self):
         self.adb('shell', 'am', 'force-stop', PACKAGE)

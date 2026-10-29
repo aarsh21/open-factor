@@ -95,7 +95,8 @@ def settings():
 
 def state():
     xml = ET.fromstring(adb('exec-out', 'run-as', package, 'cat', 'shared_prefs/open_factor.xml'))
-    return json.loads(next(n.text for n in xml if n.get('name') == 'data'))
+    from storage_snapshot import snapshot_data
+    return snapshot_data(xml, adb, package)
 
 
 def write_private(path, payload):

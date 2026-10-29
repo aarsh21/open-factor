@@ -22,6 +22,18 @@ fun Workout.completedWorkingSets() = exercises.sumOf { it.completedWorkingSets()
 fun AppData.trainingWorkouts(): List<Workout> =
     (listOfNotNull(active) + history).distinctBy { it.id }
 
+/** One pass shared by all exercise tiles; imported duplicate workout identities count once. */
+internal fun recordedExerciseSets(history: List<Workout>, today: LocalDate): Map<String, Int> {
+    val counts = mutableMapOf<String, Int>()
+    val seen = hashSetOf<String>()
+    history.forEach { workout ->
+        if (seen.add(workout.id) && !workout.localDate().isAfter(today)) workout.exercises.forEach { exercise ->
+            counts[exercise.exerciseId] = counts.getOrDefault(exercise.exerciseId, 0) + exercise.completedWorkingSets()
+        }
+    }
+    return counts
+}
+
 data class TrainingTotals(val sets: Int = 0, val exercises: Int = 0, val muscles: Int = 0)
 
 private fun List<SessionExercise>.totals(catalog: List<Exercise>): TrainingTotals {

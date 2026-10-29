@@ -121,7 +121,7 @@ fun HistoryScreen(
                     }
                 }
                 items(workouts, key = { it.id }) { workout ->
-                    HistoryWorkoutCard(workout, catalog, exercises, prefs, { onDetail(workout.id) }, onRepeat?.let { repeat -> { repeat(workout.id) } })
+                    HistoryWorkoutCard(workout, catalog, prefs, { onDetail(workout.id) }, onRepeat?.let { repeat -> { repeat(workout.id) } })
                 }
             }
         }
@@ -135,13 +135,12 @@ fun HistoryScreen(
 private fun HistoryWorkoutCard(
     workout: Workout,
     catalog: Map<String, Exercise>,
-    exercises: List<Exercise>,
     prefs: Preferences,
     onOpen: () -> Unit,
     onRepeat: (() -> Unit)?,
 ) {
     var menu by remember { mutableStateOf(false) }
-    val totals = remember(workout, exercises) { muscleWorkloads(listOf(workout), exercises).filter { it.weightedSets > 0 }.associate { it.muscle to it.weightedSets } }
+    val totals = remember(workout, catalog) { muscleWorkloads(listOf(workout), catalog).filter { it.weightedSets > 0 }.associate { it.muscle to it.weightedSets } }
     val names = remember(workout, catalog) { workout.exercises.map { catalog[it.exerciseId]?.name ?: "Custom exercise" } }
     val line = OF.line
     Column(Modifier.fillMaxWidth().drawBehind { drawLine(line, Offset(29.dp.toPx(), 0f), Offset(29.dp.toPx(), size.height), 1.dp.toPx()) }) {

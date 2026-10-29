@@ -51,12 +51,14 @@ fun AppData.trainingPeriod(
         TrainingPeriod.WEEK -> first.plusDays(6)
         TrainingPeriod.MONTH -> first.with(TemporalAdjusters.lastDayOfMonth())
     }
-    val workouts = trainingWorkouts().filter { it.localDate() in first..last && !it.localDate().isAfter(today) }
+    val workouts = trainingWorkouts().filter { it.localDate() in first..minOf(last, today) }
     val muscles = muscleWorkloads(workouts, catalog)
+    val byDate = workouts.groupBy { it.localDate() }.mapValues { (date, saved) ->
+        TrainingDay(date, saved.sumOf { it.completedWorkingSets() }, saved.sumOf { it.volumeKg() })
+    }
     val days = (0L..java.time.temporal.ChronoUnit.DAYS.between(first, last)).map { day ->
         val date = first.plusDays(day)
-        val saved = workouts.filter { it.localDate() == date }
-        TrainingDay(date, saved.sumOf { it.completedWorkingSets() }, saved.sumOf { it.volumeKg() })
+        byDate[date] ?: TrainingDay(date, 0, 0.0)
     }
     return TrainingWeek(first, last, days, workouts.count { it.completedWorkingSets() > 0 },
         days.sumOf { it.sets }, days.sumOf { it.volumeKg }, muscles,
@@ -65,8 +67,10 @@ fun AppData.trainingPeriod(
 }
 
 /** One contribution per muscle per logical set. A primary target never also counts as secondary. */
-fun muscleWorkloads(workouts: List<Workout>, catalog: List<Exercise>): List<MuscleWorkload> {
-    val byId = catalog.associateBy { it.id }
+fun muscleWorkloads(workouts: List<Workout>, catalog: List<Exercise>): List<MuscleWorkload> =
+    muscleWorkloads(workouts, catalog.associateBy { it.id })
+
+internal fun muscleWorkloads(workouts: List<Workout>, byId: Map<String, Exercise>): List<MuscleWorkload> {
     val direct = mutableMapOf<String, Int>()
     val secondary = mutableMapOf<String, Int>()
     workouts.distinctBy { it.id }.flatMap { it.exercises }.forEach { entry ->
@@ -92,9 +96,12 @@ fun List<ScaleWeightRecord>.weightTrend(today: LocalDate = LocalDate.now()): Lis
         .groupBy { it.date }
         .map { (_, entries) -> entries.firstOrNull { it.healthConnectOrigin == null } ?: entries.first() }
         .sortedBy { it.date }
-    return readings.map { reading ->
+    var first = 0
+    var total = 0.0
+    return readings.mapIndexed { index, reading ->
+        total += reading.weightKg
         val from = reading.date.minusDays(6)
-        WeightTrendReading(reading.id, reading.date, reading.weightKg,
-            readings.filter { it.date in from..reading.date }.map { it.weightKg }.average())
+        while (readings[first].date < from) total -= readings[first++].weightKg
+        WeightTrendReading(reading.id, reading.date, reading.weightKg, total / (index - first + 1))
     }
 }
