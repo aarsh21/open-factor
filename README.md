@@ -2,9 +2,9 @@
 
 An independently maintained Android workout app with straightforward logging and original exercise guidance. Choose an exercise, view its demonstration and muscles, record weight and reps, add warmups, and save your workout. Open Factor uses [NuvioMobile](https://github.com/NuvioMedia/NuvioMobile) as its base, retaining its floating navigation and grouped settings.
 
-“Simple” means useful training features in an uncluttered interface. The 0.4.0 checkout adds real Health Connect imports, stronger exercise search, quick weight logging, recorded training graphs and muscle workload to the original exercise guidance. Photos, instructions, anatomy and equipment artwork use an efficient static pack; original videos play on demand over HTTPS. Core logging and bundled guidance work offline without an account. Videos require a bundled clip or available streamed/cached data. See [media packaging and playback](docs/open-factor/MEDIA-PACKAGING.md).
+“Simple” means useful training features in an uncluttered interface. The 0.5.0 app adds unified exercise search, horizontal workout tabs, reusable templates, a dated workout history, direct camera logging, and interactive step charts with Health Connect refresh on every foreground visit. The dashboard shows three recorded-training circles and muscle workload; full-width portrait videos retain their side-mounted angle previews. Photos, instructions, anatomy and equipment artwork use an efficient static pack; original videos play on demand over HTTPS. Core logging and bundled guidance work offline without an account. Videos require a bundled clip or available streamed/cached data. See [media packaging and playback](docs/open-factor/MEDIA-PACKAGING.md).
 
-[Download Open Factor 0.4.0](https://github.com/aarsh21/open-factor/releases/tag/v0.4.0). The release includes the signed original-media APK, checksums and a verification bundle. See the [release notes and exact verification scope](docs/open-factor/releases/v0.4.0.md).
+[Download Open Factor 0.5.0](https://github.com/aarsh21/open-factor/releases/tag/v0.5.0). The release includes the signed original-media APK, checksums and a verification bundle. See the [release notes and exact verification scope](docs/open-factor/releases/v0.5.0.md).
 
 ## Build and test on Android
 
