@@ -301,14 +301,18 @@ internal object SpreadsheetImport {
     }
 }
 
+internal interface ImportExerciseSuggestions {
+    fun suggestions(name: String): List<Exercise>
+}
+
 /** Ranked discovery is for explicit choices only; automatic matching requires a unique literal name/alias. */
-internal class SpreadsheetExerciseMatcher(catalog: List<Exercise>) {
+internal class SpreadsheetExerciseMatcher(catalog: List<Exercise>) : ImportExerciseSuggestions {
     private val exercises = catalog.filterNot { it.archived }.distinctBy { it.id }
     private val index = ExerciseSearchIndex(exercises)
     private val exact = exercises.flatMap { exercise -> (exercise.aliases + exercise.name).map { key(it) to exercise.id } }
         .groupBy({ it.first }, { it.second }).mapValues { it.value.distinct() }
     fun automatic(name: String): String? = exact[key(name)]?.singleOrNull()
-    fun suggestions(name: String): List<Exercise> = index.search(name).take(8)
+    override fun suggestions(name: String): List<Exercise> = index.search(name).take(8)
     companion object {
         private fun key(value: String) = Normalizer.normalize(value, Normalizer.Form.NFKD).lowercase(Locale.ROOT)
             .replace(Regex("\\p{M}+"), "").replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()

@@ -60,8 +60,15 @@ internal object FitbodImport {
             if (Thread.currentThread().isInterrupted) throw InterruptedIOException("Import cancelled")
             val count = input.read(buffer, 0, minOf(buffer.size, MAX_FILE_BYTES - bytes.size() + 1))
             if (count == -1) break
-            require(bytes.size() + count <= MAX_FILE_BYTES) { "Fitbod CSV exceeds the 4 MiB size limit." }
-            bytes.write(buffer, 0, count)
+            if (count == 0) {
+                val next = input.read()
+                if (next == -1) break
+                require(bytes.size() < MAX_FILE_BYTES) { "Fitbod CSV exceeds the 4 MiB size limit." }
+                bytes.write(next)
+            } else {
+                require(bytes.size() + count <= MAX_FILE_BYTES) { "Fitbod CSV exceeds the 4 MiB size limit." }
+                bytes.write(buffer, 0, count)
+            }
         }
         val text = Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes.toByteArray())).toString().removePrefix(0xfeff.toChar().toString())
         require('\u0000' !in text) { "Fitbod CSV must be UTF-8 without NUL characters." }
@@ -195,6 +202,7 @@ internal fun FitbodPreview.materializeHistory(choices: Map<String, String>, skip
             }
             val rests = exercise.sets.map { it.restSeconds }.distinct()
             val notes = buildList {
+                add("Fitbod exercise: ${exercise.name}")
                 if (exercise.circuit.isNotEmpty()) add("Fitbod circuit position: ${exercise.circuit} (not converted to a superset).")
                 exercise.sets.forEach { set ->
                     val details = buildList {
@@ -226,8 +234,29 @@ internal fun AppData.withFitbodHistory(workouts: List<Workout>, catalog: List<Ex
         require(sets.map { it.id }.distinct().size == sets.size) { "Duplicate Fitbod set identity." }
         workout.exercises.forEach { exercise ->
             val match = available[exercise.exerciseId] ?: throw IllegalArgumentException("An exercise is unavailable. Review the import again.")
-            require(exercise.sets.isNotEmpty() && exercise.sets.all { it.completed && it.canComplete(match.loggingMetrics()) }) { "Invalid completed Fitbod sets." }
+            val metrics = match.loggingMetrics()
+            require(exercise.sets.isNotEmpty() && exercise.sets.all { it.completed && it.canComplete(metrics) }) { "Invalid completed Fitbod sets." }
         }
     }
     return if (additions.isEmpty()) this else copy(history = (history + additions).sortedByDescending { it.startedAt })
+}
+
+internal fun AppData.withFitbodImport(
+    preview: FitbodPreview,
+    choices: Map<String, String>,
+    skipped: Set<String>,
+    newExercises: List<Exercise>,
+    catalog: List<Exercise>,
+): AppData {
+    val pending = preview.pending(history)
+    val used = pending.exerciseNames.filterNot { it in skipped }.mapNotNull { choices[it] }.toSet()
+    val additions = newExercises.filter { it.id in used }.distinctBy { it.id }
+    val known = catalog.map { it.id }.toSet()
+    require(additions.none { it.id in known } && additions.all { it.custom && !it.archived && it.supportsFitbodStrength(true) }) {
+        "Preserved exercise identities changed. Preview the import again."
+    }
+    val completeCatalog = catalog + additions
+    val workouts = pending.materializeHistory(choices, skipped, completeCatalog)
+    val imported = withFitbodHistory(workouts, completeCatalog)
+    return if (additions.isEmpty()) imported else imported.copy(customExercises = customExercises + additions)
 }
