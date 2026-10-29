@@ -77,8 +77,9 @@ Local category mappings are:
 
 The Granular Workout Log category is a local addition so completed history can
 be selected explicitly. Weight Trend, Steps, and Period are disabled with an
-explanation. The app does not substitute invented calculations or empty
-successes for unavailable categories. Original photos, reference media, active
+explanation: Weight Trend export and Step export are not supported even though
+those values can be displayed in the app. The app does not write empty successes
+for unsupported categories. Original photos, reference media, active
 sessions, and unsaved drafts are excluded. Complete backup behavior is unchanged.
 
 ## Visibility and tutorial dismissal survive complete backup

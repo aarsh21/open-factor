@@ -1,6 +1,6 @@
 # Exercise media packaging
 
-The 0.3.0 direction keeps original guidance central while making logging straightforward. Static photos, instructions, anatomy and equipment previews are packaged in the app; original videos are separate, explicitly played content. Source-only builds remain a distinct fallback. This document describes the implementation and current staging inventory, not a deployed-service or final-release certification.
+The 0.4.0 direction keeps original guidance central while making logging straightforward. Static photos, instructions, anatomy and equipment previews are packaged in the app; original videos are separate, explicitly played content. Source-only builds remain a distinct fallback. This document describes the implementation and current staging inventory, not a deployed-service or final-release certification.
 
 Local Android builds use the extracted exercise photos, anatomy, instructions and equipment illustrations when the ignored reference pack is present. They keep the original exercise photos and anatomical SVGs intact. Equipment previews are derived at a maximum of 256 × 256 pixels under the same asset paths. Imported originals are never changed.
 
@@ -38,13 +38,13 @@ The inspected collection contains 1,831 MP4s for 619 exercises, 1,832 exercise p
 
 ## Playback and cache
 
-`ExerciseMedia` shows the photo preview first. Opening Guide performs no video download. Play creates the player and opens its data source. The client preserves original numbered camera views and exposes 1X, 2.5X and 5X speed, pause and replay without a seek bar. A bundled MP4 takes precedence; otherwise the original `videos/<exercise-id>_<view>.mp4` identity resolves under `exerciseMediaBaseUrl`.
+`ExerciseMedia` shows the photo preview first. Opening Guide performs no video download. Play creates the player and opens its data source. One ExoPlayer playlist preserves the original numbered camera order and loops all available angles after explicit Play. Direct camera selection remains available. Natural portrait sizing preserves the full demonstration frame; the player and thumbnails have no drawn card frame or letterbox background. Controls expose 1X, 2.5X and 5X speed, pause and replay without a seek bar. A bundled MP4 takes precedence; otherwise the original `videos/<exercise-id>_<view>.mp4` identity resolves under `exerciseMediaBaseUrl`.
 
 The build currently defaults that base to `https://factor-media.zabimaru.me/v1/`; override it with `-PexerciseMediaBaseUrl=https://your-host/`. This is build configuration, not evidence that the hostname or indexed objects are available. The client accepts HTTPS bases without URL credentials, query parameters, fragments or traversal; cleartext traffic is disabled. [The media service](../../backend/media/README.md) uses Hono/Node in front of private RustFS storage and includes Dokploy configuration and authenticated upload tooling.
 
 Remote video uses a **128 MiB disk cache** with least-recently-used eviction. It caches bytes requested during playback, does not prefetch the video library, and can stream around a cache error. Cached bytes can be removed by eviction or Android cache clearing; only retained complete data can support an offline replay. Static guidance and workout logging remain usable without the video service. Missing installation/configuration and playback failures retain a preview and explicit status or Retry action. The player pauses with the activity and releases pending playback/network work when its surface stops or leaves composition.
 
-The active logger's photo/Guide action opens Guide, Muscles and History in a sheet above the workout. Closing it returns to the current set. The library opens this rich detail before its secondary settings action. The Muscles tab supports original male/female artwork, readable full-width figures and selectable primary/secondary muscles. Source-only builds use their licensed preview/icon fallback rather than claiming the original pack is installed.
+The active logger's compact photo/name selector switches exercises. Its separate Guide action opens Guide, Muscles and History in a sheet above the workout. Closing it returns to the current set. The library opens this rich detail before its secondary settings action. The Muscles tab supports original male/female artwork, readable full-width figures and selectable primary/secondary muscles. Source-only builds use their licensed preview/icon fallback rather than claiming the original pack is installed.
 
 ## Ownership and distribution
 

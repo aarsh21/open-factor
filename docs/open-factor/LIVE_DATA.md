@@ -1,15 +1,29 @@
-# Live training data and local media
+# Recorded training and muscle workload
 
-The dashboard uses completed **working** sets from saved workouts and the current session, without counting the same workout ID twice. Warm-ups remain in the logger/history but do not inflate working-set counts, volume or Levels. Completing, unchecking, editing, finishing or discarding the current session recomputes derived values from persisted app state. Weekly values use workout start dates from Monday through today, excluding future records; history cards use the latest completed records in timestamp order. Habits counts saved workouts only.
+Dashboard and Workout summarize recorded training instead of showing an empty Active Program comparison. Programs remain available from Workout. Weekly navigation shows Monday–Sunday bars, with actual values only through today. Sessions, working sets, volume and trained-muscle counts come from saved workouts and the current active session, deduplicated by workout ID and grouped by workout start date in the recorded time zone. Future workouts are excluded.
 
-Active Program filters by its ID. When no saved program is active, the dashboard falls back to All Workouts instead of hiding all history. In program scope, comparison totals come from the exact active session's or latest started program cycle, falling back to Cycle 1 before any launch. They sum stored sets and skip flags across program days and derive distinct exercises and primary/secondary muscles from the catalog. The UI labels this **Compared with Cycle N plan** and **N planned**; it is not a reconstructed calendar schedule or a claim about MacroFactor's analytics algorithm. All Workouts has no program comparison. Workout templates do not supply plan targets.
+Only completed logical working sets contribute to workload. Warmups, incomplete sets, unilateral sides and Myo segments do not add extra working sets. Completing, unchecking, editing, finishing or discarding the active session recomputes the values from durable app state. A session counts once it contains a completed working set. Habits count saved workouts only. History/completion summaries can describe completed warmups as well, so their all-set count can differ from working-set analytics.
 
-Levels uses the same completed-working-set policy, including the current workout, over its selected rolling period. Its list and per-exercise dialog both normalize totals with `sets × 7 / days` and display one decimal in sets/week. Three working sets therefore display as 3.0 over seven days, 0.7 over 30 days and 0.2 over 90 days. Levels aggregates all workouts, independent of the dashboard scope. History/completion summaries still describe all completed sets, including warm-ups; that differs deliberately from working-set analytics. Source metric/bodyweight load coefficients, exact secondary-muscle weighting and original analytics remain unresolved.
+## Muscle accounting
 
-## Why alpha.2 showed icons
+The front/back anatomy map, workload table and exercise drilldowns use the catalog's primary and secondary muscle labels. Each completed logical set contributes once to each primary muscle and once to each distinct secondary muscle. A primary muscle cannot also receive a secondary contribution from the same set.
 
-The public alpha.2 APK deliberately contains no `assets/reference/` pack. Its icons are fallback content, not failed network downloads. Source imagery is available in builds with the operator-supplied APK imported through `tooling/import_reference_apk.py`, including the explicitly requested media-enabled alpha.4 release.
+| Display | Calculation |
+| --- | --- |
+| Direct | Completed sets for which the muscle is primary |
+| Indirect | Completed sets for which the muscle is secondary |
+| Weighted total | Direct + Indirect × 0.5 |
 
-The current local pack joins 1,831 image files to **619 of 1,345 exercises**, with 44 anatomy SVGs and equipment artwork. Every mapped image path exists in the local APK. The remaining 726 exercises have no recovered photo mapping. No original exercise videos are bundled; their future acquisition remains deferred. The media testing APK was initially local. Following the user’s explicit request to release that build, alpha.4 includes this pack as a release artifact. Extracted media stays outside the Git source tree and retains its original ownership; application-code licensing does not relicense it.
+For example, two bench-press working sets can produce Chest: 2 direct / 0 indirect / 2 total, Front Delts: 0 direct / 2 indirect / 1 total, and Triceps: 0 direct / 2 indirect / 1 total. The precise muscles depend on the exercise catalog entry. A workout's two sets remain two working sets even though they train several muscles.
 
-Install the local-media testing APK as an update to `org.openfactor.app` to retain local data. A future public/source-only update without the reference pack will return to media fallbacks. Do not infer complete media coverage or runtime video parity from a successful photo check.
+Muscle workload offers Week (Monday through the selected date), 30 days and 90 days. It shows actual totals in the selected window, not normalized sets/week. Muscle selection opens its contributing exercises; an exercise drilldown exposes recorded sets and an Open exercise action. Bars compare the displayed muscle counts with the largest count in the view. The color legend communicates weighted-set bands. These are explicit accounting and display policies, not a physiological recovery estimate, strength score or prescribed training target.
+
+Date-dependent summaries refresh on foreground resume and local-day changes. The [weight chart](BODY-CHARTS.md) uses daily body readings and a labeled seven-day mean. [Health Connect](HEALTH-CONNECT.md) supplies actual provider weight/body fat and daily step aggregates after consent; those imported values are separate from workout muscle accounting.
+
+## Exercise and guidance coverage
+
+Search covers all **1,345 catalog exercises**, with ranked exact names and aliases, abbreviations, reordered terms, combined name/equipment/muscle words and bounded one-edit typo matching. All equipment is the explicit default; muscle/equipment filters can narrow results and clearing them preserves the query. The full ranked list remains available rather than hiding matches inside collapsed groups. Favorites, custom exercises and gym profiles remain available.
+
+Original video guidance covers **619 exercises** with **1,831 original video objects**; catalog coverage does not imply every exercise has a demonstration. Static/full builds package recovered photos, anatomy and instructions where available. Frameless video starts only after Play, cycles the available camera angles in one repeating playlist and uses the bounded cache. See [media packaging](MEDIA-PACKAGING.md) for inventory and missing-media states.
+
+Earlier alpha source-only artifacts intentionally used fallback icons and limited licensed illustrations. Those historical packaging choices do not describe the current static-media app. The published [0.2.0](releases/v0.2.0.md) and [0.3.0](releases/v0.3.0.md) records remain specific to their artifacts; [0.4.0](releases/v0.4.0.md) records the current changes and verification scope.

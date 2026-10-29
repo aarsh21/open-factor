@@ -2,9 +2,9 @@
 
 An independently maintained Android workout app with straightforward logging and original exercise guidance. Choose an exercise, view its demonstration and muscles, record weight and reps, add warmups, and save your workout. Open Factor uses [NuvioMobile](https://github.com/NuvioMedia/NuvioMobile) as its base, retaining its floating navigation and grouped settings.
 
-“Simple” means useful training features in an uncluttered interface. The current 0.3.0 code restores the recovered exercise photos, instructions, anatomy and equipment artwork through an efficient static pack, with original videos delivered on demand over HTTPS. Core logging and bundled guidance work offline without an account. Videos require a bundled clip or available streamed/cached data. See [media packaging and playback](docs/open-factor/MEDIA-PACKAGING.md).
+“Simple” means useful training features in an uncluttered interface. The 0.4.0 checkout adds real Health Connect imports, stronger exercise search, quick weight logging, recorded training graphs and muscle workload to the original exercise guidance. Photos, instructions, anatomy and equipment artwork use an efficient static pack; original videos play on demand over HTTPS. Core logging and bundled guidance work offline without an account. Videos require a bundled clip or available streamed/cached data. See [media packaging and playback](docs/open-factor/MEDIA-PACKAGING.md).
 
-[Download Open Factor 0.3.0](https://github.com/aarsh21/open-factor/releases/tag/v0.3.0). The release includes the signed original-media APK, checksums and a verification bundle. See the [release notes and exact verification scope](docs/open-factor/releases/v0.3.0.md).
+[Download Open Factor 0.4.0](https://github.com/aarsh21/open-factor/releases/tag/v0.4.0). The release includes the signed original-media APK, checksums and a verification bundle. See the [release notes and exact verification scope](docs/open-factor/releases/v0.4.0.md).
 
 ## Build and test on Android
 
@@ -41,20 +41,22 @@ The debug APK is `openfactor/app/build/outputs/apk/debug/app-debug.apk`, package
 ## Training and exercise guidance
 
 - Quick unit setup, direct workout start, compact exercise selection, and visible Finish, Warmup and Add set actions.
-- Search exercise names and aliases; filter muscles/equipment; favorite exercises.
+- Search all 1,345 catalog exercises with ranked names, aliases, abbreviations, reordered terms and bounded typo matching; filter muscles/equipment or explicitly choose All equipment; favorite exercises. Original video demonstrations cover 619 exercises.
 - Original camera-view photos and instructions where recovered. Library selection opens Guide, Muscles and History; exercise settings are a secondary action.
-- An exercise photo and Guide action in the logger open guidance over the active workout. Dismissing it returns to the current exercise and set values.
+- A compact photo/name selector switches exercises within the workout. Guide opens guidance above the active workout; dismissing it preserves the selected exercise and set values.
 - Original male/female anatomy with selectable primary and secondary muscles, plus equipment illustrations and exercise properties where available.
-- Explicit video Play, numbered camera views, 1X/2.5X/5X speed, pause/replay and a bounded 128 MiB disk cache. Opening a guide does not start a video download.
+- Frameless portrait video with explicit Play, automatic looping through available camera angles, direct camera selection, 1X/2.5X/5X speed, pause/replay and a bounded 128 MiB disk cache. Opening a guide does not start a video download.
 - Gym profiles, literal equipment preset prefills, weight lists and gym-aware exercise filtering.
-- Custom exercises, reusable templates, and manual programs with rest/workout days, gym selection and variable-cycle targets. The active program remains visible on Workout.
-- Program-day launches with rep/RIR targets and per-exercise rest overrides; local muscle set levels over week/month/three-month windows.
+- Custom exercises, reusable templates, and manual programs with rest/workout days, gym selection and variable-cycle targets. Programs remain accessible from Workout.
+- Program-day launches with rep/RIR targets and per-exercise rest overrides; weekly recorded training graphs, front/back anatomy and direct/indirect muscle-set counts over week/30-day/90-day windows.
 - Persist active workouts, selected exercise, pause/resume, weight, reps, optional RIR, warmups and notes.
 - Optional workout/rest notifications. Precise background timing requires Android special access; force-stop suppresses reminders until reopening.
 - Automatic rest timing, pause-excluding summaries, history and repeat workout; kilograms/pounds with canonical kilogram storage.
 - Local body data and progress photos, plus export/restore backups including programs and drafts.
+- Plus shortcuts include Log Weight in a bottom sheet that preserves the current destination and active workout. Weight charts show daily readings and a labeled trailing seven-day mean without treating missing days as zero.
+- One Health Connect action requests read permissions and imports real weight, body fat and daily step aggregates. Previously connected data refreshes when the foreground app becomes stale; the app never writes to the provider. See [Health Connect behavior and provider verification](docs/open-factor/HEALTH-CONNECT.md).
 
-See [manual program usage and limits](docs/open-factor/PROGRAMS.md). Test commands above describe how to run checks; they do not claim a completed 0.3.0 release verification or universal device coverage.
+See [manual program usage and limits](docs/open-factor/PROGRAMS.md), [training analytics](docs/open-factor/LIVE_DATA.md) and [body charts](docs/open-factor/BODY-CHARTS.md). Test commands above describe how to run checks; completed release checks belong to their versioned evidence record and do not establish universal device coverage.
 
 ## Original media and source-only fallback
 
