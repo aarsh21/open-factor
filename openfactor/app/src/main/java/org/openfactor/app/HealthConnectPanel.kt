@@ -14,6 +14,7 @@ import androidx.compose.material.icons.rounded.HealthAndSafety
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +49,7 @@ fun HealthConnectPanel(
     onClose: () -> Unit,
     onSync: ((HealthConnectSyncData) -> Unit)? = null,
     autoConnectOnOpen: Boolean = false,
+    onSuccessfulSync: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val transfers = remember(context) { HealthConnectTransfers(context.applicationContext) }
@@ -61,6 +63,10 @@ fun HealthConnectPanel(
     var autoConnectConsumed by rememberSaveable { mutableStateOf(false) }
     val importSync by rememberUpdatedState(onSync)
     val importWeights by rememberUpdatedState(onImportWeights)
+    val successfulSync by rememberUpdatedState(onSuccessfulSync)
+    val syncCommitter = rememberSaveable(saver = Saver<HealthConnectSyncCommitter, Boolean>(
+        save = { it.returnedToCaller }, restore = { HealthConnectSyncCommitter(it) },
+    )) { HealthConnectSyncCommitter() }
 
     fun syncNow() {
         if (busy) return
@@ -73,14 +79,15 @@ fun HealthConnectPanel(
                     transfers.sync(today.minusDays(29), today, ZoneId.systemDefault(), context.packageName)
                 }) {
                     is HealthConnectResult.Success -> {
-                        try {
+                        val outcome = syncCommitter.commit(result, save = { sync ->
                             val save = importSync
-                            if (save != null) save(result.value) else importWeights(result.value.weights)
-                            val state = result.value.state
+                            if (save != null) save(sync) else importWeights(sync.weights)
+                            val state = sync.state
                             message = if (state.weightReadings == 0 && state.dailySteps.isEmpty())
                                 "Connected. No shared readings in the last 30 days."
                             else "Synced from Health Connect."
-                        } catch (_: Exception) {
+                        }, onSuccessfulSync = successfulSync)
+                        if (outcome == HealthConnectSyncCommitOutcome.SAVE_FAILED) {
                             message = "Readings couldn’t be saved. Sync again to retry."
                         }
                     }

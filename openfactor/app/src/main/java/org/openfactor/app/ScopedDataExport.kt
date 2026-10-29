@@ -82,6 +82,7 @@ object ScopedDataExport {
             programs = if (ExportCategory.TRAINING_PROGRAMS in chosen)
                 data.programs.filter { !request.quick || it.id == data.activeProgramId } else emptyList(),
             routines = if (ExportCategory.WORKOUTS in chosen) data.routines else emptyList(),
+            templateSplits = if (ExportCategory.WORKOUTS in chosen) data.templateSplits else emptyList(),
             customExercises = if (ExportCategory.CUSTOM_EXERCISES in chosen) data.customExercises else emptyList(),
             gyms = if (ExportCategory.GYM_PROFILES in chosen) data.gyms else emptyList(),
             exerciseDefaults = if (ExportCategory.EXERCISE_SETTINGS in chosen) data.exerciseDefaults else emptyMap(),
@@ -91,7 +92,10 @@ object ScopedDataExport {
                 ExportCategory.SCALE_WEIGHT -> payload.put(category.key, encoded.getJSONArray("scaleWeights"))
                 ExportCategory.BODY_METRICS -> payload.put(category.key, encoded.getJSONArray("bodyMeasurements"))
                 ExportCategory.TRAINING_PROGRAMS -> payload.put(category.key, encoded.getJSONArray("programs"))
-                ExportCategory.WORKOUTS -> payload.put(category.key, encoded.getJSONArray("routines"))
+                ExportCategory.WORKOUTS -> {
+                    payload.put(category.key, encoded.getJSONArray("routines"))
+                    if (data.templateSplits.isNotEmpty()) payload.put("templateSplits", encoded.getJSONArray("templateSplits"))
+                }
                 ExportCategory.WORKOUT_LOG -> payload.put(category.key, encoded.getJSONArray("history"))
                 ExportCategory.GYM_PROFILES -> payload.put(category.key, encoded.getJSONArray("gyms"))
                 ExportCategory.CUSTOM_EXERCISES -> payload.put(category.key, encoded.getJSONArray("customExercises"))

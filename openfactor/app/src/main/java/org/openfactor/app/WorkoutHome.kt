@@ -23,6 +23,8 @@ fun WorkoutHome(
     onResume: () -> Unit,
     onRoutine: (Routine) -> Unit,
     onNewRoutine: () -> Unit,
+    onTemplates: () -> Unit,
+    onEditRoutine: (Routine) -> Unit,
     onDeleteRoutine: (String) -> Unit,
     onHistory: () -> Unit,
     onPrograms: () -> Unit,
@@ -71,17 +73,16 @@ fun WorkoutHome(
                         }
                     }
                 }
-                SectionTitle("Templates", if (data.routines.isNotEmpty()) "Create" else null, onNewRoutine)
+                SectionTitle("Templates", "Browse", onTemplates)
             }
         }
         if (data.routines.isEmpty()) item {
-            OutlinedButton(onNewRoutine, Modifier.padding(horizontal = 18.dp).fillMaxWidth().heightIn(min = 56.dp)) {
-                Icon(Icons.Rounded.PlaylistAdd, null)
-                Spacer(Modifier.width(8.dp))
-                Text("Create template")
+            Row(Modifier.padding(horizontal = 18.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onTemplates, Modifier.weight(1f).heightIn(min = 56.dp)) { Text("Browse splits") }
+                OutlinedButton(onNewRoutine, Modifier.weight(1f).heightIn(min = 56.dp)) { Text("Create template") }
             }
         }
-        items(data.routines, key = { it.id }) { routine ->
+        items(data.routines.take(3), key = { it.id }) { routine ->
             var menu by remember { mutableStateOf(false) }
             Surface(Modifier.padding(horizontal = 18.dp).fillMaxWidth(), shape = OF.shape, color = OF.top) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -90,6 +91,7 @@ fun WorkoutHome(
                         Box {
                             IconButton({ menu = true }) { Icon(Icons.Rounded.MoreHoriz, "Manage ${routine.name}") }
                             DropdownMenu(menu, { menu = false }) {
+                                DropdownMenuItem({ Text("Edit template") }, { menu = false; onEditRoutine(routine) })
                                 DropdownMenuItem({ Text("Delete template") }, { menu = false; delete = routine })
                             }
                         }
@@ -106,6 +108,9 @@ fun WorkoutHome(
                     PrimaryAction("Start ${routine.name}", { onRoutine(routine) }, enabled = data.active == null)
                 }
             }
+        }
+        if (data.routines.isNotEmpty()) item {
+            TextButton(onTemplates, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("All templates (${data.routines.size})"); Icon(Icons.Rounded.ChevronRight, null) }
         }
         if (data.history.isNotEmpty()) {
             item { Box(Modifier.padding(horizontal = 18.dp)) { SectionTitle("Recent workouts", "All", onHistory) } }

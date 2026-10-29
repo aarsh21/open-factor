@@ -31,6 +31,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var workoutOpenRequest by mutableIntStateOf(0)
@@ -91,6 +92,9 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     var workoutSettings by rememberSaveable { mutableStateOf(false) }
     var healthConnect by rememberSaveable { mutableStateOf(false) }
     var autoConnectHealth by rememberSaveable { mutableStateOf(false) }
+    var routineEditId by rememberSaveable { mutableStateOf("") }
+    var routineDraftKey by rememberSaveable { mutableStateOf("") }
+    var routineReturn by rememberSaveable { mutableStateOf("") }
     var gymsReturn by rememberSaveable { mutableStateOf("") }
     var bodyDataTab by rememberSaveable { mutableIntStateOf(0) }
     var bodyChartMetric by rememberSaveable { mutableStateOf("weight") }
@@ -100,6 +104,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         if (route == "measurement-entry" || route == "photo-entry") bodyEntryReturn else route
     val exercises = remember(vm, data.customExercises, libraryReady) { vm.exercises(data) }
     val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val routeState = rememberSaveableStateHolder()
     val context = LocalContext.current
     HealthConnectForegroundSync(data, vm::importHealthConnectSync, enabled = !healthConnect)
@@ -142,6 +147,12 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
             lifecycleOwner.lifecycle.removeObserver(observer)
             view.keepScreenOn = original
         }
+    }
+    fun editTemplate(routine: Routine? = null, returnRoute: String = "") {
+        routineEditId = routine?.id.orEmpty()
+        routineDraftKey = newId()
+        routineReturn = returnRoute
+        route = "routine"
     }
     fun openExercise(id: String) {
         previousRoute = route
@@ -190,6 +201,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         data, vm::importHealthConnectWeights, onClose = { healthConnect = false; autoConnectHealth = false },
         onSync = vm::importHealthConnectSync,
         autoConnectOnOpen = autoConnectHealth,
+        onSuccessfulSync = if (autoConnectHealth) { { healthConnect = false; autoConnectHealth = false } } else null,
     )
     if (quickWeight) QuickWeightSheet(
         data.preferences.pounds,
@@ -555,12 +567,23 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             onSaved = { detailId = edit.original.id; route = "history-detail" },
                         )
                     } ?: run { LaunchedEffect(Unit) { route = "history" } }
-                    "routine" ->
-                        RoutineBuilder(exercises, { route = "" }) { name, ids ->
-                            vm.saveRoutine(name, ids)
-                            route = ""
-                            tab = 1
-                        }
+                    "templates" -> routeState.SaveableStateProvider("template-library") {
+                        TemplateLibraryScreen(data, exercises, { route = "" },
+                            onCreate = { editTemplate(returnRoute = "templates") },
+                            onEdit = { editTemplate(it, "templates") },
+                            onStart = { routine -> vm.startRoutine(routine.id).also { if (it == null) route = "session" } },
+                            onInstall = vm::installStarterSplit, onDelete = vm::deleteRoutine)
+                    }
+                    "routine" -> key(routineDraftKey) {
+                        TemplateEditor(data.routines.find { it.id == routineEditId }, exercises,
+                            onBack = { route = routineReturn },
+                            onSave = { routine -> vm.saveRoutine(routine).also { if (it == null) { route = "templates"; tab = 1 } } },
+                            favorites = data.favorites, onFavorite = vm::favorite,
+                            gyms = data.gyms, equipmentCatalog = vm.equipmentCatalog,
+                            preview = { exercise, close, add ->
+                                ExerciseDetail(exercise, data, vm, close, add, closeable = true)
+                            })
+                    }
                     else ->
                         when (tab) {
                             0 ->
@@ -587,10 +610,13 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                     onStart = { vm.start(); route = "picker" },
                                     onResume = { route = "session" },
                                     onRoutine = { r ->
-                                        vm.start(r.name, r.exerciseIds)
-                                        route = "session"
+                                        val failure = vm.startRoutine(r.id)
+                                        if (failure == null) route = "session"
+                                        else scope.launch { snackbar.showSnackbar(failure) }
                                     },
-                                    onNewRoutine = { route = "routine" },
+                                    onNewRoutine = { editTemplate() },
+                                    onTemplates = { route = "templates" },
+                                    onEditRoutine = { editTemplate(it) },
                                     onDeleteRoutine = vm::deleteRoutine,
                                     onDraft = { route = "workout-draft" },
                                     onPrograms = { route = "programs" },
@@ -714,8 +740,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                     if (data.active != null) route = "session"
                     else { vm.prepareWorkout(); route = "workout-draft" }
                 }
-                WorkoutShortcut.NEW_PROGRAM -> route = "routine"
-                WorkoutShortcut.NEW_WORKOUT -> route = "routine"
+                WorkoutShortcut.NEW_PROGRAM -> editTemplate()
+                WorkoutShortcut.NEW_WORKOUT -> editTemplate()
             }
         }
 }

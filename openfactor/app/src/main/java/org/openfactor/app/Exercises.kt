@@ -8,16 +8,12 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -45,6 +41,9 @@ fun ExerciseLibrary(
     deprioritizedIds: Set<String> = emptySet(),
     modifiedIds: Set<String> = emptySet(),
     allowCustom: Boolean = true,
+    selectedIds: Set<String> = emptySet(),
+    onSelectionChange: ((String) -> Unit)? = null,
+    showMuscleShortcuts: Boolean = false,
 ) {
     var gymId by rememberSaveable { mutableStateOf("") }
     var gymMenu by remember { mutableStateOf(false) }
@@ -153,13 +152,14 @@ fun ExerciseLibrary(
                 shape = RoundedCornerShape(50),
             )
             if (picking && onBack != null)
-                Button(onBack, shape = RoundedCornerShape(50)) { Text("Done") }
+                Button(onBack, shape = RoundedCornerShape(50)) { Text(if (onSelectionChange != null) "Done (${selectedIds.size})" else "Done") }
         }
     }
-    Box(Modifier.fillMaxSize().imePadding()) {
+    BoxWithConstraints(Modifier.fillMaxSize().imePadding()) {
+        val pickerHeight = maxHeight
         Column(Modifier.fillMaxSize()) {
             PageHeading(
-                if (picking) "Add Exercise" else "Exercises",
+                if (picking) "Add exercises" else "Exercises",
                 onBack,
                 actions = { if (allowCustom) RoundAction(Icons.Rounded.Add, "Create custom exercise", onCustom) },
             )
@@ -227,7 +227,7 @@ fun ExerciseLibrary(
                 Column(Modifier.padding(horizontal = 18.dp)) {
                     FilterChooser("Muscle group", muscleGroups, muscle) { muscle = it }
                 }
-            if (!picking && query.isBlank() && !WindowInsets.isImeVisible) Row(
+            if ((!picking || (showMuscleShortcuts && pickerHeight >= 500.dp)) && query.isBlank() && !WindowInsets.isImeVisible) Row(
                 Modifier.horizontalScroll(rememberScrollState())
                     .padding(horizontal = 14.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -307,11 +307,14 @@ fun ExerciseLibrary(
                         Text(e.title, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         RoundAction(
-                            if (picking) Icons.Rounded.Add
+                            if (picking && e.id in selectedIds) Icons.Rounded.Check
+                            else if (picking) Icons.Rounded.Add
                             else if (e.id in favorites) Icons.Rounded.Star else Icons.Rounded.StarOutline,
-                            if (picking) "Add ${e.name}" else "Favorite ${e.name}",
+                            if (picking && e.id in selectedIds) "Remove ${e.name} from selection"
+                            else if (picking) "Add ${e.name}" else "Favorite ${e.name}",
                         ) {
-                            if (picking && onPick != null) {
+                            if (picking && onSelectionChange != null) onSelectionChange(e.id)
+                            else if (picking && onPick != null) {
                                 if (!pickInFlight) { pickInFlight = true; onPick(e.id) }
                             } else onFavorite(e.id)
                         }
@@ -597,127 +600,8 @@ fun RoutineBuilder(
     onBack: () -> Unit,
     onSave: (String, List<String>) -> Unit,
 ) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var query by rememberSaveable { mutableStateOf("") }
-    var selected by rememberSaveable { mutableStateOf(listOf<String>()) }
-    var leaving by remember { mutableStateOf(false) }
-    var searching by remember { mutableStateOf(false) }
-    var editNameRequest by remember { mutableIntStateOf(0) }
-    val nameFocus = remember { FocusRequester() }
-    val searchIndex = remember(exercises) { ExerciseSearchIndexes.forExercises(exercises) }
-    val matches = remember(searchIndex, query) { searchIndex.search(query).filterNot { it.archived } }
-    val listState = rememberLazyListState()
-    LaunchedEffect(query) { listState.scrollToItem(0) }
-    LaunchedEffect(editNameRequest) { if (editNameRequest > 0) nameFocus.requestFocus() }
-    fun back() {
-        if (name.isNotBlank() || selected.isNotEmpty()) leaving = true else onBack()
-    }
-    androidx.activity.compose.BackHandler(onBack = ::back)
-    Column(Modifier.fillMaxSize().imePadding()) {
-        // Search is a working mode: retain the name as an editable header and give the list room
-        // above the keyboard. Never collapse the field while the person is typing its name.
-        Row(Modifier.fillMaxWidth().background(OF.top).padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            IconButton(::back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
-            Text(if (searching && name.isNotBlank()) name else "Create template", Modifier.weight(1f),
-                style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (searching) IconButton({ searching = false; editNameRequest++ }) {
-                Icon(Icons.Rounded.Edit, "Edit template name")
-            }
-        }
-        if (!searching) OutlinedTextField(
-            name,
-            { name = it },
-            Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp).focusRequester(nameFocus),
-            label = { Text("Template name") },
-            singleLine = true,
-        )
-        OutlinedTextField(
-            query,
-            { query = it },
-            Modifier.fillMaxWidth().padding(horizontal = 18.dp).onFocusChanged { searching = it.isFocused },
-            placeholder = { Text("Search exercises") },
-            leadingIcon = { Icon(Icons.Rounded.Search, null) },
-            trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(Icons.Rounded.Close, "Clear search") } },
-            singleLine = true,
-        )
-        Text("${selected.size} selected", Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.labelLarge, color = OF.muted)
-        LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(horizontal = 18.dp)) {
-            items(if (searching) emptyList() else selected, key = { "selected-$it" }) { id ->
-                val exercise = exercises.find { it.id == id }
-                val index = selected.indexOf(id)
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${index + 1}. ${exercise?.title ?: "Exercise"}", Modifier.weight(1f))
-                    listOf(-1 to Icons.Rounded.ArrowUpward, 1 to Icons.Rounded.ArrowDownward)
-                        .forEach { (delta, icon) ->
-                            IconButton(
-                                onClick = {
-                                    selected =
-                                        selected.toMutableList().apply {
-                                            java.util.Collections.swap(this, index, index + delta)
-                                        }
-                                },
-                                enabled = index + delta in selected.indices,
-                            ) {
-                                Icon(
-                                    icon,
-                                    "Move ${exercise?.title ?: "exercise"} ${if (delta < 0) "up" else "down"}",
-                                )
-                            }
-                        }
-                    IconButton({ selected = selected - id }) {
-                        Icon(Icons.Rounded.Close, "Remove ${exercise?.title ?: "exercise"}")
-                    }
-                }
-            }
-            if (selected.isNotEmpty() && !searching)
-                item { HorizontalDivider(Modifier.padding(vertical = 12.dp), color = OF.line) }
-            if (matches.isEmpty()) item {
-                EmptyContent(Icons.Rounded.Search, "No exercises found", "Try a name, muscle or equipment.", "Clear search", { query = "" })
-            }
-            items(
-                matches,
-                key = { it.id },
-            ) { e ->
-                ListItem(
-                    headlineContent = { Text(e.title) },
-                    supportingContent = { Text("${e.muscle} · ${e.equipment}") },
-                    leadingContent = { ExerciseImage(e, Modifier.size(48.dp)) },
-                    trailingContent = {
-                        Checkbox(
-                            e.id in selected,
-                            {
-                                selected =
-                                    if (e.id in selected) selected - e.id else selected + e.id
-                            },
-                        )
-                    },
-                    modifier =
-                        Modifier.clickable {
-                            selected = if (e.id in selected) selected - e.id else selected + e.id
-                        },
-                    colors = ListItemDefaults.colors(containerColor = OF.background),
-                )
-            }
-        }
-        Box(Modifier.padding(horizontal = 18.dp, vertical = 8.dp)) {
-            PrimaryAction(
-                "Save template",
-                { onSave(name, selected) },
-                enabled = name.isNotBlank() && selected.isNotEmpty(),
-            )
-        }
-    }
-    if (leaving)
-        ConfirmDialog(
-            "Discard unsaved template?",
-            "This template has not been saved to your library.",
-            "Discard",
-            { leaving = false },
-            {
-                leaving = false
-                onBack()
-            },
-        )
+    TemplateEditor(null, exercises, onBack, { routine ->
+        onSave(routine.name, routine.exerciseIds)
+        null
+    })
 }

@@ -91,7 +91,8 @@ data class Workout(
     val gymId: String? = null,
 )
 
-data class Routine(val id: String = newId(), val name: String, val exerciseIds: List<String>)
+data class Routine(val id: String = newId(), val name: String, val exerciseIds: List<String>,
+    val prescriptions: List<TemplateExercise> = emptyList())
 
 data class Preferences(
     val pounds: Boolean = false,
@@ -144,6 +145,7 @@ data class AppData(
     val exerciseDefaults: Map<String, ExerciseDefaults> = emptyMap(),
     val healthConnect: HealthConnectSyncState = HealthConnectSyncState(),
     val pastWorkoutEdit: PastWorkoutEdit? = null,
+    val templateSplits: List<TemplateSplit> = emptyList(),
 )
 
 fun newId() = UUID.randomUUID().toString()
@@ -378,14 +380,10 @@ object DataCodec {
             .put(
                 "routines",
                 JSONArray(
-                    d.routines.map {
-                        JSONObject()
-                            .put("id", it.id)
-                            .put("name", it.name)
-                            .put("exerciseIds", JSONArray(it.exerciseIds))
-                    }
+                    d.routines.map { TemplateCodec.encodeRoutine(it) }
                 ),
             )
+            .put("templateSplits", JSONArray(d.templateSplits.map { TemplateCodec.encodeSplit(it) }))
             .put("favorites", JSONArray(d.favorites.toList()))
             .put("customExercises", JSONArray(d.customExercises.map { it.json() }))
             .put("exerciseDefaults", ExerciseDefaultsCodec.encode(d.exerciseDefaults))
@@ -489,12 +487,12 @@ object DataCodec {
         val p = j.optJSONObject("preferences") ?: JSONObject()
         val programs = j.array("programs").objects().map { ProgramCodec.decode(it) }
         require(programs.map { it.id }.distinct().size == programs.size) { "Duplicate program" }
+        val routines = j.array("routines").objects().map { TemplateCodec.decodeRoutine(it) }
+        require(routines.map { it.id }.distinct().size == routines.size) { "Duplicate template" }
         return AppData(
             j.optJSONObject("active")?.workout(),
             j.array("history").objects().map { it.workout() },
-            j.array("routines").objects().map {
-                Routine(it.getString("id"), it.getString("name"), it.array("exerciseIds").strings())
-            },
+            routines,
             j.array("favorites").strings().toSet(),
             j.array("customExercises").objects().map { it.exercise(custom = true) },
             Preferences(
@@ -552,6 +550,7 @@ object DataCodec {
             pastWorkoutEdit = j.optJSONObject("pastWorkoutEdit")?.let {
                 PastWorkoutEdit(it.getJSONObject("original").workout(), it.getJSONObject("edited").workout())
             },
+            templateSplits = TemplateCodec.decodeSplits(j.optJSONArray("templateSplits"), routines),
         )
     }
 
@@ -1110,6 +1109,36 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         )
     }
 
+    fun saveRoutine(routine: Routine): String? {
+        var error: String? = null
+        update { data ->
+            try { data.withSavedRoutine(routine, exercises(data)) }
+            catch (failure: IllegalArgumentException) { error = failure.message; data }
+        }
+        return error
+    }
+
+    fun installStarterSplit(presetId: String): String? {
+        var error: String? = null
+        update { data ->
+            val catalog = exercises(data)
+            val preset = starterTemplateSplits(catalog).find { it.id == presetId }
+            if (preset == null) { error = "This split has unavailable exercises. Reload the library and try again."; data }
+            else try { data.withStarterSplit(preset, catalog) }
+            catch (failure: IllegalArgumentException) { error = failure.message; data }
+        }
+        return error
+    }
+
+    fun startRoutine(routineId: String): String? {
+        var error: String? = null
+        update { data ->
+            try { data.withStartedRoutine(routineId, exercises(data), System.currentTimeMillis()) }
+            catch (failure: IllegalArgumentException) { error = failure.message; data }
+        }
+        return error
+    }
+
     fun reorderRoutines(ids: List<String>) = update { data ->
         val byId = data.routines.associateBy { it.id }
         if (ids.size != data.routines.size || ids.toSet() != byId.keys) data
@@ -1117,7 +1146,8 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun deleteRoutine(id: String) = update {
-        it.copy(routines = it.routines.filterNot { r -> r.id == id })
+        it.copy(routines = it.routines.filterNot { r -> r.id == id },
+            templateSplits = it.templateSplits.filterNot { split -> id in split.days })
     }
 
     fun favorite(id: String) = update {
