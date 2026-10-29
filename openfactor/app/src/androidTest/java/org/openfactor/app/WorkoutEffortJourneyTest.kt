@@ -16,7 +16,7 @@ class WorkoutEffortJourneyTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     private fun awaitText(text: String) = compose.waitUntil(15_000) {
-        compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+        runCatching { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }.getOrDefault(false)
     }
 
     @Test fun bulkLoggingValidatesAllRowsThenRatesOnlyLastSetAndSurvivesRecreation() {

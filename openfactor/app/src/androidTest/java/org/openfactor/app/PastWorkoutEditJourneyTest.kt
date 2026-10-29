@@ -15,13 +15,18 @@ class PastWorkoutEditJourneyTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private fun await(text: String) = compose.waitUntil(15_000) {
-        compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+        runCatching { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }.getOrDefault(false)
     }
     @Test fun correctSavedValuesPersistDraftAndCancelWithoutTouchingActiveWorkout() {
         val store = WorkoutStore(context)
         val before = store.load()
         var scenario: ActivityScenario<MainActivity>? = null
         try {
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(
+                    "pm grant ${context.packageName} android.permission.POST_NOTIFICATIONS",
+                ).use { descriptor -> java.io.FileInputStream(descriptor.fileDescriptor).use { it.readBytes() } }
+            }
             val catalog = context.assets.open("catalog.json").bufferedReader().use { DataCodec.catalog(it.readText()) }
             val bench = catalog.first { it.name.equals("Barbell bench press", true) }
             val now = System.currentTimeMillis()
