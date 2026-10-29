@@ -3,6 +3,9 @@ package org.openfactor.app
 import androidx.compose.runtime.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -26,7 +29,9 @@ class ExerciseSelectionJourneyTest {
             OpenFactorTheme {
                 // Less space than an ordinary phone with its keyboard open. The previous fixed
                 // name/header/footer exhausted this viewport and hid every exercise result.
-                Box(Modifier.height(340.dp)) {
+                // This height already represents the space remaining ABOVE the keyboard.
+                // Consume the real test-host IME so RoutineBuilder cannot subtract it again.
+                Box(Modifier.height(340.dp).consumeWindowInsets(WindowInsets.ime)) {
                     RoutineBuilder(listOf(flat, incline), {}) { name, ids -> saved = name to ids }
                 }
             }
