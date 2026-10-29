@@ -27,6 +27,8 @@ internal fun DashboardTiles(
     onHistory: () -> Unit,
     onBodyData: () -> Unit,
     onStart: () -> Unit,
+    onHealthConnect: (() -> Unit)? = null,
+    onLogWeight: (() -> Unit)? = null,
 ) {
     val selected = data.preferences.dashboard.selected(section)
     if (
@@ -35,34 +37,15 @@ internal fun DashboardTiles(
             (section == DashboardSection.HABITS && !data.preferences.showHabits)
     )
         return
-    val metrics = data.dashboardMetrics(exercises)
+    val today = LocalDate.now()
+    val metrics = data.copy(preferences = data.preferences.copy(dashboardAllWorkouts = true)).dashboardMetrics(exercises, today)
     Column(Modifier.padding(horizontal = 18.dp)) {
         when (section) {
             DashboardSection.INSIGHTS -> {
-                SectionTitle(section.label)
-                Row(
-                    Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     selected.forEach { key ->
-                        if (key == "workouts")
-                            InsightCard(
-                                "Workouts",
-                                "Saved workouts · selected scope",
-                                metrics.history.size.toString(),
-                                "saved",
-                                Modifier.width(178.dp),
-                                { onDetail("workouts") },
-                            )
-                        else
-                            InsightCard(
-                                "Weight Trend",
-                                "Calculation unavailable",
-                                "—",
-                                "",
-                                Modifier.width(178.dp),
-                                { onDetail("trend") },
-                            )
+                        if (key == "trend") WeightTrendCard(data, { onChart("weight") }, onLogWeight ?: onBodyData)
+                        else DashboardRow("Workouts", "${data.history.distinctBy { it.id }.size} saved") { onHistory() }
                     }
                 }
             }
@@ -72,7 +55,7 @@ internal fun DashboardTiles(
                     Column {
                         selected.forEach { key ->
                             val dates =
-                                if (key == "weighIn") data.scaleWeights.map { it.date }.toSet()
+                                if (key == "weighIn") data.scaleWeights.map { it.date }.filter { !it.isAfter(today) }.toSet()
                                 else metrics.history.map { it.localDate() }.toSet()
                             val monday =
                                 LocalDate.now()
@@ -91,7 +74,7 @@ internal fun DashboardTiles(
                                         style = MaterialTheme.typography.titleMedium,
                                     )
                                     Text(
-                                        "${(0..6).count { monday.plusDays(it.toLong()) in dates }} days this week",
+                                        "${(0..6).count { monday.plusDays(it.toLong()) in dates }} ${if ((0..6).count { monday.plusDays(it.toLong()) in dates } == 1) "day" else "days"} this week",
                                         color = OF.muted,
                                     )
                                 }
@@ -129,7 +112,9 @@ internal fun DashboardTiles(
                     data
                         .bodyChartSeries()
                         .filter {
-                            it.key in selected && data.preferences.dataVisibility.isVisible(it.key)
+                            it.key in selected && data.preferences.dataVisibility.isVisible(it.key) &&
+                                it.points.any { point -> !point.date.isAfter(today) } &&
+                                (it.key != "weight" || "trend" !in data.preferences.dashboard.insights || !data.preferences.showInsights)
                         }
                         .sortedBy { selected.indexOf(it.key) }
                 if (series.isNotEmpty()) {
@@ -160,7 +145,7 @@ internal fun DashboardTiles(
                     Column {
                         selected.forEach { muscle ->
                             val count =
-                                muscleContributions(metrics.weekly, exercises, 7, muscle).sumOf {
+                                muscleContributions(metrics.weekly, exercises, 7, muscle, today).sumOf {
                                     it.weightedSets
                                 }
                             DashboardRow(muscle, "${count.bodyNumber()} weighted sets this week") {
@@ -184,7 +169,7 @@ internal fun DashboardTiles(
                                     .sumOf { it.completedWorkingSets() }
                             DashboardRow(
                                 exercise?.title ?: "Unavailable exercise",
-                                "$sets saved working sets · 1-RM unavailable",
+                                "$sets recorded working sets",
                             ) {
                                 onDetail("exercise:$id")
                             }
@@ -193,9 +178,19 @@ internal fun DashboardTiles(
                 }
             }
             DashboardSection.GENERAL -> {
-                SectionTitle(section.label)
-                Surface(shape = OF.shape, color = OF.card) {
-                    DashboardRow("Steps", "No local step data") { onDetail("steps") }
+                val today = LocalDate.now()
+                val steps = data.healthConnect.dailySteps.find { it.date == today }
+                val lastSync = data.healthConnect.lastSyncedAtMillis
+                SectionTitle("Steps")
+                Surface(Modifier.fillMaxWidth(), shape = OF.shape, color = OF.card) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(steps?.count?.toString() ?: "—", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium)
+                            if (onHealthConnect != null) TextButton(onHealthConnect) { Text(if (lastSync == null) "Connect" else "Sync") }
+                        }
+                        Text(if (steps != null) "Today" else if (lastSync != null) "No step reading for today" else "Connect Health Connect to import steps", color = OF.muted)
+                        if (lastSync != null) Text("Synced ${java.time.Instant.ofEpochMilli(lastSync).atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ofPattern("d MMM, HH:mm"))}", color = OF.muted, style = MaterialTheme.typography.labelSmall)
+                    }
                 }
             }
         }
@@ -221,8 +216,9 @@ internal fun DashboardDetail(
     onBack: () -> Unit,
     onDetail: (String) -> Unit,
     onExercise: ((String) -> Unit)? = null,
+    today: LocalDate = LocalDate.now(),
 ) {
-    val metrics = data.dashboardMetrics(exercises)
+    val metrics = data.dashboardMetrics(exercises, today)
     val muscle = key.takeIf { it.startsWith("muscle:") }?.removePrefix("muscle:")
     val exercise =
         key.takeIf { it.startsWith("exercise:") }
@@ -239,19 +235,12 @@ internal fun DashboardDetail(
             }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 112.dp)) {
         item { PageHeading(title, onBack) }
-        item {
-            Text(
-                if (metrics.allWorkouts) "All Workouts" else "Active Program",
-                Modifier.padding(18.dp),
-                color = OF.muted,
-            )
-        }
         when {
             muscle != null -> {
-                val contributions = muscleContributions(metrics.weekly, exercises, 7, muscle)
+                val contributions = muscleContributions(metrics.weekly, exercises, 7, muscle, today)
                 item {
                     Text(
-                        "Completed working sets this week. Primary muscles count 1 set; secondary muscles count ½ set. Calendar windows and advanced-set eligibility remain local policies.",
+                        "Primary sets count 1. Secondary sets count ½. Warmups are excluded.",
                         Modifier.padding(18.dp),
                         color = OF.muted,
                     )
@@ -276,13 +265,13 @@ internal fun DashboardDetail(
                 if (key.startsWith("exercise:"))
                     item {
                         Text(
-                            "Saved sets, not estimated 1-RM. The source strength-profile calculation is not recovered.",
+                            "Completed working sets",
                             Modifier.padding(18.dp),
                             color = OF.muted,
                         )
                     }
                 if (exercise != null && onExercise != null)
-                    item { TextButton({ onExercise(exercise.id) }) { Text("Exercise settings") } }
+                    item { TextButton({ onExercise(exercise.id) }) { Text("Open exercise") } }
                 if (history.isEmpty()) item { Text("No exercise history", Modifier.padding(18.dp)) }
                 items(history, key = { it.id }) { workout ->
                     Column(Modifier.fillMaxWidth().padding(18.dp)) {
@@ -331,7 +320,7 @@ internal fun DashboardDetail(
             key == "trend" ->
                 item {
                     Text(
-                        "Weight Trend smoothing is not recovered. No smoothed value is calculated. Scale Weight charts show your original dated readings in Body Metrics.",
+                        "Weight trend is the average of available readings in the preceding seven calendar days. Missing dates are never counted as zero.",
                         Modifier.padding(18.dp),
                         color = OF.muted,
                     )
@@ -339,7 +328,7 @@ internal fun DashboardDetail(
             key == "steps" ->
                 item {
                     Text(
-                        "No step records are stored by this build. Steps requires a local data-entry or Health Connect integration; the selected tile does not imply a connection.",
+                        "Connect Health Connect from Settings to import actual daily step totals.",
                         Modifier.padding(18.dp),
                         color = OF.muted,
                     )

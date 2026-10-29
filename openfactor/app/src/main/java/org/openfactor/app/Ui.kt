@@ -222,7 +222,7 @@ fun NuvioWorkoutNavigation(
                                     contentColor = Color.Black,
                                 ),
                             ) {
-                                Icon(Icons.Rounded.Add, "Start or resume workout", Modifier.size(28.dp))
+                                Icon(Icons.Rounded.Add, "Quick actions", Modifier.size(28.dp))
                             }
                         }
                     val iconScale by

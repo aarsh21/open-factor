@@ -86,6 +86,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     var programDayId by rememberSaveable { mutableStateOf("") }
     var programExit by remember { mutableStateOf(false) }
     var shortcuts by rememberSaveable { mutableStateOf(false) }
+    var quickWeight by rememberSaveable { mutableStateOf(false) }
     var configureShortcuts by rememberSaveable { mutableStateOf(false) }
     var workoutSettings by rememberSaveable { mutableStateOf(false) }
     var healthConnect by rememberSaveable { mutableStateOf(false) }
@@ -100,6 +101,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     val snackbar = remember { SnackbarHostState() }
     val routeState = rememberSaveableStateHolder()
     val context = LocalContext.current
+    HealthConnectForegroundSync(data, vm::importHealthConnectSync, enabled = !healthConnect)
     val view = LocalView.current
     val lifecycleOwner = LocalLifecycleOwner.current
     StorageRecoveryAlert(vm)
@@ -182,6 +184,12 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     }
     if (healthConnect) HealthConnectPanel(
         data, vm::importHealthConnectWeights, onClose = { healthConnect = false },
+        onSync = vm::importHealthConnectSync,
+    )
+    if (quickWeight) QuickWeightSheet(
+        data.preferences.pounds,
+        onClose = { quickWeight = false },
+        onSave = { vm.saveScaleWeight(it); quickWeight = false },
     )
     if (!data.onboarding.completed && !data.onboarding.deferred) {
         QuickStartScreen(data, vm) { tab = 1 }
@@ -271,6 +279,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                         onDismissTutorial = {
                             vm.settings { it.copy(dismissedTutorials = it.dismissedTutorials + "bodyCharts") }
                         },
+                        onLogWeight = { quickWeight = true },
                     )
                     "weight-entry" -> key(detailId) {
                         ScaleWeightEditor(
@@ -356,11 +365,9 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                 GymEditorScreen(gym, data, vm, { route = "gyms" }) { detailId = it }
                             }
                     "levels" -> routeState.SaveableStateProvider("levels") {
-                        LevelsScreen(data, exercises, { route = "" }) {
-                            detailId = it
-                            exerciseSettingsReturnRoute = "levels"
-                            route = "exercise-settings"
-                        }
+                        LevelsScreen(data, exercises, { route = "" }, onExercise = {
+                            openExercise(it)
+                        })
                     }
                     "exercise-settings" -> exercises.firstOrNull { it.id == detailId }?.let { e ->
                         ExerciseSettingsScreen(
@@ -525,6 +532,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                         bodyDataTab = 0
                                         route = "body-data"
                                     },
+                                    onLogWeight = { quickWeight = true },
+                                    onHealthConnect = { healthConnect = true },
                                 )
                             1 ->
                                 WorkoutHome(
@@ -580,8 +589,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                     tab,
                     scrollEnergy,
                     onAdd = {
-                        if (data.active != null) route = "session"
-                        else { vm.start(); route = "picker" }
+                        shortcuts = true
                     },
                     modifier = Modifier.align(Alignment.BottomCenter)
                         .padding(bottom = padding.calculateBottomPadding()),
@@ -647,7 +655,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         }) { shortcut ->
             shortcuts = false
             when (shortcut) {
-                WorkoutShortcut.WEIGHT -> { detailId = ""; bodyDataTab = 0; route = "weight-entry" }
+                WorkoutShortcut.WEIGHT -> { quickWeight = true }
                 WorkoutShortcut.MEASUREMENTS -> {
                     detailId = ""; bodyDataTab = 1; bodyEntryReturn = route; route = "measurement-entry"
                 }

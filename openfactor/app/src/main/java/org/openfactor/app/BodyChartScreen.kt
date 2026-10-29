@@ -35,17 +35,22 @@ fun BodyChartScreen(
     onRange: (BodyChartRange) -> Unit,
     onBack: () -> Unit,
     onDismissTutorial: () -> Unit = {},
+    onLogWeight: (() -> Unit)? = null,
 ) {
-    val series = data.bodyChartSeries()
-    val metric = series.first { it.key == metricKey }
-    val today = LocalDate.now()
+    val today = rememberToday()
+    val dailyWeight = data.scaleWeights.weightTrend(today)
+    val factor = if (data.preferences.pounds) 2.2046226218 else 1.0
+    val series = data.bodyChartSeries().map { metric ->
+        if (metric.key == "weight") metric.copy(points = dailyWeight.map { BodyChartPoint(it.recordId, it.date, it.weightKg * factor) }) else metric
+    }
+    val metric = series.firstOrNull { it.key == metricKey } ?: series.first()
     val window = range.window(today, metric.points)
-    val points = metric.inWindow(window)
+    val points = metric.inWindow(window).filter { metric.key != "weight" || !it.date.isAfter(today) }
     var selection by rememberSaveable(metricKey, range) { mutableStateOf<String?>(null) }
     val chosen = points.find { it.recordId == selection }
     var choosingMetric by remember { mutableStateOf(false) }
     var help by rememberSaveable {
-        mutableStateOf("bodyCharts" !in data.preferences.dismissedTutorials)
+        mutableStateOf(false)
     }
     val dismissHelp = {
         help = false
@@ -123,24 +128,22 @@ fun BodyChartScreen(
                 Text("${window.start} – ${window.endInclusive}", color = OF.muted)
             }
             item {
-                Text(
-                    "Recorded values · ${metric.unit}",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    "${points.size} ${if (points.size == 1) "entry" else "entries"} · no smoothing or estimated trend",
-                    color = OF.muted,
-                    style = MaterialTheme.typography.bodySmall,
-                )
                 if (points.isEmpty()) {
                     EmptyContent(
                         Icons.Rounded.ShowChart,
                         "No entries in this range",
-                        "Choose another range or log this metric in Body Data. Missing values are not plotted as zero.",
+                        "Choose another range or add a reading.",
                     )
+                    if (metric.key == "weight" && onLogWeight != null) PrimaryAction("Log weight", onLogWeight)
                 } else {
+                    val latest = points.last()
+                    Text("${latest.value.bodyNumber()} ${metric.unit}", style = MaterialTheme.typography.headlineMedium)
+                    Text(latest.date.toString(), color = OF.muted)
                     Spacer(Modifier.height(16.dp))
-                    BodyValuePlot(metric, points, window, chosen?.recordId) { selection = it }
+                    if (metric.key == "weight") {
+                        val trend = data.scaleWeights.weightTrend(today).filter { it.date in window }
+                        WeightTrendPlot(trend, data.preferences.pounds, Modifier.fillMaxWidth().height(240.dp))
+                    } else BodyValuePlot(metric, points, window, chosen?.recordId) { selection = it }
                 }
             }
             if (chosen != null)
@@ -160,7 +163,7 @@ fun BodyChartScreen(
                 item {
                     Text("Saved entries", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Tap a dot or a row to inspect it. Edit records in Body Data.",
+                        if (metric.key == "weight") "Tap a row to inspect a reading." else "Tap a dot or a row to inspect a reading.",
                         color = OF.muted,
                     )
                 }
@@ -196,9 +199,9 @@ fun BodyChartScreen(
             title = { Text("About body charts") },
             text = {
                 Text(
-                    "Each dot is one saved reading, including separate readings on the same date. Blank fields are omitted; 0% body fat is a recorded value.\n\n" +
+                    "Weight uses the newest manual reading for each date, otherwise the newest imported reading. Other metrics show saved readings individually. Blank fields are omitted; 0% body fat is a recorded value.\n\n" +
                         "1W shows Monday–Sunday. Other ranges show calendar months ending with the current month; All spans the saved dates. Future-dated entries appear only inside the displayed dates.\n\n" +
-                        "These are raw local records. Weight Trend smoothing, estimated body fat and source chart aggregation have not been recovered and are not calculated.",
+                        "Weight charts show your recorded values and a trailing seven-calendar-day average of available daily readings. Missing days are never counted as zero. Body fat and measurements are recorded values, not estimates.",
                     Modifier.verticalScroll(rememberScrollState()),
                 )
             },

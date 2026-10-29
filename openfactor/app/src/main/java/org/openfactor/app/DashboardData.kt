@@ -14,7 +14,7 @@ enum class DashboardSection(val label: String) {
 
 /** Presentation choices only; this does not store derived analytics or change saved records. */
 data class DashboardPreferences(
-    val focuses: List<String> = listOf("weekly", "records"),
+    val focuses: List<String> = listOf("weekly"),
     val sections: List<DashboardSection> = DashboardSection.entries,
     val insights: List<String> = listOf("workouts", "trend"),
     val habits: List<String> = listOf("weighIn", "workouts"),

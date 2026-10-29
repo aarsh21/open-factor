@@ -34,8 +34,9 @@ object ExerciseVideoCache {
             .setAllowCrossProtocolRedirects(false)
         // Removed/full cache storage must not prevent otherwise playable streaming.
         return runCatching<DataSource.Factory> {
-            CacheDataSource.Factory().setCache(cache(context)).setUpstreamDataSourceFactory(upstream)
+            CacheDataSource.Factory().setCache(cache(context))
+                .setUpstreamDataSourceFactory(DefaultDataSource.Factory(context.applicationContext, upstream))
                 .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-        }.getOrElse { upstream }
+        }.getOrElse { DefaultDataSource.Factory(context.applicationContext, upstream) }
     }
 }

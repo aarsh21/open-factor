@@ -54,21 +54,20 @@ fun WorkoutHome(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     TextButton(onPrograms) { Icon(Icons.Rounded.CalendarMonth, null); Spacer(Modifier.width(8.dp)); Text("Programs") }
                 }
-                data.programs.firstOrNull { it.id == data.activeProgramId }?.let { program ->
-                    Surface(shape = OF.shape, color = OF.top) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.CalendarMonth, null)
-                                Spacer(Modifier.width(12.dp))
-                                Text(program.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                            }
-                            program.days.filter { it.exercises.isNotEmpty() }.take(4).forEach { day ->
-                                TextButton(onPrograms, Modifier.fillMaxWidth()) {
-                                    Text(day.name, Modifier.weight(1f))
-                                    Icon(Icons.Rounded.ChevronRight, null)
+                val week = remember(data.active, data.history, exercises) { data.trainingWeek(exercises) }
+                Surface(Modifier.fillMaxWidth(), shape = OF.shape, color = OF.top) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("This week", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                            TextButton(onHistory) { Text("History"); Icon(Icons.Rounded.ChevronRight, null) }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            listOf(week.sessions to "Sessions", week.workingSets to "Working sets", week.trainedMuscles to "Muscles").forEach { (count, label) ->
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(count.toString(), style = MaterialTheme.typography.headlineSmall)
+                                    Text(label, style = MaterialTheme.typography.labelMedium, color = OF.muted)
                                 }
                             }
-                            OutlinedButton(onPrograms, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Open program") }
                         }
                     }
                 }

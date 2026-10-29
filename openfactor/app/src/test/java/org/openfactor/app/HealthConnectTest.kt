@@ -59,6 +59,14 @@ class HealthConnectTest {
     }
 
     @Test
+    fun zeroProviderWeightDoesNotHideAValidReadingOrBreakAnImport() {
+        val records = healthConnectScaleWeights(listOf(weight(72.3), weight(0.0, time.plusSeconds(60))),
+            emptyList(), zone, "org.openfactor.app")
+        assertEquals(72.3, records.single().weightKg, 0.0)
+        assertTrue(healthConnectScaleWeights(listOf(weight(0.0)), emptyList(), zone, "self").isEmpty())
+    }
+
+    @Test
     fun repeatedImportKeepsIdsManualDatesTrainingPhotosAndCompleteBackup() {
         val manual = ScaleWeightRecord("manual", date, 75.7, 17.5)
         val imported = ScaleWeightRecord("old-import", date.minusDays(1), 70.1, 16.2, "old.scale")

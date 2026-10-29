@@ -23,7 +23,10 @@ fun healthConnectScaleWeights(
     val fats = bodyFat.filter { it.metadata.dataOrigin.packageName != ownPackage }
         .groupBy { it.time.atZone(zone).toLocalDate() }
         .mapValues { (_, records) -> records.maxBy { it.time } }
-    return weights.filter { it.metadata.dataOrigin.packageName != ownPackage }
+    return weights.filter {
+            it.metadata.dataOrigin.packageName != ownPackage &&
+                it.weight.inKilograms.isFinite() && it.weight.inKilograms > 0 && it.weight.inKilograms <= 5000
+        }
         .groupBy { it.time.atZone(zone).toLocalDate() }
         .map { (date, records) ->
             // maxBy keeps the first record on equal timestamps, as the source's strict > does.

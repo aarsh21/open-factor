@@ -48,9 +48,6 @@ internal fun ShortcutEditor(initial: ShortcutPreferences, onCancel: () -> Unit, 
         }
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 112.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            PreferenceSwitch("Up Next Banner", "Show the next scheduled workout when scheduling is available", draft.showUpNext) {
-                draft = draft.copy(showUpNext = it)
-            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("Order", "Color").forEach { label ->
                     FilterChip(mode == label, { mode = label }, label = { Text(label) })
@@ -133,12 +130,6 @@ internal fun ShortcutSheet(p: Preferences, active: Workout?, onClose: () -> Unit
                 IconButton(onClose) { Icon(Icons.Rounded.Close, "Close shortcuts") }
                 Text("Shortcuts", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
                 IconButton(onConfigure) { Icon(Icons.Rounded.Tune, "Configure shortcuts") }
-            }
-            if (p.shortcuts.showUpNext) {
-                ListItem(headlineContent = { Text("Up Next") }, supportingContent = {
-                    Text("No workout scheduled. Calendar placement is not available yet.")
-                }, colors = ListItemDefaults.colors(containerColor = OF.top))
-                HorizontalDivider()
             }
             p.shortcuts.order.forEachIndexed { index, shortcut ->
                 val label = if (shortcut == WorkoutShortcut.EMPTY_WORKOUT && active != null) "Resume Workout" else shortcut.label

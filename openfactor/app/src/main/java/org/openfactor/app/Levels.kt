@@ -59,11 +59,11 @@ fun muscleContributions(
             .flatMap { it.exercises }
             .groupBy { it.exerciseId }
     return exercises
-        .filter { muscle in it.muscles || muscle in it.secondary }
+        .filter { muscle in it.muscles.ifEmpty { listOf(it.muscle) } || muscle in it.secondary }
         .mapNotNull { e ->
             val count = sets[e.id].orEmpty().sumOf { it.completedWorkingSets() }
             // Retained ARM64 helper 0xd881ac: primary feature group 1, secondary 0.5.
-            val factor = if (muscle in e.muscles) 1.0 else 0.5
+            val factor = if (muscle in e.muscles.ifEmpty { listOf(e.muscle) }) 1.0 else 0.5
             if (count > 0) MuscleContribution(e, count, count * factor) else null
         }
         .sortedByDescending { it.weightedSets }
@@ -76,231 +76,88 @@ fun LevelsScreen(
     exercises: List<Exercise>,
     onBack: (() -> Unit)? = null,
     onExercise: (String) -> Unit,
+    referenceDate: LocalDate? = null,
 ) {
     var days by rememberSaveable { mutableIntStateOf(7) }
     var back by rememberSaveable { mutableStateOf(false) }
-    var periods by rememberSaveable { mutableStateOf(false) }
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     var exerciseDetail by rememberSaveable { mutableStateOf<String?>(null) }
-    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var policy by rememberSaveable { mutableStateOf(false) }
+    val currentDate = rememberToday()
+    val today = minOf(referenceDate ?: currentDate, currentDate)
+    val first = if (days == 7) today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY)) else today.minusDays(days - 1L)
+    val workouts = remember(data.active, data.history, first, today) { data.trainingWorkouts().filter { it.localDate() in first..today } }
+    val totals = remember(workouts, exercises) { muscleWorkloads(workouts, exercises) }
     androidx.activity.compose.BackHandler(selected != null || exerciseDetail != null) {
         if (exerciseDetail != null) exerciseDetail = null else selected = null
     }
     exerciseDetail?.let { id ->
-        DashboardDetail(
-            data.copy(preferences = data.preferences.copy(dashboardAllWorkouts = true)),
-            exercises,
-            "exercise:$id",
-            { exerciseDetail = null },
-            {},
-            onExercise,
-        )
+        DashboardDetail(data.copy(preferences = data.preferences.copy(dashboardAllWorkouts = true)), exercises,
+            "exercise:$id", { exerciseDetail = null }, {}, onExercise, today)
         return
     }
-    val totals =
-        remember(data.active, data.history, exercises, days) {
-            (upperMuscleGroups + lowerMuscleGroups).associateWith { m ->
-                muscleContributions(data.trainingWorkouts(), exercises, days, m).sumOf {
-                    it.weightedSets
-                } * 7.0 / days
-            }
-        }
-    val context = LocalContext.current
-    val body =
-        remember(back, totals) {
-            runCatching {
-                    val xml =
-                        context.assets
-                            .open("reference/body/avatar_male_${if(back) "back" else "front"}.svg")
-                            .bufferedReader()
-                            .use { it.readText() }
-                    val themed = xml.replace("#DCDCDC", "#414141").replace("#EEEEEE", "#555555")
-                    val colored =
-                        Regex("<path[^>]*>").replace(themed) { match ->
-                            val id = Regex("id=\"([^\"]+)\"").find(match.value)?.groupValues?.get(1)
-                            val muscle =
-                                (upperMuscleGroups + lowerMuscleGroups).find {
-                                    it.replace(" ", "").equals(id, true)
-                                }
-                            if (muscle != null && totals.getValue(muscle) > 0)
-                                match.value.replace("#555555", "#276EF1")
-                            else match.value
-                        }
-                    ByteBuffer.wrap(colored.toByteArray())
-                }
-                .getOrNull()
-        }
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        state = listState,
-        contentPadding = PaddingValues(bottom = 24.dp),
-    ) {
-        item { PageHeading("Levels", onBack) }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 112.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item { PageHeading("Muscle workload", onBack, actions = { IconButton({ policy = true }) { Icon(Icons.Rounded.Info, "How muscle sets are counted") } }) }
         item {
-            Column(Modifier.fillMaxWidth().background(OF.top).padding(horizontal = 18.dp)) {
-                Box(Modifier.fillMaxWidth().height(490.dp), contentAlignment = Alignment.Center) {
-                    if (body != null)
-                        AsyncImage(
-                            body,
-                            "${if(back) "Back" else "Front"} muscle map",
-                            Modifier.fillMaxSize().padding(vertical = 14.dp),
-                        )
-                    else
-                        Icon(
-                            Icons.Rounded.AccessibilityNew,
-                            null,
-                            Modifier.size(180.dp),
-                            tint = OF.muted,
-                        )
-                    if (totals.values.all { it == 0.0 })
-                        Text(
-                            "Complete workouts\nto see your Set Levels",
-                            color = OF.muted,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            style = MaterialTheme.typography.titleLarge,
-                        )
-                    Box(Modifier.align(Alignment.BottomEnd).padding(bottom = 10.dp)) {
-                        RoundAction(Icons.Rounded.Sync, "Switch muscle map view", { back = !back })
+            Column(Modifier.padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(7 to "Week", 30 to "30 days", 90 to "90 days").forEach { (value, label) ->
+                        FilterChip(days == value, { days = value }, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp))
                     }
                 }
-                Box(Modifier.align(Alignment.CenterHorizontally)) {
-                    TextButton({ periods = true }) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Canvas(Modifier.size(8.dp)) { drawCircle(OF.blue) }
-                            Text(
-                                "  Average weekly sets over ",
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                            Text(
-                                if (days == 7) "1-week"
-                                else if (days == 30) "1-month" else "3-months",
-                                textDecoration = TextDecoration.Underline,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                            Icon(Icons.Rounded.ArrowDropDown, null)
+                Text("${first.format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))} – ${today.format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))}", color = OF.muted)
+                Box(Modifier.fillMaxWidth().height(340.dp)) {
+                    TrainingMuscleMap(totals.associate { it.muscle to it.weightedSets }, Modifier.fillMaxSize(), back)
+                    IconButton({ back = !back }, Modifier.align(Alignment.BottomEnd)) { Icon(Icons.Rounded.Sync, "Show ${if (back) "front" else "back"} muscle map") }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Weighted sets", style = MaterialTheme.typography.labelMedium, color = OF.muted)
+                    listOf("0" to 0.0, "1–4" to 1.0, "5–9" to 5.0, "10+" to 10.0).forEach { (label, value) ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Canvas(Modifier.size(9.dp)) { drawCircle(androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(muscleWorkloadColor(value)))) }
+                            Text(label, style = MaterialTheme.typography.labelSmall, color = OF.muted)
                         }
                     }
                 }
-                Text(
-                    "Primary sets + ½ secondary sets · color scale is local",
-                    Modifier.padding(bottom = 12.dp),
-                    color = OF.muted,
-                    style = MaterialTheme.typography.bodySmall,
-                )
             }
         }
-        listOf("Upper Body Levels" to upperMuscleGroups, "Lower Body Levels" to lowerMuscleGroups)
-            .forEach { (heading, muscles) ->
-                item { Column(Modifier.padding(horizontal = 18.dp)) { SectionTitle(heading) } }
-                item {
-                    Surface(
-                        Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                        color = OF.card,
-                        shape = OF.shape,
-                    ) {
-                        Column {
-                            muscles.forEachIndexed { index, muscle ->
-                                Row(
-                                    Modifier.fillMaxWidth()
-                                        .clickable { selected = muscle }
-                                        .padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                ) {
-                                    MuscleImage(muscle, Modifier.size(74.dp))
-                                    Column(Modifier.weight(1f)) {
-                                        Text(muscle, style = MaterialTheme.typography.titleMedium)
-                                        Text(
-                                            if (totals.getValue(muscle) == 0.0) "0 sets"
-                                            else
-                                                "${"%.1f".format(java.util.Locale.US, totals.getValue(muscle))} sets/week",
-                                            color = OF.muted,
-                                        )
-                                    }
-                                    Icon(Icons.Rounded.ChevronRight, null, tint = OF.muted)
-                                }
-                                if (index < muscles.lastIndex)
-                                    HorizontalDivider(
-                                        Modifier.padding(start = 102.dp),
-                                        color = OF.line,
-                                    )
-                            }
-                        }
-                    }
+        item {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Muscle", Modifier.weight(1f), color = OF.muted, style = MaterialTheme.typography.labelSmall)
+                listOf("Direct", "Indirect", "Total").forEach { Text(it, Modifier.width(58.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End, color = OF.muted, style = MaterialTheme.typography.labelSmall) }
+            }
+        }
+        items(totals, key = { it.muscle }) { muscle ->
+            Row(Modifier.fillMaxWidth().clickable { selected = muscle.muscle }.padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(muscle.muscle, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                listOf(muscle.directSets.toString(), muscle.secondarySets.toString(), muscle.weightedSets.bodyNumber()).forEach { value ->
+                    Text(value, Modifier.width(58.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End, style = MaterialTheme.typography.bodyMedium)
                 }
             }
+            HorizontalDivider(Modifier.padding(horizontal = 18.dp), color = OF.line)
+        }
     }
-    if (periods)
-        ModalBottomSheet(onDismissRequest = { periods = false }) {
-            Box(
-                Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                IconButton({ periods = false }, Modifier.align(Alignment.CenterStart)) {
-                    Icon(Icons.Rounded.Close, "Close time period")
-                }
-                Text("Time Period", style = MaterialTheme.typography.titleLarge)
-            }
-            listOf(7 to "1-week", 30 to "1-month", 90 to "3-months").forEach { (n, label) ->
-                Row(
-                    Modifier.fillMaxWidth()
-                        .clickable {
-                            days = n
-                            periods = false
-                        }
-                        .padding(horizontal = 18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(label, Modifier.weight(1f))
-                    RadioButton(
-                        days == n,
-                        {
-                            days = n
-                            periods = false
-                        },
-                    )
-                }
-            }
-            Spacer(Modifier.height(24.dp))
-        }
-    selected?.let { m ->
-        val contributions = muscleContributions(data.trainingWorkouts(), exercises, days, m)
-        ModalBottomSheet(
-            onDismissRequest = { selected = null },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        ) {
+    if (policy) AlertDialog(onDismissRequest = { policy = false }, title = { Text("Muscle set counts") },
+        text = { Text("Direct sets target a primary muscle. Indirect sets involve a secondary muscle. The weighted total is direct sets + ½ indirect sets.\n\nOnly completed working sets count. Warmups are excluded. Left/right pairs and Myo segments count as one logical set. This is a training-volume view, not a recovery or strength score.") },
+        confirmButton = { TextButton({ policy = false }) { Text("Done") } })
+    selected?.let { muscle ->
+        val contributions = muscleContributions(workouts, exercises, java.time.temporal.ChronoUnit.DAYS.between(first, today).toInt() + 1, muscle, today)
+        ModalBottomSheet(onDismissRequest = { selected = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
             LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(18.dp)) {
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton({ selected = null }) {
-                            Icon(Icons.Rounded.Close, "Close muscle levels")
-                        }
-                        Text(m, style = MaterialTheme.typography.titleLarge)
+                        Text(muscle, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                        IconButton({ selected = null }) { Icon(Icons.Rounded.Close, "Close muscle workload") }
                     }
-                    Text(
-                        "Average weekly sets over ${if(days == 7) "1-week" else if(days == 30) "1-month" else "3-months"}",
-                        color = OF.muted,
-                    )
-                    Text(
-                        "Completed working sets: primary muscles count 1 set, secondary muscles ½ set. Calendar windows and side/advanced-set handling remain local policies.",
-                        Modifier.padding(vertical = 12.dp),
-                        color = OF.muted,
-                    )
-                    if (contributions.isEmpty()) Text("No logged sets in this period.")
+                    Text("${first} – ${today}", color = OF.muted)
+                    if (contributions.isEmpty()) Text("No completed working sets in this period.", Modifier.padding(vertical = 24.dp), color = OF.muted)
                 }
-                items(contributions, key = { it.exercise.id }) { c ->
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .clickable { exerciseDetail = c.exercise.id }
-                            .padding(vertical = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(c.exercise.title, Modifier.weight(1f))
-                        Text(
-                            "${"%.1f".format(java.util.Locale.US, c.weightedSets * 7.0 / days)} sets/week",
-                            color = OF.muted,
-                        )
-                    }
+                items(contributions, key = { it.exercise.id }) { contribution ->
+                    ListItem(headlineContent = { Text(contribution.exercise.title) },
+                        supportingContent = { Text("${contribution.sets} ${if (muscle in contribution.exercise.muscles.ifEmpty { listOf(contribution.exercise.muscle) }) "direct" else "indirect"} sets") },
+                        trailingContent = { Text(contribution.weightedSets.bodyNumber()) },
+                        modifier = Modifier.clickable { exerciseDetail = contribution.exercise.id },
+                        colors = ListItemDefaults.colors(containerColor = OF.background))
                 }
             }
         }

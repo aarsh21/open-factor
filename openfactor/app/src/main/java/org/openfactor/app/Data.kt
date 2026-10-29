@@ -136,6 +136,7 @@ data class AppData(
     val workoutDraft: WorkoutDraft? = null,
     val progressPhotos: List<ProgressPhotoRecord> = emptyList(),
     val exerciseDefaults: Map<String, ExerciseDefaults> = emptyMap(),
+    val healthConnect: HealthConnectSyncState = HealthConnectSyncState(),
 )
 
 fun newId() = UUID.randomUUID().toString()
@@ -357,6 +358,7 @@ object DataCodec {
             })
             .put("onboarding", d.onboarding.json())
             .put("scaleWeights", BodyDataCodec.weights(d.scaleWeights))
+            .put("healthConnect", HealthConnectSyncCodec.encode(d.healthConnect))
             .put("bodyMeasurements", BodyDataCodec.measurements(d.bodyMeasurements))
             .put("progressPhotos", ProgressPhotoCodec.encode(d.progressPhotos))
             .put("gyms", JSONArray(d.gyms.map { GymCodec.encode(it) }))
@@ -530,6 +532,7 @@ object DataCodec {
             },
             progressPhotos = ProgressPhotoCodec.decode(j),
             exerciseDefaults = ExerciseDefaultsCodec.decode(j.optJSONObject("exerciseDefaults")),
+            healthConnect = HealthConnectSyncCodec.decode(j.optJSONObject("healthConnect")),
         )
     }
 
@@ -751,6 +754,8 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun importHealthConnectWeights(records: List<ScaleWeightRecord>) =
         update { it.withHealthConnectWeights(records) }
+
+    fun importHealthConnectSync(sync: HealthConnectSyncData) = update { it.withHealthConnectSync(sync) }
 
     fun deleteScaleWeight(id: String) = update {
         it.copy(scaleWeights = it.scaleWeights.filterNot { record -> record.id == id })

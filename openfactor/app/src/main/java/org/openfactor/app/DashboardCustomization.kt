@@ -61,7 +61,7 @@ internal fun DashboardCustomization(
             item {
                 SectionTitle("Primary Focus")
                 val focuses =
-                    draft.focuses + listOf("weekly", "records").filterNot { it in draft.focuses }
+                    listOf("weekly")
                 focuses.forEach { key ->
                     val label = if (key == "weekly") "Weekly Workouts" else "Recent Records"
                     val enabled = key in draft.focuses
@@ -148,7 +148,7 @@ internal fun DashboardCustomization(
                                             )
                                         if (section == DashboardSection.EXERCISES)
                                             Text(
-                                                "1-RM unavailable · saved sets available",
+                                                "Recorded working sets",
                                                 color = OF.muted,
                                                 style = MaterialTheme.typography.bodySmall,
                                             )

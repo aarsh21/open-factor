@@ -45,303 +45,69 @@ fun DashboardScreen(
     onResume: () -> Unit,
     onLevels: () -> Unit,
     onBodyData: () -> Unit,
+    onLogWeight: (() -> Unit)? = null,
+    onHealthConnect: (() -> Unit)? = null,
 ) {
+    val today = rememberToday()
     var customize by rememberSaveable { mutableStateOf(false) }
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
     var detailParent by rememberSaveable { mutableStateOf<String?>(null) }
     var chart by rememberSaveable { mutableStateOf<String?>(null) }
     var range by rememberSaveable { mutableStateOf(BodyChartRange.MONTH) }
-    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var weekOffset by rememberSaveable { mutableIntStateOf(0) }
     val detailState = rememberSaveableStateHolder()
     val selection = data.preferences.dashboard
-    var focus by
-        rememberSaveable(selection.focuses) { mutableStateOf(selection.focuses.firstOrNull()) }
-    fun closeDetail() {
-        detail = detailParent
-        detailParent = null
-    }
+    fun closeDetail() { detail = detailParent; detailParent = null }
     androidx.activity.compose.BackHandler(customize || detail != null || chart != null) {
         customize = false
         if (detail != null) closeDetail()
         chart = null
     }
     if (customize) {
-        DashboardCustomization(data, exercises, { customize = false }) { selection ->
-            vm.settings {
-                it.copy(
-                    dashboard = selection,
-                    showWeeklyWorkouts = true,
-                    showInsights = true,
-                    showHabits = true,
-                )
-            }
+        DashboardCustomization(data, exercises, { customize = false }) { selected ->
+            vm.settings { it.copy(dashboard = selected, showWeeklyWorkouts = true, showInsights = true, showHabits = true) }
             customize = false
         }
         return
     }
     chart?.let { key ->
-        BodyChartScreen(
-            data, key, range, { chart = it }, { range = it }, { chart = null },
-            onDismissTutorial = {
-                vm.settings { it.copy(dismissedTutorials = it.dismissedTutorials + "bodyCharts") }
-            },
-        )
+        BodyChartScreen(data, key, range, { chart = it }, { range = it }, { chart = null },
+            onDismissTutorial = { vm.settings { it.copy(dismissedTutorials = it.dismissedTutorials + "bodyCharts") } }, onLogWeight = onLogWeight)
+        return
+    }
+    if (detail == "workload") {
+        LevelsScreen(data, exercises, { detail = null }, { detail = "exercise:$it" },
+            referenceDate = minOf(today, today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks(weekOffset.toLong()).plusDays(6)))
         return
     }
     detail?.let { key ->
         detailState.SaveableStateProvider(key) {
-            DashboardDetail(
-                data,
-                exercises,
-                key,
-                ::closeDetail,
-                {
-                    detailParent = detail
-                    detail = it
-                },
-            )
+            DashboardDetail(data.copy(preferences = data.preferences.copy(dashboardAllWorkouts = true)), exercises, key,
+                ::closeDetail, { detailParent = detail; detail = it },
+                today = minOf(today, today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks(weekOffset.toLong()).plusDays(6)))
         }
         return
     }
-    val metrics = data.dashboardMetrics(exercises)
-    val allWorkouts = metrics.allWorkouts
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        state = listState,
-        contentPadding = PaddingValues(bottom = 108.dp),
-    ) {
-        item {
-            PageHeading(
-                "Dashboard",
-                actions = {
-                    RoundAction(Icons.Rounded.Tune, "Customize Dashboard", { customize = true })
-                },
-            )
+    val week = remember(data.active, data.history, exercises, weekOffset, today) { data.trainingWeek(exercises, weekOffset, today) }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 112.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        item { PageHeading("Dashboard", actions = { RoundAction(Icons.Rounded.Tune, "Customize Dashboard", { customize = true }) }) }
+        if (data.active != null) item {
+            Box(Modifier.padding(horizontal = 18.dp)) { PrimaryAction("Resume ${data.active.name}", onResume, icon = Icons.Rounded.PlayArrow) }
         }
-        if (data.active != null)
-            item {
-                Box(
-                    Modifier.fillMaxWidth()
-                        .background(OF.top)
-                        .padding(horizontal = 18.dp, vertical = 8.dp)
-                ) {
-                    PrimaryAction(
-                        "Resume ${data.active.name}",
-                        onResume,
-                        icon = Icons.Rounded.PlayArrow,
-                    )
-                }
+        if (data.preferences.showWeeklyWorkouts && "weekly" in selection.focuses) item {
+            Column(Modifier.padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                TrainingWeekPanel(week, weekOffset) { weekOffset = it }
+                if (week.workingSets == 0 && weekOffset == 0) PrimaryAction("Start workout", onStart, icon = Icons.Rounded.Add)
             }
-        if (data.preferences.showWeeklyWorkouts && focus == "records")
-            item {
-                Column(Modifier.fillMaxWidth().background(OF.top).padding(18.dp)) {
-                    SectionTitle("Recent Records", "History", onHistory)
-                    Text(
-                        if (metrics.history.isEmpty()) "No Records Yet"
-                        else
-                            "Record detection is not available. Your saved workouts remain in History.",
-                        color = OF.muted,
-                    )
-                    if ("weekly" in selection.focuses)
-                        TextButton({ focus = "weekly" }) {
-                            Text("Weekly Workouts")
-                            Icon(Icons.Rounded.ChevronRight, null)
-                        }
-                }
-            }
-        if (data.preferences.showWeeklyWorkouts && focus == "weekly")
-            item {
-                Column(
-                    Modifier.fillMaxWidth()
-                        .background(OF.top)
-                        .padding(horizontal = 18.dp)
-                        .padding(bottom = 26.dp)
-                ) {
-                    SectionTitle("Weekly Workouts")
-                    Text(
-                        if (metrics.includesActive)
-                            "Completed working sets · includes current workout"
-                        else "Completed working sets",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = OF.muted,
-                    )
-                    metrics.planCycle?.let { cycle ->
-                        Text(
-                            "Compared with Cycle ${cycle + 1} plan",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = OF.muted,
-                        )
-                    }
-                    Row(
-                        Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    ) {
-                        WeeklyRing(
-                            metrics.totals.muscles,
-                            metrics.plan?.muscles,
-                            "Muscles",
-                            Modifier.weight(1f),
-                            small = true,
-                        )
-                        WeeklyRing(
-                            metrics.totals.sets,
-                            metrics.plan?.sets,
-                            "Sets",
-                            Modifier.weight(1.65f),
-                            small = false,
-                        )
-                        WeeklyRing(
-                            metrics.totals.exercises,
-                            metrics.plan?.exercises,
-                            "Exercises",
-                            Modifier.weight(1f),
-                            small = true,
-                        )
-                    }
-                    Row(
-                        Modifier.align(Alignment.CenterHorizontally)
-                            .padding(top = 16.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(OF.elevated)
-                    ) {
-                        listOf(false to "Active Program", true to "All Workouts").forEach {
-                            (all, label) ->
-                            TextButton(
-                                { vm.settings { it.copy(dashboardAllWorkouts = all) } },
-                                enabled =
-                                    all || data.programs.any { it.id == data.activeProgramId },
-                                colors =
-                                    ButtonDefaults.textButtonColors(
-                                        containerColor =
-                                            if (allWorkouts == all)
-                                                MaterialTheme.colorScheme.primary
-                                            else Color.Transparent,
-                                        contentColor =
-                                            if (allWorkouts == all)
-                                                MaterialTheme.colorScheme.onPrimary
-                                            else MaterialTheme.colorScheme.onSurface,
-                                    ),
-                            ) {
-                                Text(label)
-                            }
-                        }
-                    }
-                    if ("records" in selection.focuses)
-                        TextButton(
-                            { focus = "records" },
-                            Modifier.align(Alignment.CenterHorizontally),
-                        ) {
-                            Text("Recent Records")
-                            Icon(Icons.Rounded.ChevronRight, null)
-                        }
-                }
-            }
+        }
+        item { Box(Modifier.padding(horizontal = 18.dp)) { TrainingMusclePanel(week, { detail = "workload" }) { detail = "muscle:$it" } } }
         items(selection.sections, key = { it.name }) { section ->
-            DashboardTiles(
-                data,
-                exercises,
-                section,
-                { detail = it },
-                { chart = it },
-                onHistory,
-                onBodyData,
-                onStart,
-            )
+            DashboardTiles(data, exercises, section, { detail = it }, { chart = it }, onHistory, onBodyData, onStart, onHealthConnect, onLogWeight)
         }
         item {
-            Column(Modifier.padding(horizontal = 18.dp)) {
-                TextButton(onLevels) {
-                    Icon(Icons.Rounded.AccessibilityNew, null)
-                    Text(" Muscle Levels")
-                }
-            }
-        }
-        item {
-            Box(Modifier.padding(18.dp)) {
-                OutlinedButton(onWorkout, Modifier.fillMaxWidth()) { Text("Workout Library") }
-            }
-        }
-    }
-}
-
-@Composable
-private fun WeeklyRing(
-    value: Int,
-    target: Int?,
-    label: String,
-    modifier: Modifier,
-    small: Boolean,
-) {
-    Column(
-        modifier.semantics(mergeDescendants = true) {
-            contentDescription =
-                "$label: $value completed this week" +
-                    if (target != null && target > 0) ", $target in cycle plan" else ""
-        },
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(Modifier.fillMaxWidth().height(170.dp), contentAlignment = Alignment.Center) {
-            Canvas(Modifier.fillMaxWidth().aspectRatio(1f).padding(2.dp)) {
-                drawCircle(OF.line, style = Stroke(4.dp.toPx()))
-                if (target != null && target > 0 && value > 0)
-                    drawArc(
-                        OF.blue,
-                        -90f,
-                        360f * (value.toFloat() / target).coerceIn(0f, 1f),
-                        false,
-                        style = Stroke(4.dp.toPx(), cap = StrokeCap.Round),
-                    )
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    value.toString(),
-                    fontFamily = MaterialTheme.typography.headlineMedium.fontFamily,
-                    fontSize = if (small) 24.sp else 30.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text("this week", fontSize = if (small) 12.sp else 14.sp, color = OF.muted)
-            }
-        }
-        Text(
-            label,
-            Modifier.padding(top = 20.dp),
-            fontSize = if (small) 16.sp else 20.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = MaterialTheme.typography.headlineMedium.fontFamily,
-        )
-        Text(
-            if (target != null) "$target planned" else "No plan",
-            color = OF.muted,
-            fontSize = 12.sp,
-        )
-    }
-}
-
-@Composable
-internal fun InsightCard(
-    title: String,
-    subtitle: String,
-    value: String,
-    unit: String,
-    modifier: Modifier,
-    onClick: () -> Unit,
-) {
-    Surface(
-        modifier.heightIn(min = 166.dp).clickable(onClick = onClick),
-        shape = OF.shape,
-        color = OF.card,
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(subtitle, color = OF.muted, fontSize = 12.sp)
-            Spacer(Modifier.height(32.dp))
-            HorizontalDivider(color = OF.line)
-            Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(value, fontSize = 24.sp, fontWeight = FontWeight.Medium)
-                Text(" $unit", color = OF.muted)
-                Spacer(Modifier.weight(1f))
-                Icon(Icons.Rounded.ChevronRight, null, tint = OF.muted)
+            Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onWorkout, Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Templates") }
+                OutlinedButton(onHistory, Modifier.weight(1f).heightIn(min = 48.dp)) { Text("History") }
             }
         }
     }

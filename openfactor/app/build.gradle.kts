@@ -45,8 +45,8 @@ android {
         applicationId = "org.openfactor.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.3.0"
+        versionCode = 8
+        versionName = "0.4.0"
         val mediaBaseUrl = providers.gradleProperty("exerciseMediaBaseUrl").getOrElse("https://factor-media.zabimaru.me/v1/")
         buildConfigField("String", "EXERCISE_MEDIA_BASE_URL", "\"${mediaBaseUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

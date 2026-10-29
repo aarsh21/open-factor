@@ -3,10 +3,8 @@ package org.openfactor.app
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -176,48 +174,24 @@ fun WorkoutSession(
                     color = OF.muted,
                 )
             } else Spacer(Modifier.width(1.dp))
-            TextButton({ restSettings = true }) {
+            if (remaining <= 0) TextButton({ restSettings = true }) {
                 Icon(Icons.Rounded.Timer, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(if (remaining > 0) "${remaining / 60}:${(remaining % 60).toString().padStart(2, '0')}" else "Rest timer")
+                Text("Rest timer")
             }
         }
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.selectableGroup(),
-        ) {
-            items(workout.exercises, key = { it.id }) { entry ->
-                val exercise =
-                    exercises.find { it.id == entry.exerciseId }
-                        ?: Exercise(entry.exerciseId, "Exercise", "Other", "Other")
-                val active = entry.id == selected?.id
-                FilterChip(
-                    selected = active,
-                    onClick = { focus.clearFocus(); vm.selectExercise(entry.id) },
-                    label = { Text(exercise.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    leadingIcon = if (entry.logicalSets().all { it.completed } && entry.sets.isNotEmpty()) {
-                        { Icon(Icons.Rounded.Check, null, Modifier.size(18.dp)) }
-                    } else null,
-                    modifier = Modifier.widthIn(max = 240.dp).heightIn(min = 48.dp)
-                        .semantics { contentDescription = "Select ${exercise.title}" },
-                )
-            }
-            item {
-                AssistChip(
-                    onAdd, label = { Text("Add exercise") },
-                    leadingIcon = { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)) },
-                    modifier = Modifier.heightIn(min = 48.dp),
-                )
-            }
-        }
+        WorkoutExerciseSelector(
+            workout, exercises, selected,
+            onSelect = { focus.clearFocus(); vm.selectExercise(it) },
+            onAdd = { focus.clearFocus(); onAdd() },
+        )
         if (remaining > 0)
             Surface(color = OF.elevated, modifier = Modifier.fillMaxWidth()) {
                 Row(
                     Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Rounded.Timer, null)
+                    IconButton({ restSettings = true }) { Icon(Icons.Rounded.Timer, "Rest timer settings") }
                     Text(
                         "  Rest ${remaining/60}:${(remaining%60).toString().padStart(2,'0')}",
                         Modifier.weight(1f),
@@ -261,23 +235,9 @@ fun WorkoutSession(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Surface(
-                                onClick = { focus.clearFocus(); guidanceExerciseId = e.id },
-                                shape = RoundedCornerShape(8.dp),
-                                color = OF.card,
-                                modifier = Modifier.size(width = 48.dp, height = 60.dp).semantics {
-                                    contentDescription = "Exercise guide for ${e.title}"
-                                },
-                            ) {
-                                ExerciseImage(e, Modifier.fillMaxSize())
-                            }
                             Text(
-                                e.title,
-                                Modifier.weight(1f).clickable(onClickLabel = "Open exercise guide") {
-                                    focus.clearFocus()
-                                    guidanceExerciseId = e.id
-                                },
-                                style = MaterialTheme.typography.titleLarge,
+                                se.workoutExerciseProgress().label,
+                                Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = OF.muted,
                             )
                             TextButton({ focus.clearFocus(); guidanceExerciseId = e.id }) {
                                 Text("Guide")

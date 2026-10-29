@@ -25,8 +25,8 @@ enum class ExportTimeFrame(val label: String) {
 enum class ExportCategory(val key: String, val label: String, val group: String, val unavailable: String? = null) {
     SCALE_WEIGHT("scaleWeight", "Scale Weight", "Metrics & Analytics"),
     BODY_METRICS("bodyMetrics", "Body Metrics", "Metrics & Analytics"),
-    WEIGHT_TREND("weightTrend", "Weight Trend", "Metrics & Analytics", "No recovered trend calculation"),
-    STEPS("steps", "Steps", "Metrics & Analytics", "Step records are not available"),
+    WEIGHT_TREND("weightTrend", "Weight Trend", "Metrics & Analytics", "Weight-trend export is not supported"),
+    STEPS("steps", "Steps", "Metrics & Analytics", "Step export is not supported"),
     MUSCLE_GROUPS("muscleGroups", "Muscle Groups", "Metrics & Analytics"),
     EXERCISES("exercises", "Exercises", "Metrics & Analytics"),
     TRAINING_PROGRAMS("trainingPrograms", "Training Programs", "Library"),
