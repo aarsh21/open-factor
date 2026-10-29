@@ -59,6 +59,15 @@ class ExerciseAutoplayLifecycleTest {
     }
 
     @Test fun visibleGuideAutoplaysRealFramesLoopsAnglesAndHonorsPauseAcrossBackground() {
+        try {
+            exercisePlaybackJourney()
+        } catch (failure: Throwable) {
+            android.util.Log.e("ComposeTestAutoplay", "Original test failure before activity teardown", failure)
+            throw failure
+        }
+    }
+
+    private fun exercisePlaybackJourney() {
         // Keep the shared image loader tied to the production application, not this test's asset wrapper.
         SingletonImageLoader.get(instrumentation.targetContext)
         val context = TestVideoContext(instrumentation.targetContext, instrumentation.context.assets)
