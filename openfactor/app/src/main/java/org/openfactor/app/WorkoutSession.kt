@@ -1,6 +1,10 @@
 package org.openfactor.app
 
 import androidx.compose.foundation.*
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,8 +21,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -47,6 +54,7 @@ fun WorkoutSession(
 ) {
     val focus = LocalFocusManager.current
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     var timerSettingsError by remember { mutableStateOf(false) }
     val workout = data.active
     if (workout == null) {
@@ -316,7 +324,17 @@ fun WorkoutSession(
                                         exerciseName = e.title + (s.side?.let { " ${it.label.lowercase()}" } ?: "") +
                                             (if (componentIndex > 0) " Myo component $componentIndex" else ""),
                                         onChange = { changed -> vm.editSet(se.id, s.id) { changed } },
-                                        onComplete = { focus.clearFocus(); vm.toggleSetCompletion(se.id, s.id) },
+                                        onComplete = {
+                                            focus.clearFocus()
+                                            val before = vm.data.value.active?.takeIf { it.id == workout.id }
+                                                ?.exercises?.find { it.id == se.id }?.sets?.find { it.id == s.id }
+                                            vm.toggleSetCompletion(se.id, s.id)
+                                            val after = vm.data.value.active?.takeIf { it.id == workout.id }
+                                                ?.exercises?.find { it.id == se.id }?.sets?.find { it.id == s.id }
+                                            // Acknowledge a committed log, never undo, validation or restoration.
+                                            if (before?.completed == false && after?.completed == true)
+                                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        },
                                         onRemove = { vm.removeSet(se.id, s.id) },
                                         onKind = { kind, isWarmup -> vm.setKind(se.id, s.id, kind, isWarmup) },
                                         hasExtras = group.components.size > 1,
@@ -334,7 +352,17 @@ fun WorkoutSession(
                             val canLogAll = se.canLogAllSets(metrics)
                             PrimaryAction(
                                 "Log all sets",
-                                { focus.clearFocus(); vm.logAllSets(se.id) },
+                                {
+                                    focus.clearFocus()
+                                    val before = vm.data.value.active?.takeIf { it.id == workout.id }
+                                        ?.exercises?.find { it.id == se.id }
+                                    val pending = before?.sets?.filterNot { it.completed }?.map { it.id }.orEmpty()
+                                    vm.logAllSets(se.id)
+                                    val after = vm.data.value.active?.takeIf { it.id == workout.id }
+                                        ?.exercises?.find { it.id == se.id }
+                                    if (pending.isNotEmpty() && after != null && pending.all { id -> after.sets.any { it.id == id && it.completed } })
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                },
                                 Modifier.padding(top = 16.dp),
                                 enabled = canLogAll,
                                 icon = Icons.Rounded.DoneAll,
@@ -659,11 +687,30 @@ private fun SetRow(
     var options by remember { mutableStateOf(false) }
     var pendingKind by remember { mutableStateOf<Pair<SetKind, Boolean>?>(null) }
     val spokenKind = if (set.warmup) "warmup set" else "set"
+    val motionEnabled = LocalAppMotionEnabled.current
+    val completionDuration = if (motionEnabled) AppMotion.State else 0
+    val completionSource = remember { MutableInteractionSource() }
+    val rowColor by animateColorAsState(
+        if (set.completed) OF.green.copy(alpha = 0.08f) else Color.Transparent,
+        tween(completionDuration, easing = AppMotion.EaseOut), label = "set completion row",
+    )
+    val completionColor by animateColorAsState(
+        if (set.completed) OF.green else OF.elevated,
+        tween(completionDuration, easing = AppMotion.EaseOut), label = "set completion surface",
+    )
+    val checkColor by animateColorAsState(
+        if (set.completed) Color.Black else if (set.canComplete(metrics)) MaterialTheme.colorScheme.onSurface else OF.muted,
+        tween(completionDuration, easing = AppMotion.EaseOut), label = "set completion check color",
+    )
+    val checkScale by animateFloatAsState(
+        if (set.completed || !motionEnabled) 1f else .92f,
+        tween(completionDuration, easing = AppMotion.EaseOut), label = "set completion check",
+    )
     Row(
         Modifier.fillMaxWidth()
             .padding(vertical = 4.dp)
             .background(
-                if (set.completed) OF.green.copy(alpha = 0.08f) else Color.Transparent,
+                rowColor,
                 RoundedCornerShape(8.dp),
             ),
         verticalAlignment = Alignment.CenterVertically,
@@ -740,14 +787,17 @@ private fun SetRow(
         IconButton(
             onComplete,
             Modifier.size(48.dp)
-                .background(if (set.completed) OF.green else OF.elevated, RoundedCornerShape(8.dp)),
+                .pressFeedback(completionSource, enabled = set.completed || set.canComplete(metrics))
+                .background(completionColor, RoundedCornerShape(8.dp)),
             enabled = set.completed || set.canComplete(metrics),
+            interactionSource = completionSource,
         ) {
             Icon(
                 Icons.Rounded.Check,
                 if (set.completed) "Mark $spokenKind incomplete $displayNumber for $exerciseName"
                 else "Complete $spokenKind $displayNumber for $exerciseName",
-                tint = if (set.completed) Color.Black else if (set.canComplete(metrics)) MaterialTheme.colorScheme.onSurface else OF.muted,
+                modifier = Modifier.graphicsLayer { scaleX = checkScale; scaleY = checkScale },
+                tint = checkColor,
             )
         }
     }

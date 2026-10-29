@@ -1,21 +1,31 @@
 package org.openfactor.app
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -40,9 +50,19 @@ fun QuickStartScreen(
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     var saveError by remember { mutableStateOf<String?>(null) }
-    val scroll = rememberScrollState()
+    val motion = LocalAppMotionEnabled.current
+    val haptic = LocalHapticFeedback.current
+    // Only the rare first page earns an entrance. Restored drafts and provider returns stay put.
+    var introduced by rememberSaveable { mutableStateOf(stage != 0) }
+    val entrance = remember { Animatable(if (introduced || !motion) 1f else 0f) }
+    LaunchedEffect(motion) {
+        if (!introduced) {
+            introduced = true
+            if (motion) entrance.animateTo(1f, tween(AppMotion.Enter, easing = AppMotion.EaseOut))
+            else entrance.snapTo(1f)
+        } else if (!motion) entrance.snapTo(1f)
+    }
     LaunchedEffect(Unit) { vm.ensureProfileSetup() }
-    LaunchedEffect(stage) { scroll.scrollTo(0) }
     LaunchedEffect(data.healthConnect.lastSyncedAtMillis) {
         if (data.healthConnect.lastSyncedAtMillis != null) vm.editProfileSetup { it.refreshWeight(data.scaleWeights) }
     }
@@ -69,25 +89,46 @@ fun QuickStartScreen(
                 Text("Open Factor", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                 TextButton(::leave) { Text("Skip for now") }
             }
-            SetupProgress(stage)
-            Column(
-                Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(horizontal = 24.dp, vertical = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(28.dp),
-            ) {
-                Text(
-                    when (stage) { 0 -> "Make it yours"; 1 -> "Your starting point"; else -> "Ready, set, log." },
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-                when (stage) {
-                    0 -> ProfileBasicsFields(draft, ::edit)
-                    1 -> {
-                        SetupHealthConnect(data) {
-                            focus.clearFocus(); keyboard?.hide(); onConnect()
+            SetupProgress(stage, entrance.value)
+            AnimatedContent(
+                targetState = stage,
+                modifier = Modifier.weight(1f).fillMaxWidth().graphicsLayer {
+                    alpha = .45f + entrance.value * .55f
+                    translationY = if (motion) (1f - entrance.value) * 8.dp.toPx() else 0f
+                },
+                transitionSpec = {
+                    if (!motion) EnterTransition.None togetherWith ExitTransition.None
+                    else {
+                        val direction = if (targetState > initialState) 1 else -1
+                        (fadeIn(tween(AppMotion.Step, easing = AppMotion.EaseOut)) +
+                            slideInHorizontally(tween(AppMotion.Step, easing = AppMotion.EaseOut)) { direction * (it * .045f).toInt() })
+                            .togetherWith(fadeOut(tween(AppMotion.Quick)) +
+                                slideOutHorizontally(tween(AppMotion.Quick)) { -direction * (it * .025f).toInt() })
+                    }.using(SizeTransform(clip = false) { _, _ -> tween(0) })
+                },
+                contentAlignment = Alignment.TopStart,
+                label = "setup step",
+            ) { displayedStage ->
+                Column(
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp, vertical = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(28.dp),
+                ) {
+                    Text(
+                        when (displayedStage) { 0 -> "Make it yours"; 1 -> "Your starting point"; else -> "Ready, set, log." },
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    when (displayedStage) {
+                        0 -> ProfileBasicsFields(draft, ::edit)
+                        1 -> {
+                            SetupHealthConnect(data) {
+                                focus.clearFocus(); keyboard?.hide(); onConnect()
+                            }
+                            ProfileBodyFields(draft, ::edit)
                         }
-                        ProfileBodyFields(draft, ::edit)
+                        else -> ProfileTrainingFields(draft, ::edit)
                     }
-                    else -> ProfileTrainingFields(draft, ::edit)
                 }
             }
             Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 10.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -96,10 +137,15 @@ fun QuickStartScreen(
                     if (stage == 2) "Start training" else "Continue",
                     {
                         focus.clearFocus(); keyboard?.hide()
-                        if (stage < 2) vm.editProfileSetup { it.copy(stage = stage + 1) }
+                        if (stage < 2) {
+                            vm.editProfileSetup { it.copy(stage = stage + 1) }
+                        }
                         else {
                             saveError = vm.completeProfileSetup()
-                            if (saveError == null) onReady()
+                            if (saveError == null) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onReady()
+                            }
                         }
                     },
                     enabled = stageError == null,
@@ -110,17 +156,26 @@ fun QuickStartScreen(
 }
 
 @Composable
-private fun SetupProgress(stage: Int) {
+private fun SetupProgress(stage: Int, entrance: Float) {
+    val motion = LocalAppMotionEnabled.current
+    val track = OF.line
+    val active = MaterialTheme.colorScheme.primary
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)
             .semantics(mergeDescendants = true) { contentDescription = "Setup step ${stage + 1} of 3" },
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         repeat(3) { index ->
-            Box(Modifier.weight(1f).height(3.dp).background(
-                if (index <= stage) MaterialTheme.colorScheme.primary else OF.line,
-                RoundedCornerShape(50),
-            ))
+            val fill = animateFloatAsState(if (index <= stage) 1f else 0f,
+                tween(if (motion) AppMotion.Step else 0, easing = AppMotion.EaseOut), label = "setup progress")
+            Canvas(Modifier.weight(1f).height(3.dp)) {
+                val start = Offset(size.height / 2, size.height / 2)
+                val end = Offset(size.width - size.height / 2, size.height / 2)
+                drawLine(track, start, end, size.height, StrokeCap.Round)
+                val fraction = fill.value * if (index == 0) entrance else 1f
+                if (fraction > 0f) drawLine(active, start,
+                    Offset(start.x + (end.x - start.x) * fraction, end.y), size.height, StrokeCap.Round)
+            }
         }
     }
 }

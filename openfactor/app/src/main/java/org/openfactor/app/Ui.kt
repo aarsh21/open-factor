@@ -2,11 +2,11 @@ package org.openfactor.app
 
 import android.content.res.Configuration
 import android.graphics.Typeface
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -51,6 +51,7 @@ object OF {
 @Composable
 fun OpenFactorTheme(theme: AppTheme = AppTheme.DARK, content: @Composable () -> Unit) {
     val context = LocalContext.current
+    val motionEnabled = rememberAppMotionEnabled()
     val configuration = LocalConfiguration.current
     val dark = when (theme) {
         AppTheme.SYSTEM -> isSystemInDarkTheme()
@@ -134,7 +135,8 @@ fun OpenFactorTheme(theme: AppTheme = AppTheme.DARK, content: @Composable () -> 
                 )
             },
         content = {
-            CompositionLocalProvider(LocalConfiguration provides appConfiguration, content = content)
+            CompositionLocalProvider(LocalConfiguration provides appConfiguration,
+                LocalAppMotionEnabled provides motionEnabled, content = content)
         },
     )
 }
@@ -152,6 +154,7 @@ fun NuvioWorkoutNavigation(
     onSelect: (Int) -> Unit,
 ) {
     val labels = listOf("Dashboard", "Workout", "Exercises", "Settings")
+    val motion = LocalAppMotionEnabled.current
     val textMeasurer = rememberTextMeasurer()
     val icons =
         listOf(
@@ -162,8 +165,8 @@ fun NuvioWorkoutNavigation(
         )
     val drift by
         animateFloatAsState(
-            scrollEnergy,
-            tween(180, easing = FastOutSlowInEasing),
+            if (motion) scrollEnergy else 0f,
+            tween(if (motion) AppMotion.State else 0, easing = AppMotion.EaseOut),
             label = "navigation scroll depth",
         )
     Box(
@@ -178,7 +181,7 @@ fun NuvioWorkoutNavigation(
             val offset by
                 animateDpAsState(
                     4.dp + slot * (if (selected < 2) selected else selected + 1),
-                    tween(280, easing = FastOutSlowInEasing),
+                    tween(if (motion) AppMotion.Step else 0, easing = AppMotion.EaseOut),
                     label = "navigation pill",
                 )
             // Only the material responds to scroll. The four touch targets stay at their fixed
@@ -214,9 +217,11 @@ fun NuvioWorkoutNavigation(
                             Modifier.weight(1f).fillMaxHeight(),
                             contentAlignment = Alignment.Center,
                         ) {
+                            val interactions = remember { MutableInteractionSource() }
                             FilledIconButton(
                                 onAdd,
-                                Modifier.size(48.dp),
+                                Modifier.size(48.dp).pressFeedback(interactions),
+                                interactionSource = interactions,
                                 colors = IconButtonDefaults.filledIconButtonColors(
                                     containerColor = Color.White,
                                     contentColor = Color.Black,
@@ -227,8 +232,8 @@ fun NuvioWorkoutNavigation(
                         }
                     val iconScale by
                         animateFloatAsState(
-                            if (i == selected) 1.04f else 1f,
-                            tween(180),
+                            if (motion && i == selected) 1.04f else 1f,
+                            tween(if (motion) AppMotion.Quick else 0),
                             label = "navigation icon",
                         )
                     val labelStyle = LocalTextStyle.current.copy(
@@ -273,7 +278,9 @@ fun NuvioWorkoutNavigation(
 
 @Composable
 fun RoundAction(icon: ImageVector, description: String, onClick: () -> Unit) {
-    IconButton(onClick, Modifier.size(48.dp).clip(RoundedCornerShape(50)).background(OF.elevated)) {
+    val interactions = remember { MutableInteractionSource() }
+    IconButton(onClick, Modifier.size(48.dp).pressFeedback(interactions).clip(RoundedCornerShape(50)).background(OF.elevated),
+        interactionSource = interactions) {
         Icon(icon, description, Modifier.size(24.dp))
     }
 }
@@ -341,9 +348,11 @@ fun PrimaryAction(
     enabled: Boolean = true,
     icon: ImageVector? = null,
 ) {
+    val interactions = remember { MutableInteractionSource() }
     Button(
         onClick,
-        modifier.fillMaxWidth().heightIn(min = 52.dp),
+        modifier.fillMaxWidth().heightIn(min = 52.dp).pressFeedback(interactions, enabled),
+        interactionSource = interactions,
         enabled = enabled,
         shape = RoundedCornerShape(8.dp),
         colors =
