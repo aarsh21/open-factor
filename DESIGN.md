@@ -145,6 +145,10 @@ Dashboard customization now groups ordered tiles into compact section cards with
 
 Spreadsheet import uses the native document picker and a preview with explicit exercise choices, set count, omissions and confirmation. Its pinned actions reserve clearance for floating navigation and system bars. The [performance/verification record](docs/open-factor/PERFORMANCE.md) distinguishes final native checks and large synthetic data from physical-device/frame-time claims; [spreadsheet scope](docs/open-factor/SPREADSHEET-IMPORT.md) records partial-target limitations. These working-tree changes do not extend the published 0.6.2 release evidence.
 
+## Exercise preview framing
+
+Compact exercise previews fill their existing rounded frames with a centered crop, rather than fitting a narrow portrait inside a wider slot and exposing side gutters. The shared `ExerciseImage` applies this consistently to the exercise library, logger, workout/template composers, program editor, template lists and history summaries. Loading and missing photos use the theme's neutral raised surface, with an accessible exercise icon on failure. Transparent licensed line illustrations retain a white canvas for contrast. Full demonstration photos/videos keep their natural-aspect presentation; this thumbnail change does not crop the instructional guide or modify any source media.
+
 ## Colors
 
 Frontmatter records the dark palette and the explicit light substitutions in `OpenFactorTheme`. `OF.top` and `OF.card` resolve to the theme surface; `OF.elevated` resolves to surface variant. Dark is the default; Light and System are available.

@@ -943,6 +943,16 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         data.withSpreadsheetPrograms(programs, exercises(data))
     }
 
+    internal fun appendFitbodHistory(preview: FitbodPreview, choices: Map<String, String>, skipped: Set<String>): Int {
+        var imported = 0
+        update { data ->
+            val catalog = exercises(data)
+            val workouts = preview.pending(data.history).materializeHistory(choices, skipped, catalog)
+            data.withFitbodHistory(workouts, catalog).also { imported = it.history.size - data.history.size }
+        }
+        return imported
+    }
+
     fun beginProgram(program: TrainingProgram) = update { it.copy(programDraft = program) }
 
     fun discardProgramDraft() = update { it.copy(programDraft = null) }
