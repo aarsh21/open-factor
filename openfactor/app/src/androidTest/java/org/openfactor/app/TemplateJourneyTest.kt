@@ -25,12 +25,14 @@ class TemplateJourneyTest {
         runCatching { compose.onAllNodesWithContentDescription(description).fetchSemanticsNodes().isNotEmpty() }.getOrDefault(false)
     }
 
-    private fun field(label: String): SemanticsNodeInteraction {
-        val matcher = hasSetTextAction() and hasText(label)
-        // Recreation can restore the list below the name row; locate lazy items before querying.
+    private fun lazyNode(matcher: SemanticsMatcher): SemanticsNodeInteraction {
+        // IME resizing and recreation can leave a row uncomposed. Scroll the vertical lazy
+        // list to discover it before performScrollTo asks for an existing semantics node.
         compose.onNode(hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(matcher)
         return compose.onNode(matcher).performScrollTo()
     }
+
+    private fun field(label: String) = lazyNode(hasSetTextAction() and hasText(label))
 
     @Test fun browseSplitRecreatesRawDraftSavesOrDiscardsAndStartsEditedDayWithBlankActuals() {
         val store = WorkoutStore(context)
@@ -74,8 +76,7 @@ class TemplateJourneyTest {
             compose.onNodeWithContentDescription("Edit Upper A").performScrollTo().performClick()
             awaitText("Edit template")
             field("Template name").performTextReplacement("My upper")
-            compose.onNodeWithContentDescription("Edit targets for Barbell Bench Press")
-                .performScrollTo().performClick()
+            lazyNode(hasContentDescription("Edit targets for Barbell Bench Press")).performClick()
             field("Sets").performScrollTo().performTextReplacement("2")
             field("Rest (seconds)").performTextReplacement("invalid")
             compose.onNodeWithText("Save template").assertIsNotEnabled()
