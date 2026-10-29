@@ -37,6 +37,7 @@ class WorkoutSummaryLayoutTest {
                 }
             }
         }
+        compose.onNodeWithContentDescription("Completed sets: 2").assertExists()
         // SemanticsNode.boundsInRoot is clipped by the scrolling viewport (and may be Rect.Zero
         // for a prefetched/offscreen item). Width is a layout invariant, so measure the actual
         // card bounds, then separately require its data row to be reachable and displayed.

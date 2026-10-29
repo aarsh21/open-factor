@@ -48,7 +48,7 @@ fun WorkoutSummary(
             item {
                 Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     SummaryStat("Duration", historyDuration(w.elapsedSeconds(w.finishedAt ?: w.startedAt)), Modifier.weight(1f))
-                    SummaryStat("Completed sets", w.completedSets().toString(), Modifier.weight(.7f))
+                    SummaryStat("Sets", w.completedSets().toString(), Modifier.weight(.7f), spokenLabel = "Completed sets")
                     SummaryStat("Volume", "${w.volumeKg().displayWeight(prefs.pounds)} ${if (prefs.pounds) "lb" else "kg"}", Modifier.weight(1.3f))
                 }
             }
@@ -72,8 +72,8 @@ fun WorkoutSummary(
 }
 
 @Composable
-private fun SummaryStat(label: String, value: String, modifier: Modifier) {
-    Column(modifier.semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+private fun SummaryStat(label: String, value: String, modifier: Modifier, spokenLabel: String = label) {
+    Column(modifier.semantics(mergeDescendants = true) { contentDescription = "$spokenLabel: $value" }, verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Text(label, color = OF.muted, style = MaterialTheme.typography.labelMedium)
     }
