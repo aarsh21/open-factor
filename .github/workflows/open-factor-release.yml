@@ -1,0 +1,186 @@
+name: Open Factor Release
+on:
+  workflow_run:
+    workflows: ['Open Factor Android']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      verify_only:
+        description: Build and sign without publishing (also verifies an already released version)
+        type: boolean
+        default: true
+permissions:
+  contents: read
+concurrency:
+  group: open-factor-release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      VERIFY_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_only || false }}
+      MEDIA_BASELINE_TAG: v0.8.0
+      MEDIA_BASELINE_SHA256: 2c804aebbe3877edc7a728348422e05890fa0a47389fa14760e8ce4f23fb941c
+      RELEASE_CERTIFICATE_SHA256: 26d674e28f0df6bfe2fe4a9fc4e2fed332621521d2459331eea645c944e22505
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - name: Require successful main CI and a new documented version
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -I - <<'PY'
+          import base64, json, os, re, subprocess
+          from pathlib import Path
+
+          def gh(*args):
+              return subprocess.check_output(['gh', *args], text=True)
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          source = os.environ['SOURCE_SHA']
+          current = json.loads(gh('api', f'repos/{repo}/git/ref/heads/main'))['object']['sha']
+          if source != current:
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+                  output.write('build=false\n')
+              print('Skipping superseded main commit; its successor owns publication.')
+              raise SystemExit(0)
+          runs = json.loads(gh('run', 'list', '--repo', repo, '--workflow', 'open-factor-android.yml',
+                               '--branch', 'main', '--commit', source, '--event', 'push',
+                               '--json', 'conclusion,status,url'))
+          passed = next((run for run in runs if run['status'] == 'completed' and run['conclusion'] == 'success'), None)
+          if passed is None:
+              raise SystemExit('The exact main commit must pass the complete Android CI workflow first.')
+          build = Path('openfactor/app/build.gradle.kts').read_text()
+          version = re.search(r'^\s*versionName = "([0-9]+\.[0-9]+\.[0-9]+)"\s*$', build, re.M)
+          code = re.search(r'^\s*versionCode = ([1-9][0-9]*)\s*$', build, re.M)
+          if version is None or code is None:
+              raise SystemExit('Expected one stable versionName and positive versionCode.')
+          version, code = version.group(1), int(code.group(1))
+          tag = 'v' + version
+          verify_only = os.environ['VERIFY_ONLY'] == 'true'
+          releases = json.loads(gh('api', f'repos/{repo}/releases?per_page=100'))
+          existing = next((release for release in releases if release['tag_name'] == tag), None)
+          if existing is not None and not verify_only:
+              if existing['draft'] or not any(asset['name'] == 'open-factor.apk' and asset['state'] == 'uploaded'
+                                              for asset in existing['assets']):
+                  raise SystemExit('This version already has an incomplete release. Repair it explicitly; never overwrite automatically.')
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+                  output.write('build=false\n')
+              print(f'{tag} already has a downloadable APK; leaving it unchanged.')
+              raise SystemExit(0)
+          stable = [release for release in releases if not release['draft'] and not release['prerelease']]
+          if stable and not verify_only:
+              previous_tag = stable[0]['tag_name']
+              previous = json.loads(gh('api', f'repos/{repo}/contents/openfactor/app/build.gradle.kts?ref={previous_tag}'))
+              previous = base64.b64decode(previous['content']).decode()
+              old_version = re.search(r'versionName = "([0-9]+\.[0-9]+\.[0-9]+)"', previous).group(1)
+              old_code = int(re.search(r'versionCode = ([0-9]+)', previous).group(1))
+              if tuple(map(int, version.split('.'))) <= tuple(map(int, old_version.split('.'))) or code <= old_code:
+                  raise SystemExit('A new release must increase both versionName and versionCode.')
+          notes = Path(f'docs/open-factor/releases/{tag}.md')
+          if not notes.is_file():
+              raise SystemExit(f'Add reviewed release notes at {notes} before publishing.')
+          body = notes.read_text().replace('](../', f'](https://github.com/{repo}/blob/{tag}/docs/open-factor/')
+          body = re.sub(r'\]\((v[0-9.]+\.md)\)', rf'](https://github.com/{repo}/blob/{tag}/docs/open-factor/releases/\1)', body)
+          body = (f'## Download\n\n[**Download the signed Android APK**](https://github.com/{repo}/releases/download/{tag}/open-factor.apk)\n\n'
+                  'Export a complete backup before updating. The APK and SHA256SUMS are attached below.\n\n' + body +
+                  f'\n[Passed build and Android device checks]({passed["url"]}).\n')
+          Path(os.environ['RUNNER_TEMP'], 'release-notes.md').write_text(body)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'build=true\nversion={version}\ntag={tag}\ncode={code}\n')
+          PY
+      - uses: actions/setup-java@v4
+        if: steps.gate.outputs.build == 'true'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        if: steps.gate.outputs.build == 'true'
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.gate.outputs.build == 'true'
+      - name: Install Android build tools
+        if: steps.gate.outputs.build == 'true'
+        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+      - name: Download and authenticate the pinned original-media baseline
+        if: steps.gate.outputs.build == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/media-baseline"
+          gh release download "$MEDIA_BASELINE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern open-factor.apk --dir "$RUNNER_TEMP/media-baseline"
+          printf '%s  %s\n' "$MEDIA_BASELINE_SHA256" "$RUNNER_TEMP/media-baseline/open-factor.apk" | sha256sum --check
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs \
+            "$RUNNER_TEMP/media-baseline/open-factor.apk" > "$RUNNER_TEMP/baseline-signature.txt"
+          grep -Fx "Signer #1 certificate SHA-256 digest: $RELEASE_CERTIFICATE_SHA256" "$RUNNER_TEMP/baseline-signature.txt"
+      - name: Build, test, sign and verify the original-media APK
+        if: steps.gate.outputs.build == 'true'
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.OPENFACTOR_RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.OPENFACTOR_RELEASE_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_BASE64" && test -n "$KEYSTORE_PASSWORD"
+          umask 077
+          export OPENFACTOR_KEYSTORE="$RUNNER_TEMP/open-factor-release.jks"
+          export OPENFACTOR_PASSWORD_FILE="$RUNNER_TEMP/open-factor-release.password"
+          trap 'rm -f "$OPENFACTOR_KEYSTORE" "$OPENFACTOR_PASSWORD_FILE"' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$OPENFACTOR_KEYSTORE"
+          printf '%s' "$KEYSTORE_PASSWORD" > "$OPENFACTOR_PASSWORD_FILE"
+          unset KEYSTORE_BASE64 KEYSTORE_PASSWORD
+          export OPENFACTOR_MEDIA_PACK_APK="$RUNNER_TEMP/media-baseline/open-factor.apk"
+          export OPENFACTOR_MEDIA_PACK_SHA256="$MEDIA_BASELINE_SHA256"
+          export OPENFACTOR_RELEASE_DIR="$GITHUB_WORKSPACE/openfactor/app/build/media-release"
+          bash tooling/build_media_release.sh
+          grep -Fx "Signer #1 certificate SHA-256 digest: $RELEASE_CERTIFICATE_SHA256" "$OPENFACTOR_RELEASE_DIR/signature.txt"
+      - name: Publish downloadable APK on GitHub Releases
+        if: steps.gate.outputs.build == 'true' && env.VERIFY_ONLY != 'true'
+        env:
+          TAG: ${{ steps.gate.outputs.tag }}
+          VERSION: ${{ steps.gate.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "$current" != "$SOURCE_SHA" ]]; then
+            printf '%s\n' 'Main advanced during the build; its successor owns publication.'
+            exit 0
+          fi
+          # Create the release with its attachments in one operation; never replace a published APK.
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" \
+            --title "Open Factor $VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" --latest \
+            openfactor/app/build/media-release/open-factor.apk \
+            openfactor/app/build/media-release/SHA256SUMS \
+            openfactor/app/build/media-release/artifact.json \
+            openfactor/app/build/media-release/signature.txt
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,assets \
+            --jq '{url, downloads: [.assets[] | {name,url}]}'
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.gate.outputs.build == 'true'
+        with:
+          name: open-factor-signed-release-${{ steps.gate.outputs.version }}
+          path: |
+            openfactor/app/build/media-release/
+            openfactor/app/build/test-results/testReleaseUnitTest/
+            openfactor/app/build/reports/lint-results-release.*
+          if-no-files-found: error

@@ -20,17 +20,36 @@ require(legacyReference != "false" || mediaMode == "source") {
 }
 val preparedReference = layout.buildDirectory.dir("generated/referenceMediaPack")
 val mediaPackScript = rootProject.file("../tooling/prepare_media_pack.py")
+val reusedMediaScript = rootProject.file("../tooling/reuse_release_media.py")
+val mediaPackApk = providers.gradleProperty("openfactorMediaPackApk").map { file(it) }.orNull
+val mediaPackSha256 = providers.gradleProperty("openfactorMediaPackSha256").orNull
+require((mediaPackApk == null) == (mediaPackSha256 == null)) {
+    "openfactorMediaPackApk and openfactorMediaPackSha256 must be supplied together"
+}
+require(mediaPackApk == null || mediaMode == "static") { "A published media pack can only be reused in static mode" }
 val referenceMedia = tasks.register<Exec>("prepareReferenceMediaPack") {
-    inputs.file(mediaPackScript)
     inputs.property("mode", mediaMode)
-    if (mediaMode != "source") inputs.files(fileTree(referenceDirectory) {
-        if (mediaMode != "full") exclude("videos/**")
-    })
+    inputs.property("reusePublishedPack", mediaPackApk != null)
     outputs.dir(preparedReference)
-    commandLine("python3", mediaPackScript.absolutePath,
-        "--source", referenceDirectory.absolutePath,
-        "--output", preparedReference.get().asFile.absolutePath,
-        "--mode", mediaMode)
+    if (mediaPackApk != null) {
+        inputs.file(mediaPackApk)
+        inputs.file(reusedMediaScript)
+        inputs.file(rootProject.file("../tooling/verify_media_apk.py"))
+        inputs.file(rootProject.file("../backend/media/video-index.json"))
+        inputs.property("baselineSha256", mediaPackSha256!!)
+        commandLine("python3", "-I", reusedMediaScript.absolutePath,
+            "--apk", mediaPackApk.absolutePath, "--sha256", mediaPackSha256,
+            "--output", preparedReference.get().asFile.absolutePath)
+    } else {
+        inputs.file(mediaPackScript)
+        if (mediaMode != "source") inputs.files(fileTree(referenceDirectory) {
+            if (mediaMode != "full") exclude("videos/**")
+        })
+        commandLine("python3", mediaPackScript.absolutePath,
+            "--source", referenceDirectory.absolutePath,
+            "--output", preparedReference.get().asFile.absolutePath,
+            "--mode", mediaMode)
+    }
 }
 val bundledAssets = tasks.register<Sync>("prepareBundledAssets") {
     dependsOn(referenceMedia)

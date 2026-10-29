@@ -9,7 +9,13 @@ build_tools="${OPENFACTOR_BUILD_TOOLS:-$ANDROID_HOME/build-tools/35.0.0}"
 output_dir="${OPENFACTOR_RELEASE_DIR:-$project_dir/openfactor/app/build/media-release}"
 mkdir -p "$output_dir"
 cd "$project_dir/openfactor"
-./gradlew :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease -PopenfactorMediaMode=static
+media_args=(-PopenfactorMediaMode=static)
+if [[ -n "${OPENFACTOR_MEDIA_PACK_APK:-}" || -n "${OPENFACTOR_MEDIA_PACK_SHA256:-}" ]]; then
+    : "${OPENFACTOR_MEDIA_PACK_APK:?Set the published baseline APK path}"
+    : "${OPENFACTOR_MEDIA_PACK_SHA256:?Set its reviewed SHA-256}"
+    media_args+=("-PopenfactorMediaPackApk=$OPENFACTOR_MEDIA_PACK_APK" "-PopenfactorMediaPackSha256=$OPENFACTOR_MEDIA_PACK_SHA256")
+fi
+./gradlew :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease "${media_args[@]}"
 "$build_tools/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk "$output_dir/aligned.apk"
 "$build_tools/apksigner" sign --ks "$OPENFACTOR_KEYSTORE" --ks-key-alias open-factor \
     --ks-pass "file:$OPENFACTOR_PASSWORD_FILE" \

@@ -32,6 +32,12 @@ Static/full staging needs Python 3.11+ and ImageMagick's `magick` command. Sourc
 
 The generated `media-pack.json` records the mode, source APK/catalog hashes, file counts and exact source/output SHA-256 values. Equipment thumbnail transformations are identified individually. The reference catalog retains original clip identities and `videoObjectPaths`. The implemented Android media client resolves those identities to a bundled clip or the configured HTTPS service; an accessible server and uploaded object are still required for uncached remote playback.
 
+## Reusing the published static pack in release CI
+
+Release CI does not need the ignored original directory or an ImageMagick installation. It downloads the reviewed `v0.8.0` APK into a fresh temporary directory, verifies its pinned SHA-256 and signing certificate, then passes `openfactorMediaPackApk` and `openfactorMediaPackSha256` to the static build. `tooling/reuse_release_media.py` invokes the full media/backend verifier in isolated Python before copying only manifest-listed static assets into the generated pack. No APK code, native libraries or unrelated assets are extracted or executed. Paths, lengths, digests, output ownership and bounds are checked again before staging.
+
+The entire existing `media-pack.json` and all 3,394 asset bytes remain unchanged, including original-source digests and equipment-thumbnail transformation receipts. This is reuse of the already published pack, not regeneration from reduced equipment thumbnails or a new provenance claim. The finished APK is verified separately. The baseline pin and certificate live in the reviewed release workflow; replacing media requires an explicit baseline/verifier review rather than silently following the latest uploaded asset. Normal local static/full staging and explicit source exclusion remain unchanged. See [release operations](RELEASING.md).
+
 ## Current original-media inventory
 
 The inspected collection contains 1,831 MP4s for 619 exercises, 1,832 exercise photos, 44 muscle-group SVGs, four body assets and 297 equipment images. There are 1,213 instruction files, of which 1,212 contain text. These counts do not establish full media or instruction coverage for all 1,345 catalog exercises. The current static staging manifest records **32,986,897 bytes** before APK compression and **zero bundled MP4s**. The roughly 2.73 GB video payload remains outside static mode.
