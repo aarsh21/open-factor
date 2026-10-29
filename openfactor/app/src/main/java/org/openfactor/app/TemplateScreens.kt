@@ -2,10 +2,12 @@ package org.openfactor.app
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -15,6 +17,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
@@ -241,6 +244,8 @@ fun TemplateLibraryScreen(
     val byId = remember(data.routines) { data.routines.associateBy { it.id } }
     var showStarters by rememberSaveable { mutableStateOf(data.routines.isEmpty()) }
     var seenCount by rememberSaveable { mutableIntStateOf(data.routines.size) }
+    var selectedDay by rememberSaveable { mutableIntStateOf(0) }
+    val listState = rememberLazyListState()
     var starterId by rememberSaveable { mutableStateOf("") }
     var splitId by rememberSaveable { mutableStateOf("") }
     var pendingName by rememberSaveable { mutableStateOf("") }
@@ -258,7 +263,9 @@ fun TemplateLibraryScreen(
     }
     val starter = starters.find { it.id == starterId }
     val split = data.templateSplits.find { it.id == splitId }
-    fun back() { if (starterId.isNotEmpty() || splitId.isNotEmpty()) { starterId = ""; splitId = ""; error = null } else onBack() }
+    val selectedRoutine = split?.days?.getOrNull(selectedDay)?.let(byId::get)
+    LaunchedEffect(starterId, splitId, selectedDay, showStarters) { listState.scrollToItem(0) }
+    fun back() { if (starterId.isNotEmpty() || splitId.isNotEmpty()) { starterId = ""; splitId = ""; selectedDay = 0; error = null } else onBack() }
     BackHandler(onBack = ::back)
     Column(Modifier.fillMaxSize()) {
         PageHeading(starter?.name ?: split?.name ?: "Templates", ::back,
@@ -268,10 +275,12 @@ fun TemplateLibraryScreen(
                 SegmentedButton(showStarters == value, { showStarters = value }, SegmentedButtonDefaults.itemShape(index, 2)) { Text(label) }
             }
         }
-        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        if (starter != null || split != null) TemplateWeekStrip(
+            starter?.days?.map { it?.name } ?: split!!.days.map { byId[it]?.name },
+            selectedDay, { selectedDay = it }, Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
+        LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             if (starter != null || split != null) {
-                item { TemplateWeekStrip((starter?.days?.map { it?.name } ?: split!!.days.map { byId[it]?.name })) }
-                items((0..6).toList(), key = { it }) { index ->
+                items(listOf(selectedDay), key = { it }) { index ->
                     val suggested = starter?.days?.get(index)
                     val routine = split?.days?.get(index)?.let(byId::get)
                     val name = suggested?.name ?: routine?.name
@@ -282,25 +291,34 @@ fun TemplateLibraryScreen(
                             if (routine != null) IconButton({ onEdit(routine) }) { Icon(Icons.Rounded.Edit, "Edit ${routine.name}") }
                         }
                         val prescriptions = suggested?.prescriptions ?: routine?.effectivePrescriptions().orEmpty()
+                        val muscles = prescriptions.flatMap { target -> exercises.find { it.id == target.exerciseId }?.muscles.orEmpty() }.distinct()
+                        if (muscles.isNotEmpty()) TemplateMuscleOverview(muscles)
+                        if (prescriptions.isNotEmpty()) Text(
+                            prescriptions.size.let { "$it ${if (it == 1) "exercise" else "exercises"}" } + " · " +
+                                prescriptions.sumOf { it.sets }.let { "$it ${if (it == 1) "set" else "sets"}" }, color = OF.muted,
+                            style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(vertical = 8.dp))
+                        if (name == null) Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Rounded.Bedtime, null, Modifier.size(48.dp), tint = OF.muted)
+                        }
                         prescriptions.forEach { target ->
                             val exercise = exercises.find { it.id == target.exerciseId }
                             Row(Modifier.fillMaxWidth().padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 if (exercise != null) ExerciseImage(exercise, Modifier.size(42.dp))
-                                Text(exercise?.title ?: "Unavailable exercise", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                                Text(target.sets.toString(), color = OF.muted, style = MaterialTheme.typography.labelLarge,
-                                    modifier = Modifier.semantics { contentDescription = "${target.sets} sets" })
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(exercise?.title ?: "Unavailable exercise", style = MaterialTheme.typography.bodyLarge)
+                                    Text(templateTargetSummary(TemplateTargetInput.from(target)), color = OF.muted, style = MaterialTheme.typography.labelMedium)
+                                }
                             }
                         }
-                        if (routine != null) OutlinedButton({ error = onStart(routine) }, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = data.active == null) { Text("Start ${routine.name}") }
-                        HorizontalDivider(Modifier.padding(top = 8.dp), color = OF.line)
+
                     }
                 }
             } else {
                 if (!showStarters && data.templateSplits.isNotEmpty()) {
                     item { SectionTitle("Your splits") }
                     items(data.templateSplits, key = { "split-${it.id}" }) { saved ->
-                        TemplateSplitRow(saved.name, saved.days.map { byId[it]?.name }, { splitId = saved.id })
+                        TemplateSplitRow(saved.name, saved.days.map { byId[it]?.name }, { selectedDay = 0; splitId = saved.id })
                     }
                 }
                 if (!showStarters && data.routines.isNotEmpty()) {
@@ -321,7 +339,7 @@ fun TemplateLibraryScreen(
                     }
                 }
                 if (showStarters) items(starters, key = { "starter-${it.id}" }) { preset ->
-                    TemplateSplitRow(preset.name, preset.days.map { it?.name }, { starterId = preset.id })
+                    TemplateSplitRow(preset.name, preset.days.map { it?.name }, { selectedDay = 0; starterId = preset.id })
                 }
                 if (!showStarters && data.routines.isEmpty()) item {
                     Text("No templates yet", style = MaterialTheme.typography.titleLarge)
@@ -330,6 +348,9 @@ fun TemplateLibraryScreen(
                 item { OutlinedButton(onCreate, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Icon(Icons.Rounded.Add, null); Spacer(Modifier.width(8.dp)); Text("Create template") } }
             }
             if (error != null) item { Text(error.orEmpty(), color = MaterialTheme.colorScheme.error) }
+        }
+        if (selectedRoutine != null) Box(Modifier.padding(18.dp)) {
+            PrimaryAction("Start ${selectedRoutine.name}", { error = onStart(selectedRoutine) }, enabled = data.active == null)
         }
         if (starter != null) Box(Modifier.padding(18.dp)) {
             PrimaryAction(if (installing) "Adding templates" else "Use split", {
@@ -352,24 +373,37 @@ fun TemplateLibraryScreen(
         TemplateWeekStrip(days)
     }
 }
-@Composable private fun TemplateWeekStrip(days: List<String?>) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        days.forEachIndexed { index, name ->
-            val label = when {
-                name == null -> "Rest"
-                name.startsWith("Full body", true) -> name.replace("body", "").replace("  ", " ")
-                name.startsWith("Shoulder", true) -> "Delts"
-                else -> name
+@Composable private fun TemplateWeekStrip(
+    days: List<String?>, selectedDay: Int? = null, onSelect: ((Int) -> Unit)? = null, modifier: Modifier = Modifier,
+) {
+    val cell: @Composable (Int, String?, Modifier) -> Unit = { index, name, cellModifier ->
+        val label = when {
+            name == null -> "Rest"
+            name.startsWith("Full body", true) -> name.replace("body", "").replace("  ", " ")
+            name.startsWith("Shoulder", true) -> "Delts"
+            else -> name
+        }
+        val selected = selectedDay == index
+        Column(cellModifier.heightIn(min = 64.dp).then(if (onSelect != null) Modifier
+            .selectable(selected, role = Role.Tab) { onSelect(index) }
+            .semantics(mergeDescendants = true) { contentDescription = "Day ${index + 1}, ${name ?: "Rest"}" } else Modifier)
+            .padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text((index + 1).toString(), color = OF.muted, style = MaterialTheme.typography.labelSmall)
+            Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                color = if (selected) MaterialTheme.colorScheme.onSurface else if (name == null) OF.background else OF.card,
+                contentColor = if (selected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface) {
+                Text(label, Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelSmall, minLines = 2, maxLines = 2,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center, overflow = TextOverflow.Ellipsis)
             }
-            Column(Modifier.weight(1f).padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text((index + 1).toString(), color = OF.muted, style = MaterialTheme.typography.labelSmall)
-                Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), color = if (name == null) OF.background else OF.card) {
-                    Text(label, Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 8.dp),
-                        style = MaterialTheme.typography.labelSmall, minLines = 2, maxLines = 2,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center, overflow = TextOverflow.Ellipsis)
-                }
-            }
+        }
+    }
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        if (onSelect != null && maxWidth < 336.dp) LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            items(days.mapIndexed { index, name -> index to name }, key = { it.first }) { (index, name) -> cell(index, name, Modifier.width(52.dp)) }
+        } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            days.forEachIndexed { index, name -> cell(index, name, Modifier.weight(1f)) }
         }
     }
 }

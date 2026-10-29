@@ -49,11 +49,19 @@ class TemplateJourneyTest {
                 preferences = Preferences(pounds = false, autoRest = false)))
             activity = ActivityScenario.launch(MainActivity::class.java)
             awaitText("Start workout")
-            compose.onNodeWithText("Browse splits").performScrollTo().performClick()
+            compose.onNodeWithText("Browse splits").performScrollTo()
+            // Clear the floating navigation before a real touch on compact CI viewports.
+            compose.onRoot().performTouchInput { swipeUp(startY = height * .65f, endY = height * .35f) }
+            compose.onNodeWithText("Browse splits").assertIsDisplayed().performClick()
             awaitText("Starter splits")
             compose.onNodeWithText("Upper / Lower").performScrollTo().performClick()
             awaitText("Use split")
             compose.onNodeWithText("Day 1").assertExists()
+            compose.onNodeWithContentDescription("Day 3, Rest").performClick()
+            compose.onNodeWithText("Day 3").assertExists()
+            compose.onNodeWithText("Barbell Bench Press").assertDoesNotExist()
+            compose.onNodeWithText("Use split").assertIsDisplayed()
+            compose.onNodeWithContentDescription("Day 1, Upper A").performClick()
             compose.onNodeWithContentDescription("Edit Upper A").assertDoesNotExist()
             compose.runOnIdle { assertTrue(store.load().routines.isEmpty()) }
             compose.onNodeWithText("Use split").assertIsDisplayed().performClick()
@@ -106,7 +114,7 @@ class TemplateJourneyTest {
             awaitDescription("Edit My upper")
             compose.runOnIdle { assertEquals(saved, store.load()) }
 
-            compose.onNodeWithText("Start My upper").performScrollTo().performClick()
+            compose.onNodeWithText("Start My upper").assertIsDisplayed().performClick()
             awaitText("Warmup")
             compose.onAllNodesWithText("5–8 reps").onFirst().performScrollTo().assertIsDisplayed()
             compose.onNodeWithContentDescription("Barbell Bench Press set 1 weight (kg)")

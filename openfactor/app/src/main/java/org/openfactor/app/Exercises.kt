@@ -142,7 +142,7 @@ fun ExerciseLibrary(
                 query,
                 { query = it },
                 Modifier.weight(1f).background(OF.top, RoundedCornerShape(50)),
-                placeholder = { Text("Search exercises") },
+                placeholder = { Text("Search exercises", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 leadingIcon = { Icon(Icons.Rounded.Search, null) },
                 trailingIcon = {
                     if (query.isNotEmpty())
@@ -266,7 +266,9 @@ fun ExerciseLibrary(
                             m,
                             Modifier.padding(top = 4.dp),
                             fontSize = 12.sp,
-                            maxLines = 1,
+                            minLines = 2,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                             color = if (muscle == m) MaterialTheme.colorScheme.onSurface else OF.muted,
                         )
                     }
