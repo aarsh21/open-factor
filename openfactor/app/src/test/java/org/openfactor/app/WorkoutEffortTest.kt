@@ -4,6 +4,16 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class WorkoutEffortTest {
+    @Test fun bulkCompletionStartsNoIntermediateRestWhenExerciseRestIsDisabled() {
+        val se = SessionExercise(exerciseId = "press", sets = listOf(
+            LoggedSet(weightKg = 40.0, reps = 8), LoggedSet(weightKg = 40.0, reps = 8)))
+        val workout = Workout(name = "Upper", exercises = listOf(se))
+        val completed = workout.withAllSetsCompleted(se.id, Preferences(autoRest = true, restBetweenExercises = false), 1000)
+        assertTrue(completed.exercises.single().sets.all { it.completed })
+        assertEquals(0L, completed.restUntil)
+        val rest = workout.withAllSetsCompleted(se.id, Preferences(autoRest = true, restSeconds = 90), 1000)
+        assertEquals(91000L, rest.restUntil)
+    }
     private val metrics = listOf(SetMetric.WEIGHT, SetMetric.REPS)
     private val first = LoggedSet(id = "first", weightKg = 47.5, reps = 8, rir = 3, completed = true)
     private val last = LoggedSet(id = "last", weightKg = 45.0, reps = 9)

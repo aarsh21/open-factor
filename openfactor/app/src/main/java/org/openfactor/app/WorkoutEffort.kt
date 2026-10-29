@@ -12,9 +12,12 @@ fun Workout.withAllSetsCompleted(
 ): Workout {
     val entry = exercises.find { it.id == exerciseId } ?: return this
     if (!entry.canLogAllSets(metrics)) return this
-    // Reuse the ordinary completion rules for side/Myo boundaries, rest and automatic navigation.
-    return entry.sets.filterNot { it.completed }.fold(this) { workout, set ->
-        workout.toggleSetCompletion(exerciseId, set.id, preferences, now, metrics)
+    // Only the final boundary can start rest. Intermediate rows were logged together, so their
+    // individual timers must not leak through when rest after the exercise is disabled.
+    val pending = entry.sets.filterNot { it.completed }
+    return pending.foldIndexed(this) { index, workout, set ->
+        val policy = if (index == pending.lastIndex) preferences else preferences.copy(autoRest = false)
+        workout.toggleSetCompletion(exerciseId, set.id, policy, now, metrics)
     }
 }
 
