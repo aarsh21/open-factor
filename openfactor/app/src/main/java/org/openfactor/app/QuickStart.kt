@@ -53,7 +53,7 @@ fun QuickStartScreen(
     val motion = LocalAppMotionEnabled.current
     val haptic = LocalHapticFeedback.current
     // Only the rare first page earns an entrance. Restored drafts and provider returns stay put.
-    var introduced by rememberSaveable { mutableStateOf(stage != 0) }
+    var introduced by rememberSaveable { mutableStateOf(stage != 0 || data.onboarding.profileDraft != null) }
     val entrance = remember { Animatable(if (introduced || !motion) 1f else 0f) }
     LaunchedEffect(motion) {
         if (!introduced) {
