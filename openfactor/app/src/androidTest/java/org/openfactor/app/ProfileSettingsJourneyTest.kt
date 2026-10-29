@@ -37,7 +37,12 @@ class ProfileSettingsJourneyTest {
             compose.onNodeWithText("Bodyweight Contribution").assertDoesNotExist()
             compose.onNodeWithText("Keep screen on").assertIsDisplayed()
             compose.onNodeWithText("Done").performClick()
-            compose.onNodeWithText("Units").performScrollTo().performClick()
+            compose.onNodeWithText("Units").performScrollTo()
+            // BringIntoView only knows the scroll viewport, not the floating navigation overlay.
+            // Scroll the destination above that overlay before exercising its real touch target.
+            compose.onRoot().performTouchInput { swipeUp(startY = height * .65f, endY = height * .35f) }
+            compose.onNodeWithText("Units").assertIsDisplayed().performClick()
+            await("WEIGHT UNITS")
             compose.onNodeWithText("ENERGY UNITS").assertDoesNotExist()
             compose.onNodeWithContentDescription("Back").performClick()
             compose.onNodeWithText("Profile").performScrollTo().performClick()
