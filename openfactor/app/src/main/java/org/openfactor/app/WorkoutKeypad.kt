@@ -46,6 +46,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
@@ -164,7 +165,7 @@ internal class KeypadFieldNode(val target: KeypadTarget) {
 }
 
 /** What a set row tells its metric field when the keypad is on. */
-internal class KeypadField(
+internal data class KeypadField(
     val keypad: WorkoutKeypad,
     val setId: String,
     val metric: SetMetric,
@@ -413,10 +414,14 @@ private fun RowScope.KeypadButton(
                         interval = (interval * 85 / 100).coerceAtLeast(60)
                     }
                 }
-                val up = waitForUpOrCancellation()
-                job.cancel()
-                up?.consume()
-                source.tryEmit(if (up != null) PressInteraction.Release(press) else PressInteraction.Cancel(press))
+                // Also stops if the gesture itself is cancelled (pointerInput restarted, key detached),
+                // so a held step can never keep firing at another field.
+                var up: PointerInputChange? = null
+                try { up = waitForUpOrCancellation() } finally {
+                    job.cancel()
+                    up?.consume()
+                    source.tryEmit(if (up != null) PressInteraction.Release(press) else PressInteraction.Cancel(press))
+                }
             }
         }
         .semantics(mergeDescendants = true) {

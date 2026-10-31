@@ -49,6 +49,9 @@ internal class CoalescedSaver<T : Any>(
         }
     }
 
+    /** Lifecycle flush: a failed write stays pending (reported like a deferred one) instead of throwing. */
+    fun flushQuietly() { runCatching { flush() }.onFailure(onDeferredFailure) }
+
     fun flush() {
         synchronized(lock) {
             if (savedVersion == version) return

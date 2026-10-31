@@ -189,6 +189,8 @@ class EffortPromptOnLeaveJourneyTest {
         val before = store.load()
         var activity: ActivityScenario<MainActivity>? = null
         try {
+            // On a fresh install the system notification prompt would cover the workout.
+            grantNotifications()
             store.save(session(Preferences(showRir = false, autoRest = false)))
             activity = ActivityScenario.launch(MainActivity::class.java)
             awaitText("Warmup")

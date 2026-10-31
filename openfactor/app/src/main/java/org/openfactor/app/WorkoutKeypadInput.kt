@@ -96,5 +96,6 @@ internal fun nextKeypadTarget(rows: List<LoggedSet>, metrics: List<SetMetric>, c
 internal fun nextUnfinishedSet(rows: List<LoggedSet>, metrics: List<SetMetric>, current: KeypadTarget): KeypadTarget? {
     val rowIndex = rows.indexOfFirst { it.id == current.setId }
     if (rowIndex < 0 || metrics.isEmpty()) return null
-    return rows.drop(rowIndex + 1).firstOrNull { !it.completed }?.let { KeypadTarget(it.id, metrics.first()) }
+    // Later rows first, then any earlier set that was skipped, so the keypad stays up until all are logged.
+    return (rows.drop(rowIndex + 1) + rows.take(rowIndex)).firstOrNull { !it.completed }?.let { KeypadTarget(it.id, metrics.first()) }
 }

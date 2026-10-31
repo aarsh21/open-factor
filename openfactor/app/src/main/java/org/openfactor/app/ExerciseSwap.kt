@@ -212,14 +212,17 @@ fun AppData.exerciseSwapUndo(next: AppData): ExerciseSwapUndo? {
 
 /** Undo can arrive late (a long snackbar); it must never erase sets logged or notes saved after the swap. */
 fun AppData.canUndoExerciseSwap(undo: ExerciseSwapUndo): Boolean = undo.after == null || (
-    active == undo.after.active &&
+    active.let { now -> val after = undo.after.active; if (now == null || after == null) now == after else now.sameWorkAs(after) } &&
         undo.routine?.let { r -> routines.find { it.id == r.id } == undo.after.routines.find { it.id == r.id } } != false &&
         undo.program?.let { p -> programs.find { it.id == p.id } == undo.after.programs.find { it.id == p.id } } != false
     )
 
 /** Restores only the swapped workout and plans; other workouts and plans are never touched. */
 fun AppData.withoutExerciseSwap(undo: ExerciseSwapUndo): AppData = if (!canUndoExerciseSwap(undo)) this else copy(
-    active = if (active?.id == undo.workout.id) undo.workout else active,
+    // The rest timer and pause keep running as they are now; only the swapped work is reverted.
+    active = active?.takeIf { it.id == undo.workout.id }
+        ?.let { now -> undo.workout.copy(restUntil = now.restUntil, pausedAt = now.pausedAt, pausedDurationMs = now.pausedDurationMs) }
+        ?: active,
     routines = undo.routine?.let { saved -> routines.map { if (it.id == saved.id) saved else it } } ?: routines,
     programs = undo.program?.let { saved -> programs.map { if (it.id == saved.id) saved else it } } ?: programs,
 )

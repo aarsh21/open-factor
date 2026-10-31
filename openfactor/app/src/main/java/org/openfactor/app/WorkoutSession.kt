@@ -517,7 +517,7 @@ fun WorkoutSession(
     // First match wins, as with the linear find it replaces.
     val catalogById = remember(exercises) { HashMap<String, Exercise>().apply { exercises.forEach { putIfAbsent(it.id, it) } } }
     fun owesEffort(entry: SessionExercise) = entry.pendingEffortSet(
-        catalogById[entry.exerciseId]?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS),
+        loggingMetricsOf(catalogById[entry.exerciseId]),
     ) != null
     val promptedExercise = when {
         !data.preferences.rateEffortAfterExercise -> null
@@ -540,7 +540,7 @@ fun WorkoutSession(
     if (keypadOpen) LaunchedEffect(ratedExercise?.id) { focus.clearFocus() }
     ratedExercise?.takeIf { !keypadOpen }?.let { entry ->
         val exercise = catalogById[entry.exerciseId]
-        val set = entry.lastEffortSet(exercise?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS))
+        val set = entry.lastEffortSet(loggingMetricsOf(exercise))
         if (exercise != null && set != null) ExerciseEffortSheet(
             exercise, set,
             onDismiss = { vm.reviewExerciseEffort(entry.id, set.id, set.rir); rateExerciseId = null },
@@ -813,6 +813,9 @@ private fun SetRow(
     keypad: WorkoutKeypad? = null,
 ) {
     TraceRecomposition("SetRow", set.id)
+    // Stable across recompositions so each field's KeypadField stays equal and unchanged fields skip.
+    val latestComplete by rememberUpdatedState(onComplete)
+    val stableComplete = remember { { latestComplete() } }
     val focus = LocalFocusManager.current
     var remove by remember { mutableStateOf(false) }
     var options by remember { mutableStateOf(false) }
@@ -929,7 +932,7 @@ private fun SetRow(
                     keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }),
                     textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center, fontWeight = FontWeight.Medium),
                     shape = RoundedCornerShape(10.dp),
-                    field = keypad?.let { KeypadField(it, set.id, metric, prefs, set.completed, set.canComplete(metrics), onComplete) },
+                    field = keypad?.let { KeypadField(it, set.id, metric, prefs, set.completed, set.canComplete(metrics), stableComplete) },
                 )
             }
         }

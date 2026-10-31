@@ -157,15 +157,15 @@ fun AppData.setRemovalUndo(next: AppData): SetRemovalUndo? {
  * Undo can arrive late (a long snackbar); any edit after the removal withdraws it, so it can never
  * erase new work. Moving between exercises is not an edit and keeps the offer.
  */
-fun AppData.canUndoSetRemoval(undo: SetRemovalUndo): Boolean = active?.let {
-    // Effort prompts are bookkeeping of that navigation, not an edit.
-    it.copy(selectedExerciseId = undo.after.selectedExerciseId, effortPrompts = undo.after.effortPrompts) == undo.after
-} == true
+fun AppData.canUndoSetRemoval(undo: SetRemovalUndo): Boolean = active?.sameWorkAs(undo.after) == true
 
 /** Restores the set with its ids, values, completion, kind and side/Myo links, at its old position. */
 fun AppData.withoutSetRemoval(undo: SetRemovalUndo): AppData =
     if (!canUndoSetRemoval(undo)) this
-    else copy(active = undo.before.copy(selectedExerciseId = active?.selectedExerciseId, effortPrompts = active?.effortPrompts.orEmpty()))
+    else copy(active = active?.let { now ->
+        undo.before.copy(selectedExerciseId = now.selectedExerciseId, effortPrompts = now.effortPrompts,
+            restUntil = now.restUntil, pausedAt = now.pausedAt, pausedDurationMs = now.pausedDurationMs)
+    })
 
 private class SwipeColors(
     val idle: Color,

@@ -330,6 +330,22 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     val navigation = remember { SeekableTransitionState(destination) }
     // True only while a back gesture drives the transition; taps and 3-button back never set it.
     var keypadInset by remember { mutableStateOf(0.dp) }
+    /**
+     * One Undo snackbar at a time: a newer offer replaces the old one, and the first later edit
+     * (canUndo turns false) withdraws it, so Undo can never erase new work.
+     */
+    fun offerUndo(message: String, canUndo: (AppData) -> Boolean, undo: () -> Unit) {
+        scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            val offer = launch {
+                vm.data.first { !canUndo(it) }
+                snackbar.currentSnackbarData?.dismiss()
+            }
+            val result = snackbar.showSnackbar(message, "Undo", duration = SnackbarDuration.Long)
+            offer.cancel()
+            if (result == SnackbarResult.ActionPerformed) undo()
+        }
+    }
     var scrubbing by remember { mutableStateOf(false) }
     LaunchedEffect(destination) {
         navigation.animateTo(destination)
@@ -626,33 +642,12 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             swapPick = (swapEntryId to swapPickId).takeIf { swapEntryId.isNotEmpty() && swapPickId.isNotEmpty() },
                             onSwapPickHandled = { swapEntryId = ""; swapPickId = "" },
                             onExerciseSwapped = { undo, title ->
-                                scope.launch {
-                                    // A newer swap replaces the old offer instead of queueing behind it.
-                                    snackbar.currentSnackbarData?.dismiss()
-                                    // The offer ends with the first later edit, so Undo can never erase new work.
-                                    val offer = launch {
-                                        vm.data.first { !it.canUndoExerciseSwap(undo) }
-                                        snackbar.currentSnackbarData?.dismiss()
-                                    }
-                                    val result = snackbar.showSnackbar("Swapped for $title", "Undo", duration = SnackbarDuration.Long)
-                                    offer.cancel()
-                                    if (result == SnackbarResult.ActionPerformed) vm.undoExerciseSwap(undo)
-                                }
+                                offerUndo("Swapped for $title", { it.canUndoExerciseSwap(undo) }) { vm.undoExerciseSwap(undo) }
                             },
                             undoOffered = snackbar.currentSnackbarData != null,
                             onKeypadInset = { keypadInset = it },
                             onSetRemoved = { undo, label ->
-                                scope.launch {
-                                    snackbar.currentSnackbarData?.dismiss()
-                                    // Withdrawn by the first later edit, so Undo never clobbers new work.
-                                    val offer = launch {
-                                        vm.data.first { !it.canUndoSetRemoval(undo) }
-                                        snackbar.currentSnackbarData?.dismiss()
-                                    }
-                                    val result = snackbar.showSnackbar("$label removed", "Undo", duration = SnackbarDuration.Long)
-                                    offer.cancel()
-                                    if (result == SnackbarResult.ActionPerformed) vm.undoSetRemoval(undo)
-                                }
+                                offerUndo("$label removed", { it.canUndoSetRemoval(undo) }) { vm.undoSetRemoval(undo) }
                             },
                         )
                     "history" ->

@@ -117,7 +117,11 @@ class SetRowSwipeTest {
         }))
         assertFalse(typed.canUndoSetRemoval(undo))
         assertSame(typed, typed.withoutSetRemoval(undo))
-        assertFalse(removed.copy(active = removed.active!!.copy(restUntil = 99)).canUndoSetRemoval(undo))
+        // Tapping rest Skip/+30s or pausing is not an edit: the offer survives, and Undo keeps the timer.
+        val rested = removed.copy(active = removed.active!!.copy(restUntil = 99, pausedAt = 5))
+        assertTrue(rested.canUndoSetRemoval(undo))
+        assertEquals(99L, rested.withoutSetRemoval(undo).active!!.restUntil)
+        assertEquals(data.active!!.exercises, rested.withoutSetRemoval(undo).active!!.exercises)
         assertFalse(removed.copy(active = null).canUndoSetRemoval(undo))
 
         val moved = removed.copy(active = removed.active!!.copy(selectedExerciseId = "other"))

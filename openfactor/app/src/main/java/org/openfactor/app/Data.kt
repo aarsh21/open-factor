@@ -819,10 +819,10 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun exercises(d: AppData = _data.value) = catalog + d.customExercises
 
     /** Writes typed set values still queued for the worker; call before the process may be killed. */
-    fun flushPendingSaves() = saver.flush()
+    fun flushPendingSaves() = saver.flushQuietly()
 
     override fun onCleared() {
-        saver.flush()
+        saver.flushQuietly()
         saveScope.cancel()
     }
 
@@ -844,8 +844,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun metricsFor(entry: SessionExercise, d: AppData): List<SetMetric> =
-        (catalog.find { it.id == entry.exerciseId } ?: d.customExercises.find { it.id == entry.exerciseId })
-            ?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS)
+        loggingMetricsOf(catalog.find { it.id == entry.exerciseId } ?: d.customExercises.find { it.id == entry.exerciseId })
 
     /** True when an owed effort question must be answered or skipped before the finish confirmation. */
     fun askEffortBeforeFinish(): Boolean {
@@ -1081,9 +1080,10 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun groupSuperset(ids: Set<String>) = editActive { it.withSuperset(ids) }
 
     fun swapExercise(entryId: String, replacementId: String, scope: SwapScope): ExerciseSwapUndo? {
-        var undo: ExerciseSwapUndo? = null
-        update { d -> d.withExerciseSwap(entryId, replacementId, scope, exercises(d)).also { undo = d.exerciseSwapUndo(it) } }
-        return undo
+        val before = _data.value
+        update { d -> d.withExerciseSwap(entryId, replacementId, scope, exercises(d)) }
+        // Snapshot what was published (after update()'s effort bookkeeping), not the raw block result.
+        return before.exerciseSwapUndo(_data.value)
     }
 
     fun undoExerciseSwap(undo: ExerciseSwapUndo) = update { it.withoutExerciseSwap(undo) }
@@ -1124,9 +1124,9 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     /** The swipe and accessibility removal: no confirmation, an Undo offer instead. */
     fun removeSetWithUndo(exerciseId: String, setId: String): SetRemovalUndo? {
-        var undo: SetRemovalUndo? = null
-        update { d -> d.withRemovedSet(exerciseId, setId).also { undo = d.setRemovalUndo(it) } }
-        return undo
+        val before = _data.value
+        update { d -> d.withRemovedSet(exerciseId, setId) }
+        return before.setRemovalUndo(_data.value)
     }
 
     fun undoSetRemoval(undo: SetRemovalUndo) = update { it.withoutSetRemoval(undo) }
@@ -1151,8 +1151,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                     setId,
                     d.preferences,
                     System.currentTimeMillis(),
-                    exercises(d).find { it.id == d.active?.exercises?.find { entry -> entry.id == exerciseId }?.exerciseId }
-                        ?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS),
+                    loggingMetricsOf(exercises(d).find { it.id == d.active?.exercises?.find { entry -> entry.id == exerciseId }?.exerciseId }),
                 )
         )
     }
@@ -1335,3 +1334,15 @@ val Exercise.title: String
         name.replace(titleWordStart) {
             it.groupValues[1] + it.groupValues[2].uppercase()
         }
+
+/** The one default for unknown/removed exercises, shared by effort eligibility and the session UI. */
+internal fun loggingMetricsOf(exercise: Exercise?): List<SetMetric> = exercise?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS)
+
+/**
+ * Undo offers end with the first real edit. Navigation (selection and the effort prompts it records),
+ * the rest timer and pausing are not edits, so they never withdraw an offer.
+ */
+internal fun Workout.sameWorkAs(other: Workout): Boolean = copy(
+    selectedExerciseId = other.selectedExerciseId, effortPrompts = other.effortPrompts,
+    restUntil = other.restUntil, pausedAt = other.pausedAt, pausedDurationMs = other.pausedDurationMs,
+) == other

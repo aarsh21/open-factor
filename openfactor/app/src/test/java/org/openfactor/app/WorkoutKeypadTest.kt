@@ -103,7 +103,10 @@ class WorkoutKeypadTest {
         assertEquals(KeypadTarget("left", SetMetric.WEIGHT), nextKeypadTarget(rows, metrics, KeypadTarget("warmup", SetMetric.REPS)))
         assertEquals(KeypadTarget("right", SetMetric.WEIGHT), nextKeypadTarget(rows, metrics, KeypadTarget("left", SetMetric.REPS)))
         assertEquals(KeypadTarget("component", SetMetric.WEIGHT), nextKeypadTarget(rows, metrics, KeypadTarget("myo", SetMetric.REPS)))
-        assertNull(nextKeypadTarget(rows, metrics, KeypadTarget("component", SetMetric.REPS)))
+        // Past the last row it wraps to the earliest set still unfinished (here the warm-up).
+        assertEquals(KeypadTarget("warmup", SetMetric.WEIGHT), nextKeypadTarget(rows, metrics, KeypadTarget("component", SetMetric.REPS)))
+        val allDone = rows.map { it.copy(completed = true) }
+        assertNull(nextKeypadTarget(allDone, metrics, KeypadTarget("component", SetMetric.REPS)))
         // Editing a completed row still walks its own fields first.
         assertEquals(KeypadTarget("done", SetMetric.REPS), nextKeypadTarget(rows, metrics, KeypadTarget("done", SetMetric.WEIGHT)))
         assertNull(nextKeypadTarget(rows, metrics, KeypadTarget("removed", SetMetric.WEIGHT)))

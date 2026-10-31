@@ -248,6 +248,23 @@ class ExerciseSwapTest {
         assertNull(data.exerciseSwapUndo(data))
     }
 
+    @Test fun undoSurvivesEffortBookkeepingAndRestButNotRealEdits() {
+        val data = started()
+        val entry = data.active!!.exercises[1].id
+        val next = data.withExerciseSwap(entry, "db-bench", SwapScope.TODAY, emptyList())
+        val undo = data.exerciseSwapUndo(next)!!
+        // What the view model publishes after the swap: an effort prompt recorded, a rest timer running.
+        val published = next.copy(active = next.active!!.copy(
+            effortPrompts = listOf(EffortPrompt(data.active!!.exercises[0].id)), restUntil = 42,
+        ))
+        assertTrue(published.canUndoExerciseSwap(undo))
+        val restored = published.withoutExerciseSwap(undo).active!!
+        assertEquals(data.active!!.exercises, restored.exercises)
+        assertEquals(42L, restored.restUntil)
+        val edited = published.copy(active = published.active!!.copy(notes = "changed"))
+        assertFalse(edited.canUndoExerciseSwap(undo))
+    }
+
     @Test fun lateUndoNeverErasesWorkLoggedAfterTheSwap() {
         val data = started()
         val entry = data.active!!.exercises[1].id
