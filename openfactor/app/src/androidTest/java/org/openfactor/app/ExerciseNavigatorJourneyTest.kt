@@ -87,8 +87,13 @@ class ExerciseNavigatorJourneyTest {
         SemanticsMatcher.expectValue(SemanticsProperties.Selected, true)
     private fun selectedTabDescription(): String =
         compose.onNode(selectedTab).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single()
-    private fun tab(index: Int, of: Int = 7) =
-        compose.onNodeWithContentDescription("Select ${title(index)}, ${index + 1} of $of,", substring = true)
+    /** Scrolls the strip to the tab first: narrow screens (CI's 320dp emulator) show fewer at once. */
+    private fun tab(index: Int, of: Int = 7): SemanticsNodeInteraction {
+        val matcher = hasContentDescription("Select ${title(index)}, ${index + 1} of $of,", substring = true)
+        compose.onNode(hasScrollToIndexAction() and hasAnyDescendant(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)))
+            .performScrollToNode(matcher)
+        return compose.onNode(matcher)
+    }
     private fun awaitSelected(id: String) = compose.waitUntil(5_000) { store.load().active?.selectedExerciseId == id }
 
     private fun shot(name: String) {
@@ -104,13 +109,14 @@ class ExerciseNavigatorJourneyTest {
         // Each item is a tab named with title, position and working-set progress (warm-ups excluded).
         assertTrue(selectedTabDescription(),
             selectedTabDescription().startsWith("Select ${title(1)}, 2 of 7, 1 of 3 working sets complete"))
-        assertEquals(7, compose.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)).fetchSemanticsNodes().size)
+        // Every exercise has a tab (reached by scrolling where the screen is narrow).
+        (0 until 7).forEach { tab(it).assertExists() }
         tab(0).assertExists()
         compose.onNodeWithContentDescription("Select ${title(0)}, 1 of 7, 3 of 3 working sets complete").assertExists()
         // The superset is visible on both members, and only there.
         tab(2).assertContentDescriptionContains("superset with ${title(3)}", substring = true)
         tab(3).assertContentDescriptionContains("superset with ${title(2)}", substring = true)
-        assertFalse(compose.onNode(hasContentDescription("Select ${title(4)}", substring = true))
+        assertFalse(tab(4)
             .fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single().contains("superset"))
         // An unfinished exercise offers no Next shortcut.
         compose.onAllNodesWithContentDescription("Next exercise", substring = true).assertCountEquals(0)

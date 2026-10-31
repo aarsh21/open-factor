@@ -79,7 +79,8 @@ class NavigationMotionTest {
         frame("01-home")
         compose.mainClock.autoAdvance = false
         compose.onNodeWithContentDescription("Workout history").performClick()
-        compose.mainClock.advanceTimeBy(96)
+        // Early in the 220ms push: travel is a fraction of the width, so narrow screens move fewer pixels.
+        compose.mainClock.advanceTimeBy(48)
         frame("02-push-mid")
         assertTrue("Both screens share the frame mid-push", exists(HOME) && exists("Workout History"))
         val headingMid = left("Workout History")
@@ -87,15 +88,16 @@ class NavigationMotionTest {
         frame("03-history")
         assertFalse("Home leaves once the push settles", exists(HOME))
         val headingRest = left("Workout History")
-        assertTrue("A push arrives from the right ($headingMid > $headingRest)", headingMid > headingRest + 4)
+        val minTravel = compose.onRoot().fetchSemanticsNode().size.width / 200f
+        assertTrue("A push arrives from the right ($headingMid > $headingRest)", headingMid > headingRest + minTravel)
         assertFalse("The floating navigation sinks away under a pushed screen", exists("Dashboard"))
 
         back { onBackPressedDispatcher.onBackPressed() }
-        compose.mainClock.advanceTimeBy(96)
+        compose.mainClock.advanceTimeBy(48)
         frame("04-pop-mid")
         assertTrue("Both screens share the frame mid-pop", exists(HOME) && exists("Workout History"))
         val homeMid = left(HOME)
-        assertTrue("A pop reveals from the left ($homeMid < $homeLeft)", homeMid < homeLeft - 4)
+        assertTrue("A pop reveals from the left ($homeMid < $homeLeft)", homeMid < homeLeft - minTravel)
         compose.mainClock.advanceTimeBy(600)
         frame("05-home-again")
         assertFalse(exists("Workout History"))
