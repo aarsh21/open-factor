@@ -64,8 +64,8 @@ android {
         applicationId = "org.openfactor.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 17
-        versionName = "0.8.1"
+        versionCode = 18
+        versionName = "0.9.0"
         resValue("string", "app_name", "Open Factor")
         val mediaBaseUrl = providers.gradleProperty("exerciseMediaBaseUrl").getOrElse("https://factor-media.zabimaru.me/v1/")
         buildConfigField("String", "EXERCISE_MEDIA_BASE_URL", "\"${mediaBaseUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
@@ -95,6 +95,11 @@ android {
         require(mediaMode != "source") { "External reference assets are excluded from source-only builds" }
         sourceSets.getByName("main").assets.srcDir(it)
     }
+}
+// Opt-in Compose compiler stability reports: -PopenfactorComposeReports=true writes build/compose-reports.
+if (providers.gradleProperty("openfactorComposeReports").orNull == "true") composeCompiler {
+    reportsDestination = layout.buildDirectory.dir("compose-reports")
+    metricsDestination = layout.buildDirectory.dir("compose-reports")
 }
 tasks.named("preBuild").configure { dependsOn(bundledAssets) }
 dependencies {

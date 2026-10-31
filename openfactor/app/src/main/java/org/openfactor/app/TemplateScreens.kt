@@ -27,7 +27,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Text stays raw until Save; invalid edits survive recreation without changing a saved template. */
-private data class TemplateTargetInput(val exerciseId: String, val sets: String, val min: String, val max: String, val rest: String, val rowId: String = newId()) {
+private data class TemplateTargetInput(val exerciseId: String, val sets: String, val min: String, val max: String, val rest: String, val rowId: String = newId(), val note: String = "") {
     fun target(hasReps: Boolean): TemplateExercise? {
         val count = sets.toIntOrNull()?.takeIf { it in 1..30 } ?: return null
         val restValue = rest.takeIf(String::isNotBlank)?.toIntOrNull()
@@ -36,13 +36,14 @@ private data class TemplateTargetInput(val exerciseId: String, val sets: String,
         val high = max.takeIf(String::isNotBlank)?.toIntOrNull()
         if (hasReps && ((min.isNotBlank() && (low == null || low !in 1..9999)) ||
             (max.isNotBlank() && (high == null || high !in 1..9999)) || (low != null && high != null && low > high))) return null
-        return TemplateExercise(exerciseId, count, low.takeIf { hasReps }, high.takeIf { hasReps }, restValue)
+        if (note.trim().length > TEMPLATE_NOTE_LIMIT) return null
+        return TemplateExercise(exerciseId, count, low.takeIf { hasReps }, high.takeIf { hasReps }, restValue, note.trim())
     }
-    fun json() = JSONObject().put("rowId", rowId).put("id", exerciseId).put("sets", sets).put("min", min).put("max", max).put("rest", rest)
+    fun json() = JSONObject().put("rowId", rowId).put("id", exerciseId).put("sets", sets).put("min", min).put("max", max).put("rest", rest).put("note", note)
     companion object {
         fun from(target: TemplateExercise) = TemplateTargetInput(target.exerciseId, target.sets.toString(),
-            target.repsMin?.toString().orEmpty(), target.repsMax?.toString().orEmpty(), target.restSeconds?.toString().orEmpty())
-        fun decode(j: JSONObject) = TemplateTargetInput(j.getString("id"), j.getString("sets"), j.getString("min"), j.getString("max"), j.getString("rest"), j.getString("rowId"))
+            target.repsMin?.toString().orEmpty(), target.repsMax?.toString().orEmpty(), target.restSeconds?.toString().orEmpty(), note = target.note)
+        fun decode(j: JSONObject) = TemplateTargetInput(j.getString("id"), j.getString("sets"), j.getString("min"), j.getString("max"), j.getString("rest"), j.getString("rowId"), j.optString("note"))
     }
 }
 private data class TemplateEditorInput(val id: String, val name: String, val targets: List<TemplateTargetInput>) {
@@ -149,6 +150,12 @@ fun TemplateEditor(
                             Column(Modifier.weight(1f).then(if (preview != null && exercise != null) Modifier.clickable { inspecting = input.exerciseId } else Modifier)) {
                                 Text(title, style = MaterialTheme.typography.titleMedium)
                                 Text(templateTargetSummary(input), color = OF.muted, style = MaterialTheme.typography.bodyMedium)
+                                if (input.note.isNotBlank() && expanded != input.rowId) Row(Modifier.padding(top = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(TemplateNoteIcon, null, Modifier.size(14.dp), tint = OF.muted)
+                                    Text(input.note.trim(), color = OF.muted, style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
                             }
                             IconButton({ expanded = if (expanded == input.rowId) "" else input.rowId }) {
                                 Icon(Icons.Rounded.Tune, "Edit targets for $title")
@@ -182,7 +189,14 @@ fun TemplateEditor(
                                 TemplateNumberField("Min reps", input.min, { edit(input.copy(min = it)) }, Modifier.weight(1f), minInvalid)
                                 TemplateNumberField("Max reps", input.max, { edit(input.copy(max = it)) }, Modifier.weight(1f), maxInvalid)
                             }
-                            if (invalid) Text(when {
+                            val noteTooLong = input.note.trim().length > TEMPLATE_NOTE_LIMIT
+                            OutlinedTextField(input.note, { edit(input.copy(note = it)) }, Modifier.fillMaxWidth(),
+                                label = { Text("Template note") }, leadingIcon = { Icon(TemplateNoteIcon, null) },
+                                placeholder = { Text("Only for this template, e.g. slow tempo") },
+                                supportingText = { Text(if (noteTooLong) "Use $TEMPLATE_NOTE_LIMIT characters or fewer."
+                                    else "Shows when you start ${draft.name.trim().ifBlank { "this template" }}.") },
+                                isError = noteTooLong, maxLines = 5)
+                            if (invalid && !noteTooLong) Text(when {
                                 setsInvalid -> "Enter 1–30 sets."
                                 restInvalid -> "Rest must be 0–1800 seconds."
                                 rangeReversed -> "Minimum reps cannot exceed maximum reps."
@@ -308,6 +322,8 @@ fun TemplateLibraryScreen(
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(exercise?.title ?: "Unavailable exercise", style = MaterialTheme.typography.bodyLarge)
                                     Text(templateTargetSummary(TemplateTargetInput.from(target)), color = OF.muted, style = MaterialTheme.typography.labelMedium)
+                                    if (target.note.isNotBlank()) Text(target.note, color = OF.muted, style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 }
                             }
                         }

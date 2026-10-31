@@ -51,7 +51,7 @@ Unresolved or ambiguous names expose suggestions through the existing `ExerciseS
 - Weight, achieved reps (regardless of whether populated), timestamps/start dates, difficulty controls, formulas, progression/increment rules, colors, hidden-row difficulty logic, videos and links are excluded. Visible and hidden exercise rows are both imported; the app does not guess an Easy/Hard selection.
 - No historical sessions are imported. Workbook weights are neither taken as logged actuals nor inferred as future load targets.
 - No calendar dates, training schedule, rest days or phase activation order are inferred. Phases remain separate inactive programs.
-- No CSV, XLS, XLSM, encrypted workbook, generic tabular layout, merged-cell inference, or formula recalculation support in this program-target importer. [Fitbod strength-set CSV history import](FITBOD-IMPORT.md) has its own Settings entry. Both are separate from Open Factor JSON backup restore.
+- No CSV, XLS, XLSM, encrypted workbook, generic tabular layout, merged-cell inference, or formula recalculation support in this program-target importer. It is separate from Open Factor JSON backup restore.
 - No guarantee of exact catalog matches for every source name. Variant ambiguity requires review.
 
 ## Resource and XML boundaries

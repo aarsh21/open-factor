@@ -14,6 +14,11 @@ internal class WorkoutHistoryArchive(context: Context, name: String) {
     private var cachedHistory: List<Workout>? = null
     private var cachedDigest: String? = null
     private var lastPruned: Set<String>? = null
+    // Identity caches: avoid re-parsing the snapshot just encoded, or an unchanged checkpoint, per save.
+    private var encodedRaw: String? = null
+    private var encodedKey: String? = null
+    private var checkpointRaw: String? = null
+    private var checkpointKey: String? = null
 
     fun decode(raw: String): AppData {
         val key = reference(raw)
@@ -28,7 +33,7 @@ internal class WorkoutHistoryArchive(context: Context, name: String) {
     }
 
     fun encode(data: AppData): String {
-        if (data.history.isEmpty()) return DataCodec.encode(data, pretty = false)
+        if (data.history.isEmpty()) return DataCodec.encode(data, pretty = false).also { encodedRaw = it; encodedKey = null }
         val key = if (data.history === cachedHistory && cachedDigest?.let { File(directory, "$it.json").isFile } == true) requireNotNull(cachedDigest) else {
             val bytes = DataCodec.encodeHistory(data.history).toByteArray(Charsets.UTF_8)
             val hash = digest(bytes)
@@ -48,14 +53,20 @@ internal class WorkoutHistoryArchive(context: Context, name: String) {
             cachedDigest = hash
             hash
         }
-        val hot = DataCodec.encode(data.copy(history = emptyList()), pretty = false)
-        return JSONObject(hot).put("storageHistory", key).toString()
+        // Same compact text as encoding, re-parsing and appending the reference, without the re-parse.
+        return DataCodec.document(data.copy(history = emptyList())).put("storageHistory", key).toString()
+            .also { encodedRaw = it; encodedKey = key }
     }
 
     /** Call only after the primary snapshot commits; the startup checkpoint remains recoverable. */
     fun prune(primary: String, checkpoint: String?, preserveOriginals: Boolean) {
         if (preserveOriginals) return
-        val keep = listOfNotNull(reference(primary), checkpoint?.let { runCatching { reference(it) }.getOrNull() }).toSet()
+        val primaryKey = if (primary === encodedRaw) encodedKey else reference(primary)
+        if (checkpoint !== checkpointRaw) {
+            checkpointKey = checkpoint?.let { runCatching { reference(it) }.getOrNull() }
+            checkpointRaw = checkpoint
+        }
+        val keep = listOfNotNull(primaryKey, checkpointKey).toSet()
         if (lastPruned == keep) return
         directory.listFiles()?.filter { it.name.endsWith(".json") && it.name.removeSuffix(".json") !in keep }
             ?.forEach { it.delete() }

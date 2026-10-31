@@ -34,7 +34,7 @@ internal class HealthConnectForegroundGate {
  */
 @Composable
 fun HealthConnectForegroundSync(
-    data: AppData,
+    state: HealthConnectSyncState,
     onSync: (HealthConnectSyncData) -> Unit,
     enabled: Boolean = true,
 ) {
@@ -43,7 +43,7 @@ fun HealthConnectForegroundSync(
     val transfers = remember(context) { HealthConnectTransfers(context.applicationContext) }
     val gate = remember { HealthConnectForegroundGate() }
     val scope = rememberCoroutineScope()
-    val latestData by rememberUpdatedState(data.healthConnect)
+    val latestData by rememberUpdatedState(state)
     val latestSave by rememberUpdatedState(onSync)
     val latestEnabled by rememberUpdatedState(enabled)
     var job by remember { mutableStateOf<Job?>(null) }
@@ -93,7 +93,7 @@ fun HealthConnectForegroundSync(
     LaunchedEffect(enabled) {
         if (!enabled) cancelPendingRead()
     }
-    LaunchedEffect(data.healthConnect.lastSyncedAtMillis != null) {
+    LaunchedEffect(state.lastSyncedAtMillis != null) {
         if (enabled && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) refresh()
     }
 }

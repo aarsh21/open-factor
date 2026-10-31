@@ -5,18 +5,23 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -27,6 +32,8 @@ internal object AppMotion {
     const val State = 180
     const val Step = 220
     const val Enter = 280
+    /** Palette and light/dark cross-fade: rare, deliberate, quick. */
+    const val Palette = 250
     val EaseOut = CubicBezierEasing(.16f, 1f, .3f, 1f)
 }
 
@@ -74,4 +81,37 @@ internal fun Modifier.pressFeedback(source: MutableInteractionSource, enabled: B
     // A draw transform, rather than a layout-layer transform, leaves the actual touch region
     // unchanged even for a 48dp icon button. The existing ripple belongs to the same drawing.
     return drawWithContent { scale(pressScale.value) { this@drawWithContent.drawContent() } }
+}
+
+/**
+ * Something the person just added settles into place from where it was created. Anything that
+ * was already there when the screen appeared (restored, recreated, re-selected) renders still.
+ */
+@Composable
+internal fun Modifier.arrival(fresh: Boolean): Modifier {
+    val motion = LocalAppMotionEnabled.current
+    val progress = remember { Animatable(if (fresh && motion) 0f else 1f) }
+    LaunchedEffect(progress) { progress.animateTo(1f, tween(AppMotion.State, easing = AppMotion.EaseOut)) }
+    return graphicsLayer {
+        alpha = progress.value
+        translationY = (1f - progress.value) * -8.dp.toPx()
+    }
+}
+
+/** Neighbours glide to their new place instead of jumping when content above them grows or shrinks. */
+@Composable
+internal fun Modifier.settleSize(): Modifier =
+    if (LocalAppMotionEnabled.current) animateContentSize(tween(AppMotion.State, easing = AppMotion.EaseOut)) else this
+
+/** Rows in user-ordered lists slide to their new slot on reorder/delete instead of teleporting. */
+@Composable
+internal fun Modifier.itemMotion(item: LazyItemScope): Modifier {
+    val motion = LocalAppMotionEnabled.current
+    return with(item) {
+        this@itemMotion.animateItem(
+            fadeInSpec = if (motion) tween(AppMotion.State, easing = AppMotion.EaseOut) else null,
+            placementSpec = if (motion) tween(AppMotion.State, easing = AppMotion.EaseOut) else null,
+            fadeOutSpec = if (motion) tween(AppMotion.Quick) else null,
+        )
+    }
 }

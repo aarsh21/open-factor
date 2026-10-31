@@ -10,6 +10,8 @@ data class TemplateExercise(
     val repsMin: Int? = 8,
     val repsMax: Int? = 12,
     val restSeconds: Int? = 120,
+    /** Shown only in sessions started from this template, beside the everywhere-pinned note. */
+    val note: String = "",
 ) {
     fun validationError(): String? = when {
         exerciseId.isBlank() -> "Choose an exercise."
@@ -18,9 +20,12 @@ data class TemplateExercise(
         repsMax != null && repsMax !in 1..9999 -> "Enter a valid maximum rep target."
         repsMin != null && repsMax != null && repsMin > repsMax -> "Minimum reps cannot exceed maximum reps."
         restSeconds != null && restSeconds !in 0..1800 -> "Rest must be 0–1800 seconds."
+        note.length > TEMPLATE_NOTE_LIMIT -> "Keep the template note under ${TEMPLATE_NOTE_LIMIT + 1} characters."
         else -> null
     }
 }
+
+const val TEMPLATE_NOTE_LIMIT = 1000
 
 /** Seven slots, in order. Null is an intentional rest day, never a missing workout. */
 data class TemplateSplit(val id: String = newId(), val name: String, val days: List<String?>)
@@ -58,7 +63,7 @@ fun Routine.toWorkout(
                 targetRepsMax = target.repsMax.takeIf { supportsReps },
             ) }, restSeconds = target.restSeconds)
     }
-    return Workout(name = name.trim(), startedAt = now, exercises = entries, selectedExerciseId = entries.first().id)
+    return Workout(name = name.trim(), startedAt = now, exercises = entries, selectedExerciseId = entries.first().id, routineId = id)
 }
 
 fun StarterTemplateSplit.materialize(catalog: List<Exercise>): MaterializedTemplateSplit {
@@ -83,10 +88,22 @@ fun AppData.withStarterSplit(preset: StarterTemplateSplit, catalog: List<Exercis
     return copy(routines = routines + materialized.routines, templateSplits = templateSplits + materialized.split)
 }
 
+/** Legacy id-only templates gain equivalent one-set prescriptions so the note has a home. */
+fun AppData.withTemplateNote(routineId: String, exerciseId: String, note: String): AppData {
+    val routine = routines.find { it.id == routineId } ?: throw IllegalArgumentException("This template is no longer available.")
+    require(exerciseId in routine.exerciseIds) { "This exercise is not in ${routine.name}." }
+    require(routine.prescriptions.isNotEmpty() || routine.exerciseIds.distinct().size == routine.exerciseIds.size) {
+        "Edit ${routine.name} to remove repeated exercises first."
+    }
+    val prescriptions = routine.effectivePrescriptions().map { if (it.exerciseId == exerciseId) it.copy(note = note.trim()) else it }
+    prescriptions.firstNotNullOfOrNull { it.validationError() }?.let { throw IllegalArgumentException(it) }
+    return copy(routines = routines.map { if (it.id == routineId) it.copy(prescriptions = prescriptions) else it })
+}
+
 fun AppData.withStartedRoutine(id: String, catalog: List<Exercise>, now: Long): AppData {
     require(active == null) { "Finish or discard the active workout first." }
     val routine = routines.find { it.id == id } ?: throw IllegalArgumentException("This template is no longer available.")
-    return copy(active = routine.toWorkout(now, exerciseDefaults, catalog))
+    return copy(active = routine.toWorkout(now, exerciseDefaults, catalog).copy(routineId = routine.id))
 }
 
 object TemplateCodec {
@@ -101,13 +118,15 @@ object TemplateCodec {
             JSONObject().put("exerciseId", it.exerciseId).put("sets", it.sets)
                 .put("repsMin", it.repsMin ?: JSONObject.NULL).put("repsMax", it.repsMax ?: JSONObject.NULL)
                 .put("restSeconds", it.restSeconds ?: JSONObject.NULL)
+                .put("note", it.note.takeIf(String::isNotBlank))
         }))
     fun decodeRoutine(value: JSONObject): Routine {
         val ids = value.getJSONArray("exerciseIds").let { a -> (0 until a.length()).map { a.getString(it) } }
         val prescriptions = value.optJSONArray("prescriptions")?.let { a -> (0 until a.length()).map { index ->
             val p = a.getJSONObject(index)
             TemplateExercise(p.getString("exerciseId"), p.optionalInt("sets") ?: 3,
-                p.optionalInt("repsMin"), p.optionalInt("repsMax"), p.optionalInt("restSeconds"))
+                p.optionalInt("repsMin"), p.optionalInt("repsMax"), p.optionalInt("restSeconds"),
+                if (p.isNull("note")) "" else p.getString("note"))
         } }.orEmpty()
         val routine = Routine(value.getString("id"), value.getString("name"), ids, prescriptions)
         // Legacy routines may have a blank name/empty exercise list. Preserve them on import.

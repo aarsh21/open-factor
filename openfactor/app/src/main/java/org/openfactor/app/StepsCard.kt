@@ -99,7 +99,7 @@ private fun StepBars(history: StepHistory, selected: LocalDate, onSelect: (Local
     val ceiling = (ceil(max / 1000.0) * 1000.0).coerceAtLeast(1000.0)
     val line = OF.line
     val muted = OF.muted
-    val accent = OF.blue
+    val accent = OF.accent
     val foreground = MaterialTheme.colorScheme.onSurface
     val number = remember { NumberFormat.getIntegerInstance() }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

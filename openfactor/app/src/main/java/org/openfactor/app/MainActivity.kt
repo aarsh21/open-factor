@@ -2,12 +2,22 @@ package org.openfactor.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.SeekableTransitionState
+import androidx.compose.animation.core.rememberTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.activity.compose.setContent
 import androidx.activity.compose.ReportDrawnWhen
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.verticalScroll
@@ -15,6 +25,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.toArgb
+import androidx.core.graphics.drawable.toDrawable
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
@@ -30,7 +42,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -41,6 +56,12 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         if (intent.action == WorkoutNotifications.OPEN_WORKOUT) workoutOpenRequest++
+    }
+
+    override fun onPause() {
+        // Typed set values are saved off the main thread; make them durable before the app can be killed.
+        androidx.lifecycle.ViewModelProvider(this)[WorkoutViewModel::class.java].flushPendingSaves()
+        super.onPause()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,10 +85,17 @@ class MainActivity : ComponentActivity() {
         setContent {
             val vm: WorkoutViewModel = viewModel()
             val data by vm.data.collectAsState()
+            // The window root needs only the theme; set-row edits must not recompose it.
+            val theme by remember { derivedStateOf { data.preferences.theme } }
+            val palette by remember { derivedStateOf { data.preferences.palette } }
             val libraryReady by vm.libraryReady.collectAsState()
             ReportDrawnWhen { libraryReady }
-            OpenFactorTheme(data.preferences.theme) {
-                val dark = isSystemInDarkTheme()
+            OpenFactorTheme(theme, palette) {
+                // Bar icons follow the palette's actual tone, mid cross-fade included, so neither they nor
+                // the window behind the app keep charcoal under another palette.
+                val dark = OF.palette.isDark
+                // Only a settled tone replaces the window drawable, not every frame of the cross-fade.
+                LaunchedEffect(palette, dark) { window.setBackgroundDrawable(palette.colors(dark).background.toArgb().toDrawable()) }
                 SideEffect {
                     androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
                         isAppearanceLightStatusBars = !dark
@@ -88,6 +116,13 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     val data by vm.data.collectAsState()
     val libraryReady by vm.libraryReady.collectAsState()
     val libraryLoad by vm.libraryLoad.collectAsState()
+    // Each typed digit replaces data.active. The shell reads data only through these slices (routes
+    // and dialogs below read it in their own scopes), so it does not recompose per keystroke.
+    val customExercises by remember(vm) { derivedStateOf { data.customExercises } }
+    val healthConnectState by remember(vm) { derivedStateOf { data.healthConnect } }
+    val activeId by remember(vm) { derivedStateOf { data.active?.id } }
+    val onboardingPending by remember(vm) { derivedStateOf { !data.onboarding.completed && !data.onboarding.deferred } }
+    TraceRecomposition("OpenFactorApp")
     var tab by rememberSaveable { mutableIntStateOf(1) }
     var route by rememberSaveable { mutableStateOf(when { data.pastWorkoutEdit != null -> "history-edit"; data.active != null -> "session"; else -> "" }) }
     var detailId by rememberSaveable { mutableStateOf("") }
@@ -112,22 +147,23 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     var bodyChartMetric by rememberSaveable { mutableStateOf("weight") }
     var bodyChartRange by rememberSaveable { mutableStateOf(BodyChartRange.WEEK) }
     var bodyEntryReturn by rememberSaveable { mutableStateOf("body-data") }
+    var swapEntryId by rememberSaveable { mutableStateOf("") }
+    var swapPickId by rememberSaveable { mutableStateOf("") }
     val contentRoute =
         if (route == "measurement-entry" || route == "photo-entry") bodyEntryReturn else route
-    val exercises = remember(vm, data.customExercises, libraryReady) { vm.exercises(data) }
+    val exercises = remember(vm, customExercises, libraryReady) { vm.exercises(data) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val routeState = rememberSaveableStateHolder()
     val context = LocalContext.current
-    HealthConnectForegroundSync(data, vm::importHealthConnectSync, enabled = !healthConnect)
+    HealthConnectForegroundSync(healthConnectState, vm::importHealthConnectSync, enabled = !healthConnect)
     val view = LocalView.current
     val lifecycleOwner = LocalLifecycleOwner.current
     StorageRecoveryAlert(vm)
-    val currentData by rememberUpdatedState(data)
     val notificationPermission = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-    ) { WorkoutNotifications.sync(context, currentData, forceRefresh = true) }
-    LaunchedEffect(data.active?.id) {
+    ) { WorkoutNotifications.sync(context, vm.data.value, forceRefresh = true) }
+    LaunchedEffect(activeId) {
         if (data.active != null && android.os.Build.VERSION.SDK_INT >= 33) {
             val prefs = context.getSharedPreferences("notification-permission", android.content.Context.MODE_PRIVATE)
             if (!prefs.getBoolean("requested", false) && !WorkoutNotifications.notificationsAllowed(context)) {
@@ -141,13 +177,13 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) WorkoutNotifications.sync(context, currentData, forceRefresh = true)
+            if (event == Lifecycle.Event.ON_RESUME) WorkoutNotifications.sync(context, vm.data.value, forceRefresh = true)
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    val keepAlive = data.preferences.keepAlive && route == "session" && data.active != null &&
-        (data.onboarding.completed || data.onboarding.deferred)
+    val keepAlive by remember(vm) { derivedStateOf { data.preferences.keepAlive && route == "session" && data.active != null &&
+        (data.onboarding.completed || data.onboarding.deferred) } }
     DisposableEffect(view, lifecycleOwner, keepAlive) {
         if (!keepAlive) return@DisposableEffect onDispose { }
         val original = view.keepScreenOn
@@ -197,6 +233,10 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                 vm.addDraftExercise(id)
                 route = "workout-draft"
             }
+            "swap-picker" -> {
+                swapPickId = id
+                route = "session"
+            }
             else -> {
                 if (data.active != null) {
                     vm.addExercise(id)
@@ -220,7 +260,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         onClose = { quickWeight = false },
         onSave = { vm.saveScaleWeight(it); quickWeight = false },
     )
-    if (!data.onboarding.completed && !data.onboarding.deferred) {
+    if (onboardingPending) {
         QuickStartScreen(data, vm, onConnect = { autoConnectHealth = true; healthConnect = true }) { tab = 1 }
         return
     }
@@ -261,52 +301,102 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                 }
             }
         }
-    LaunchedEffect(scrollEnergy, tab) {
-        delay(140)
-        scrollEnergy = 0f
+    // Scroll energy changes every scroll frame: observe it outside composition so scrolling a tab
+    // never recomposes the shell. Each change restarts the 140ms settle, as a keyed effect did.
+    LaunchedEffect(tab) {
+        snapshotFlow { scrollEnergy }.collectLatest {
+            delay(140)
+            scrollEnergy = 0f
+        }
     }
-    BackHandler(route.isNotBlank()) {
-        route =
-            when (route) {
-                "exercise" -> previousRoute
-                "exercise-settings" -> exerciseSettingsReturnRoute
-                "custom" -> customReturnRoute
-                "picker" -> "session"
-                "draft-picker" -> "workout-draft"
-                "gym" -> "gyms"
-                "gyms" -> gymsReturn
-                "measurement-entry", "photo-entry" -> bodyEntryReturn
-                "weight-entry" -> "body-data"
-                "body-charts" -> "body-data"
-                "program-picker" -> "program-editor"
-                "program-editor",
-                "program-setup" -> {
-                    programExit = true
-                    route
-                }
-                "programs" -> ""
-                else -> ""
+    /** Null means back asks first instead of leaving. */
+    fun backRoute(): String? = when (route) {
+        "exercise" -> previousRoute
+        "exercise-settings" -> exerciseSettingsReturnRoute
+        "custom" -> customReturnRoute
+        "picker", "swap-picker" -> "session"
+        "draft-picker" -> "workout-draft"
+        "gym" -> "gyms"
+        "gyms" -> gymsReturn
+        "measurement-entry", "photo-entry" -> bodyEntryReturn
+        "weight-entry" -> "body-data"
+        "body-charts" -> "body-data"
+        "program-picker" -> "program-editor"
+        "program-editor", "program-setup" -> null
+        else -> ""
+    }
+    val motion = LocalAppMotionEnabled.current
+    val destination = AppDestination.of(contentRoute, detailId, tab)
+    val navigation = remember { SeekableTransitionState(destination) }
+    // True only while a back gesture drives the transition; taps and 3-button back never set it.
+    var keypadInset by remember { mutableStateOf(0.dp) }
+    /**
+     * One Undo snackbar at a time: a newer offer replaces the old one, and the first later edit
+     * (canUndo turns false) withdraws it, so Undo can never erase new work.
+     */
+    fun offerUndo(message: String, canUndo: (AppData) -> Boolean, undo: () -> Unit) {
+        scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            val offer = launch {
+                vm.data.first { !canUndo(it) }
+                snackbar.currentSnackbarData?.dismiss()
             }
+            val result = snackbar.showSnackbar(message, "Undo", duration = SnackbarDuration.Long)
+            offer.cancel()
+            if (result == SnackbarResult.ActionPerformed) undo()
+        }
+    }
+    var scrubbing by remember { mutableStateOf(false) }
+    LaunchedEffect(destination) {
+        navigation.animateTo(destination)
+        scrubbing = false
+    }
+    val screenTransition = rememberTransition(navigation, label = "screen")
+    PredictiveBackHandler(route.isNotBlank()) { gesture ->
+        val target = backRoute()
+        val revealed = target?.let {
+            AppDestination.of(it, detailId, tab)
+        }
+        try {
+            gesture.collect { event ->
+                // The gesture scrubs the same pop transition a tap would play, so lifting the
+                // finger continues from exactly where the screen already is.
+                if (motion && revealed != null && revealed != navigation.currentState) {
+                    scrubbing = true
+                    navigation.seekTo(event.progress, revealed)
+                }
+            }
+            if (target == null) programExit = true else route = target
+        } catch (cancelled: CancellationException) {
+            scope.launch {
+                navigation.animateTo(navigation.currentState)
+                scrubbing = false
+            }
+            throw cancelled
+        }
     }
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = OF.background,
         contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
         snackbarHost = {
-            SnackbarHost(snackbar, Modifier.padding(bottom = if (route.isBlank()) 94.dp else 0.dp))
+            SnackbarHost(snackbar, Modifier.padding(bottom = if (route.isBlank()) 94.dp else if (route == "session") keypadInset else 0.dp))
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize()) {
-            Column(
-                Modifier.fillMaxSize()
-                    .nestedScroll(rootScroll)
-                    .padding(
-                        top = padding.calculateTopPadding(),
-                        bottom = if (contentRoute.isBlank()) 0.dp else padding.calculateBottomPadding(),
-                    )
-                    .background(OF.background)
-            ) {
-                when (contentRoute) {
+        Box(Modifier.fillMaxSize().background(OF.background)) {
+            screenTransition.AnimatedContent(
+                Modifier.fillMaxSize().nestedScroll(rootScroll).padding(top = padding.calculateTopPadding()),
+                transitionSpec = { appTransition(motion, scrubbing) },
+                contentKey = { it },
+            ) { screen ->
+            val shownId = screen.key
+            val shownTab = screen.key.removePrefix("tab:").toIntOrNull() ?: tab
+            // A departing screen keeps rendering its own record; only the current one redirects.
+            fun leave(to: String) { if (route == screen.route) route = to }
+            // Without motion there is nothing to watch leave: never stack two opaque screens.
+            if (motion || screen == screenTransition.targetState)
+            Column(Modifier.fillMaxSize().padding(bottom = if (screen.route.isBlank()) 0.dp else padding.calculateBottomPadding())) {
+                when (screen.route) {
                     "profile" -> ProfileEditor(data, vm) { route = "" }
                     "body-data" -> {
                         BodyDataScreen(
@@ -328,12 +418,12 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                         },
                         onLogWeight = { quickWeight = true },
                     )
-                    "weight-entry" -> key(detailId) {
+                    "weight-entry" -> key(shownId) {
                         ScaleWeightEditor(
-                            data.scaleWeights.find { it.id == detailId }, data.preferences.pounds,
+                            data.scaleWeights.find { it.id == shownId }, data.preferences.pounds,
                             { route = "body-data" },
                             { vm.saveScaleWeight(it); bodyDataTab = 0; route = "body-data" },
-                            { vm.deleteScaleWeight(detailId); bodyDataTab = 0; route = "body-data" },
+                            { vm.deleteScaleWeight(shownId); bodyDataTab = 0; route = "body-data" },
                         )
                     }
                     "programs" ->
@@ -407,7 +497,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                         }
                     "gym" ->
                         data.gyms
-                            .firstOrNull { it.id == detailId }
+                            .firstOrNull { it.id == shownId }
                             ?.let { gym ->
                                 GymEditorScreen(gym, data, vm, { route = "gyms" }) { detailId = it }
                             }
@@ -416,7 +506,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             openExercise(it)
                         })
                     }
-                    "exercise-settings" -> exercises.firstOrNull { it.id == detailId }?.let { e ->
+                    "exercise-settings" -> exercises.firstOrNull { it.id == shownId }?.let { e ->
                         ExerciseSettingsScreen(
                             e, data.exerciseDefaults[e.id] ?: ExerciseDefaults(), data.preferences.restSeconds,
                             { route = exerciseSettingsReturnRoute }, { vm.saveExerciseDefaults(e.id, it) }, { exerciseInfo = true },
@@ -435,7 +525,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                     }
                     "exercise" ->
                         exercises
-                            .firstOrNull { it.id == detailId }
+                            .firstOrNull { it.id == shownId }
                             ?.let { e ->
                                 ExerciseDetail(
                                     e,
@@ -465,6 +555,21 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             picking = true,
                             gyms = data.gyms,
                             equipmentCatalog = vm.equipmentCatalog,
+                        )
+                    }
+                    "swap-picker" -> routeState.SaveableStateProvider("swap-picker") {
+                        ExerciseLibrary(
+                            exercises,
+                            data.favorites,
+                            vm::favorite,
+                            ::openExercise,
+                            { id -> pickExercise(id, "swap-picker") },
+                            onBack = { route = "session" },
+                            onCustom = ::openCustom,
+                            picking = true,
+                            gyms = data.gyms,
+                            equipmentCatalog = vm.equipmentCatalog,
+                            pickTitle = "Swap exercise",
                         )
                     }
                     "custom" -> {
@@ -514,7 +619,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                 onDiscard = { vm.discardWorkoutDraft(); route = "" },
                                 canStart = data.active == null,
                             )
-                        } ?: run { LaunchedEffect(Unit) { route = "" } }
+                        } ?: run { LaunchedEffect(Unit) { leave("") } }
                     "session" ->
                         WorkoutSession(
                             data,
@@ -532,6 +637,17 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             onFinished = {
                                 detailId = it
                                 route = "history-detail"
+                            },
+                            onSwapSearch = { swapEntryId = it; swapPickId = ""; route = "swap-picker" },
+                            swapPick = (swapEntryId to swapPickId).takeIf { swapEntryId.isNotEmpty() && swapPickId.isNotEmpty() },
+                            onSwapPickHandled = { swapEntryId = ""; swapPickId = "" },
+                            onExerciseSwapped = { undo, title ->
+                                offerUndo("Swapped for $title", { it.canUndoExerciseSwap(undo) }) { vm.undoExerciseSwap(undo) }
+                            },
+                            undoOffered = snackbar.currentSnackbarData != null,
+                            onKeypadInset = { keypadInset = it },
+                            onSetRemoved = { undo, label ->
+                                offerUndo("$label removed", { it.canUndoSetRemoval(undo) }) { vm.undoSetRemoval(undo) }
                             },
                         )
                     "history" ->
@@ -552,7 +668,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                         )
                     "history-detail" ->
                         data.history
-                            .firstOrNull { it.id == detailId }
+                            .firstOrNull { it.id == shownId }
                             ?.let { w ->
                                 WorkoutSummary(
                                     w,
@@ -570,7 +686,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                     repeatLabel = if (data.active != null) "Resume active workout" else "Repeat workout",
                                     onEdit = { vm.beginPastWorkoutEdit(w.id); route = "history-edit" },
                                 )
-                            } ?: run { LaunchedEffect(Unit) { route = "history" } }
+                            } ?: run { LaunchedEffect(Unit) { leave("history") } }
                     "history-edit" -> data.pastWorkoutEdit?.let { edit ->
                         PastWorkoutEditor(edit, exercises, data, vm,
                             onChange = vm::editPastWorkout,
@@ -578,7 +694,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             onSave = vm::savePastWorkoutEdit,
                             onSaved = { detailId = edit.original.id; route = "history-detail" },
                         )
-                    } ?: run { LaunchedEffect(Unit) { route = "history" } }
+                    } ?: run { LaunchedEffect(Unit) { leave("history") } }
                     "templates" -> routeState.SaveableStateProvider("template-library") {
                         TemplateLibraryScreen(data, exercises, { route = "" },
                             onCreate = { editTemplate(returnRoute = "templates") },
@@ -597,7 +713,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             })
                     }
                     else ->
-                        when (tab) {
+                        when (shownTab) {
                             0 ->
                                 DashboardScreen(
                                     data,
@@ -642,9 +758,9 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                     onCustom = ::openCustom,
                                     gyms = data.gyms,
                                     equipmentCatalog = vm.equipmentCatalog,
-                                    performedIds = data.history.flatMap { w -> w.exercises.filter { entry -> entry.sets.any { it.completed } }.map { it.exerciseId } }.toSet(),
-                                    deprioritizedIds = data.exerciseDefaults.filterValues { it.doNotRecommend }.keys,
-                                    modifiedIds = data.exerciseDefaults.filterValues { it.hasOverrides }.keys,
+                                    performedIds = remember(data.history) { data.history.flatMap { w -> w.exercises.filter { entry -> entry.sets.any { it.completed } }.map { it.exerciseId } }.toSet() },
+                                    deprioritizedIds = remember(data.exerciseDefaults) { data.exerciseDefaults.filterValues { it.doNotRecommend }.keys },
+                                    modifiedIds = remember(data.exerciseDefaults) { data.exerciseDefaults.filterValues { it.hasOverrides }.keys },
                                 )
                             }
                             3 ->
@@ -668,18 +784,30 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                         }
                 }
             }
-            if (contentRoute.isBlank())
+            }
+            // The bar belongs to the root screens, so it rides the same (scrubbable) transition:
+            // it sinks away as a screen pushes over it and rises back when that screen pops.
+            screenTransition.AnimatedVisibility(
+                { it.route.isBlank() },
+                Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding()),
+                enter = if (!motion) EnterTransition.None else
+                    fadeIn(tween(AppMotion.Step, easing = AppMotion.EaseOut)) +
+                        // Never longer than the screen pop, or a back gesture would outrun its own scrub.
+                        slideInVertically(tween(AppMotion.Step, easing = AppMotion.EaseOut)) { it / 2 },
+                exit = if (!motion) ExitTransition.None else
+                    fadeOut(tween(AppMotion.Quick)) +
+                        slideOutVertically(tween(AppMotion.State, easing = AppMotion.EaseOut)) { it / 3 },
+            ) {
                 NuvioWorkoutNavigation(
                     tab,
-                    scrollEnergy,
+                    { scrollEnergy },
                     onAdd = {
                         shortcuts = true
                     },
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                        .padding(bottom = padding.calculateBottomPadding()),
                 ) {
                     tab = it
                 }
+            }
         }
     }
     if (route == "measurement-entry") key(detailId) {

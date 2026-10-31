@@ -73,7 +73,7 @@ internal fun SpreadsheetImportScreen(vm: WorkoutViewModel, snackbar: SnackbarHos
         }
         if (parsed == null) {
             item {
-                Text("Supports Phase 1 / Phase 2 / Phase 3 sheets with DAY sections and EXERCISE, WEEK, REPS and RIR columns. Other spreadsheet layouts are not supported. For Fitbod strength-set CSV history, use Settings → Import Fitbod CSV.")
+                Text("Supports Phase 1 / Phase 2 / Phase 3 sheets with DAY sections and EXERCISE, WEEK, REPS and RIR columns. Other spreadsheet layouts are not supported.")
             }
         } else {
             item {

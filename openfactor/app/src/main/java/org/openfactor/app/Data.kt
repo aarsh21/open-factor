@@ -4,6 +4,10 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.ByteArrayInputStream
@@ -72,6 +76,8 @@ data class SessionExercise(
     val restSeconds: Int? = null,
     val supersetId: String? = null,
     val reviewedEffortSetIds: Set<String> = emptySet(),
+    // The "Last time" note is a placeholder; hiding it never touches the historical note.
+    val lastNoteDismissed: Boolean = false,
 )
 
 data class Workout(
@@ -89,6 +95,10 @@ data class Workout(
     val programDayId: String? = null,
     val programCycle: Int? = null,
     val gymId: String? = null,
+    /** Template this session was started from; null for empty, program and older workouts. */
+    val routineId: String? = null,
+    /** Effort questions owed for exercises already left; see [withEffortPromptTransition]. */
+    val effortPrompts: List<EffortPrompt> = emptyList(),
 )
 
 data class Routine(val id: String = newId(), val name: String, val exerciseIds: List<String>,
@@ -114,6 +124,7 @@ data class Preferences(
     val dataVisibility: DataVisibility = DataVisibility(),
     val dismissedTutorials: Set<String> = emptySet(),
     val theme: AppTheme = AppTheme.DARK,
+    val palette: AppPalette = AppPalette.CHARCOAL,
     val shortcuts: ShortcutPreferences = ShortcutPreferences(),
     val dashboard: DashboardPreferences = DashboardPreferences(),
     // Older backups keep rest enabled at these boundaries; these are compatibility defaults.
@@ -123,6 +134,8 @@ data class Preferences(
     val supersetAutoNext: Boolean = true,
     val restBetweenSidesPercent: Int = 100,
     val rateEffortAfterExercise: Boolean = true,
+    val effortPromptTiming: EffortPromptTiming = EffortPromptTiming.NEXT_EXERCISE,
+    val workoutKeypad: Boolean = true,
     val weeklyWorkoutGoal: Int? = null,
 )
 
@@ -307,6 +320,7 @@ object DataCodec {
             .put("restSeconds", restSeconds)
             .put("supersetId", supersetId)
             .put("reviewedEffortSetIds", JSONArray(reviewedEffortSetIds.sorted()))
+            .put("lastNoteDismissed", lastNoteDismissed.takeIf { it })
 
     private fun Workout.json() =
         JSONObject()
@@ -322,6 +336,10 @@ object DataCodec {
             .put("programDayId", programDayId)
             .put("programCycle", programCycle)
             .put("gymId", gymId)
+            .put("routineId", routineId)
+            .put("effortPrompts", effortPrompts.takeIf { it.isNotEmpty() }?.let { prompts ->
+                JSONArray(prompts.map { JSONObject().put("exerciseId", it.exerciseId).put("afterRest", it.afterRest) })
+            })
             .put("exercises", JSONArray(exercises.map { it.json() }))
             .put("notes", notes)
 
@@ -418,6 +436,7 @@ object DataCodec {
                     .put("dataVisibility", DataVisibilityCodec.encode(d.preferences.dataVisibility))
                     .put("dismissedTutorials", JSONArray(d.preferences.dismissedTutorials.sorted()))
                     .put("theme", d.preferences.theme.name)
+                    .put("palette", d.preferences.palette.name)
                     .put("shortcuts", d.preferences.shortcuts.json())
                     .put("dashboard", d.preferences.dashboard.json())
                     .put("restAfterLastWarmupSet", d.preferences.restAfterLastWarmupSet)
@@ -425,6 +444,8 @@ object DataCodec {
                     .put("supersetAutoNext", d.preferences.supersetAutoNext)
                     .put("restBetweenSidesPercent", d.preferences.restBetweenSidesPercent)
                     .put("rateEffortAfterExercise", d.preferences.rateEffortAfterExercise)
+                    .put("effortPromptTiming", d.preferences.effortPromptTiming.name)
+                    .put("workoutKeypad", d.preferences.workoutKeypad)
                     .put("weeklyWorkoutGoal", d.preferences.weeklyWorkoutGoal),
             )
 
@@ -469,6 +490,7 @@ object DataCodec {
             if (isNull("restSeconds")) null else getInt("restSeconds"),
             supersetId = if (isNull("supersetId")) null else getString("supersetId").also { require(it.isNotBlank()) },
             reviewedEffortSetIds = array("reviewedEffortSetIds").strings().toSet(),
+            lastNoteDismissed = optBoolean("lastNoteDismissed"),
         ).validateSetLinks()
 
     private fun JSONObject.workout(): Workout =
@@ -487,6 +509,10 @@ object DataCodec {
             optString("programDayId").takeIf { it.isNotBlank() && it != "null" },
             if (isNull("programCycle")) null else getInt("programCycle"),
             optString("gymId").takeIf { it.isNotBlank() && it != "null" },
+            optString("routineId").takeIf { it.isNotBlank() && it != "null" },
+            effortPrompts = array("effortPrompts").objects().map {
+                EffortPrompt(it.getString("exerciseId"), it.optBoolean("afterRest"))
+            },
         )
 
     fun decode(text: String, historyOverride: List<Workout>? = null): AppData = decode(JSONObject(text), historyOverride)
@@ -527,6 +553,8 @@ object DataCodec {
                 dismissedTutorials = if (p.has("dismissedTutorials"))
                     p.getJSONArray("dismissedTutorials").strings().toSet() else emptySet(),
                 theme = AppTheme.valueOf(p.optString("theme", AppTheme.DARK.name)),
+                // Cosmetic: a missing or unknown palette (older or newer backup) falls back to Charcoal.
+                palette = AppPalette.entries.firstOrNull { it.name == p.optString("palette") } ?: AppPalette.CHARCOAL,
                 shortcuts = ShortcutPreferences.decode(p.optJSONObject("shortcuts")),
                 dashboard = DashboardPreferences.decode(p.optJSONObject("dashboard")),
                 restAfterLastWarmupSet = p.optBoolean("restAfterLastWarmupSet", true),
@@ -537,6 +565,10 @@ object DataCodec {
                     it.toInt()
                 },
                 rateEffortAfterExercise = p.optBoolean("rateEffortAfterExercise", true),
+                // Older backups (and unknown future values) get the new on-leave timing.
+                effortPromptTiming = EffortPromptTiming.entries.find { it.name == p.optString("effortPromptTiming") }
+                    ?: EffortPromptTiming.NEXT_EXERCISE,
+                workoutKeypad = p.optBoolean("workoutKeypad", true),
                 weeklyWorkoutGoal = if (p.isNull("weeklyWorkoutGoal")) null else p.optInt("weeklyWorkoutGoal").takeIf { it in 1..7 },
             ),
             j.optString("activeProgramId").takeIf { it.isNotBlank() && it != "null" },
@@ -715,6 +747,9 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     val photoStore = ProgressPhotoStore(application)
     private val _data = MutableStateFlow(store.load())
     val data = _data.asStateFlow()
+    private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val saver = CoalescedSaver<AppData>(TYPED_SAVE_DELAY_MS, saveScope,
+        { android.util.Log.w("WorkoutStore", "Deferred save failed; retrying on the next save", it) }, store::save)
     private val _storageRecovery = MutableStateFlow(store.recovery())
     val storageRecovery = _storageRecovery.asStateFlow()
     val hasStorageRecovery: Boolean get() = store.hasRecoveryPayloads()
@@ -783,13 +818,38 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun exercises(d: AppData = _data.value) = catalog + d.customExercises
 
-    @Synchronized private fun update(block: (AppData) -> AppData) {
+    /** Writes typed set values still queued for the worker; call before the process may be killed. */
+    fun flushPendingSaves() = saver.flushQuietly()
+
+    override fun onCleared() {
+        saver.flushQuietly()
+        saveScope.cancel()
+    }
+
+    @Synchronized private fun update(coalesce: (AppData, AppData) -> Boolean = { _, _ -> false }, block: (AppData) -> AppData) {
         val previous = _data.value
-        val next = block(previous)
+        val next = block(previous).withEffortPrompts(previous)
         if (next == previous) return
-        store.save(next)
+        // Only typed set values may trail on a worker; every other change is durable before it publishes.
+        if (coalesce(previous, next)) saver.saveLater(next) else saver.saveNow(next)
         _data.value = next
         if (previous.active != next.active) WorkoutNotifications.sync(getApplication(), next)
+    }
+
+    // One choke point, so every selection change (tabs, Next, auto-advance, supersets) is covered.
+    private fun AppData.withEffortPrompts(previous: AppData): AppData {
+        val workout = active ?: return this
+        val updated = workout.withEffortPromptTransition(previous.active, preferences) { metricsFor(it, this) }
+        return if (updated === workout) this else copy(active = updated)
+    }
+
+    private fun metricsFor(entry: SessionExercise, d: AppData): List<SetMetric> =
+        loggingMetricsOf(catalog.find { it.id == entry.exerciseId } ?: d.customExercises.find { it.id == entry.exerciseId })
+
+    /** True when an owed effort question must be answered or skipped before the finish confirmation. */
+    fun askEffortBeforeFinish(): Boolean {
+        update { d -> d.copy(active = d.active?.withEffortPromptsBeforeFinish(d.preferences) { metricsFor(it, d) }) }
+        return _data.value.let { it.preferences.asksEffortOnLeave && it.active?.effortPrompts?.isNotEmpty() == true }
     }
 
     fun saveScaleWeight(record: ScaleWeightRecord) = update { it.withScaleWeight(record) }
@@ -943,20 +1003,6 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         data.withSpreadsheetPrograms(programs, exercises(data))
     }
 
-    internal fun appendFitbodHistory(
-        preview: FitbodPreview,
-        choices: Map<String, String>,
-        skipped: Set<String>,
-        newExercises: List<Exercise> = emptyList(),
-    ): Int {
-        var imported = 0
-        update { data ->
-            data.withFitbodImport(preview, choices, skipped, newExercises, exercises(data))
-                .also { imported = it.history.size - data.history.size }
-        }
-        return imported
-    }
-
     fun beginProgram(program: TrainingProgram) = update { it.copy(programDraft = program) }
 
     fun discardProgramDraft() = update { it.copy(programDraft = null) }
@@ -1016,7 +1062,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         it.copy(name = name.trim().ifBlank { "Workout" })
     }
 
-    private fun editActive(block: (Workout) -> Workout) = update { d ->
+    private fun editActive(coalesce: (AppData, AppData) -> Boolean = { _, _ -> false }, block: (Workout) -> Workout) = update(coalesce) { d ->
         d.copy(active = d.active?.let(block))
     }
 
@@ -1032,6 +1078,15 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun groupSuperset(ids: Set<String>) = editActive { it.withSuperset(ids) }
+
+    fun swapExercise(entryId: String, replacementId: String, scope: SwapScope): ExerciseSwapUndo? {
+        val before = _data.value
+        update { d -> d.withExerciseSwap(entryId, replacementId, scope, exercises(d)) }
+        // Snapshot what was published (after update()'s effort bookkeeping), not the raw block result.
+        return before.exerciseSwapUndo(_data.value)
+    }
+
+    fun undoExerciseSwap(undo: ExerciseSwapUndo) = update { it.withoutExerciseSwap(undo) }
 
     fun leaveSuperset(id: String) = editActive { w ->
         w.copy(exercises = w.exercises.map { if (it.id == id) it.copy(supersetId = null) else it }).normalizeSupersets()
@@ -1067,8 +1122,17 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun removeSet(exerciseId: String, setId: String) = editSessionExercise(exerciseId) { it.withoutSet(setId) }
 
+    /** The swipe and accessibility removal: no confirmation, an Undo offer instead. */
+    fun removeSetWithUndo(exerciseId: String, setId: String): SetRemovalUndo? {
+        val before = _data.value
+        update { d -> d.withRemovedSet(exerciseId, setId) }
+        return before.setRemovalUndo(_data.value)
+    }
+
+    fun undoSetRemoval(undo: SetRemovalUndo) = update { it.withoutSetRemoval(undo) }
+
     fun editSet(exerciseId: String, setId: String, block: (LoggedSet) -> LoggedSet) =
-        editActive { w ->
+        editActive({ previous, next -> previous.onlyTypedSetValuesChanged(next, exerciseId, setId) }) { w ->
             w.copy(
                 exercises =
                     w.exercises.map {
@@ -1087,14 +1151,26 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                     setId,
                     d.preferences,
                     System.currentTimeMillis(),
-                    exercises(d).find { it.id == d.active?.exercises?.find { entry -> entry.id == exerciseId }?.exerciseId }
-                        ?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS),
+                    loggingMetricsOf(exercises(d).find { it.id == d.active?.exercises?.find { entry -> entry.id == exerciseId }?.exerciseId }),
                 )
         )
     }
 
     fun exerciseNotes(id: String, notes: String) = editActive { w ->
         w.copy(exercises = w.exercises.map { if (it.id == id) it.copy(notes = notes) else it })
+    }
+
+    fun dismissLastNote(id: String) = editActive { w ->
+        w.copy(exercises = w.exercises.map { if (it.id == id) it.copy(lastNoteDismissed = true) else it })
+    }
+
+    fun saveTemplateNote(routineId: String, exerciseId: String, note: String): String? {
+        var error: String? = null
+        update { data ->
+            try { data.withTemplateNote(routineId, exerciseId, note) }
+            catch (failure: IllegalArgumentException) { error = failure.message; data }
+        }
+        return error
     }
 
     fun workoutNotes(notes: String) = editActive { it.copy(notes = notes) }
@@ -1107,7 +1183,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         val now = System.currentTimeMillis()
         data.copy(
             active = null,
-            history = listOf(workout.withPause(false, now).copy(finishedAt = now)) + data.history,
+            history = listOf(workout.withPause(false, now).copy(finishedAt = now, effortPrompts = emptyList())) + data.history,
             routines = if (saveTemplate) data.routines + Routine(name = workout.name.trim().ifBlank { "Routine" },
                 exerciseIds = workout.exercises.map { it.exerciseId }) else data.routines,
         )
@@ -1230,7 +1306,8 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                 )
             else decoded
         backup.install()
-        store.save(d)
+        // Through the saver, so a queued typed edit can never overwrite the restored data.
+        saver.saveNow(d)
         _data.value = d
         WorkoutNotifications.sync(getApplication(), d)
         cleanPhotos()
@@ -1241,8 +1318,31 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun export(): String = ByteArrayOutputStream().also { export(it) }.toString("UTF-8")
 }
 
+/** True when an edit changed only typed metric values of one set, never its completion or kind. */
+internal fun AppData.onlyTypedSetValuesChanged(next: AppData, exerciseId: String, setId: String): Boolean {
+    val before = active?.exercises?.find { it.id == exerciseId }?.sets?.find { it.id == setId } ?: return false
+    val after = next.active?.takeIf { it.id == active?.id }?.exercises?.find { it.id == exerciseId }?.sets?.find { it.id == setId } ?: return false
+    return after.copy(weightKg = before.weightKg, reps = before.reps, assistanceKg = before.assistanceKg,
+        durationSeconds = before.durationSeconds, distanceMeters = before.distanceMeters) == before
+}
+
+// Compiled once: titles are derived in list rows and set rows during composition.
+private val titleWordStart = Regex("(^|[\\s(\\-/])([\\p{L}])")
+
 val Exercise.title: String
     get() =
-        name.replace(Regex("(^|[\\s(\\-/])([\\p{L}])")) {
+        name.replace(titleWordStart) {
             it.groupValues[1] + it.groupValues[2].uppercase()
         }
+
+/** The one default for unknown/removed exercises, shared by effort eligibility and the session UI. */
+internal fun loggingMetricsOf(exercise: Exercise?): List<SetMetric> = exercise?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS)
+
+/**
+ * Undo offers end with the first real edit. Navigation (selection and the effort prompts it records),
+ * the rest timer and pausing are not edits, so they never withdraw an offer.
+ */
+internal fun Workout.sameWorkAs(other: Workout): Boolean = copy(
+    selectedExerciseId = other.selectedExerciseId, effortPrompts = other.effortPrompts,
+    restUntil = other.restUntil, pausedAt = other.pausedAt, pausedDurationMs = other.pausedDurationMs,
+) == other

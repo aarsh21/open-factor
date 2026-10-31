@@ -20,7 +20,7 @@ class PreferenceStorageTest {
             val initialized = vm.data.value
             vm.settings { it.copy(
                 keepAlive = true, showWorkoutTimer = false, showBodyweightContribution = false,
-                heightInFeet = true, clock24Hour = true, distanceImperial = true, theme = AppTheme.LIGHT,
+                heightInFeet = true, clock24Hour = true, distanceImperial = true, theme = AppTheme.LIGHT, palette = AppPalette.MOSS,
                 shortcuts = ShortcutPreferences(listOf(WorkoutShortcut.HISTORY, WorkoutShortcut.WEIGHT),
                     mapOf(WorkoutShortcut.HISTORY to ShortcutColor.PURPLE), false),
             ) }

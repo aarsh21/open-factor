@@ -236,6 +236,7 @@ private fun BodyValuePlot(
         )
     }
     val foreground = MaterialTheme.colorScheme.primary
+    val line = OF.line
     Row(Modifier.fillMaxWidth().height(240.dp)) {
         Column(
             Modifier.fillMaxHeight().widthIn(min = 48.dp).padding(end = 8.dp),
@@ -267,7 +268,7 @@ private fun BodyValuePlot(
                 }
         ) {
             listOf(inset, size.height / 2, size.height - inset).forEach { y ->
-                drawLine(OF.line, Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
+                drawLine(line, Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
             }
             points.forEach { point ->
                 val center = position(point, size.width, size.height)

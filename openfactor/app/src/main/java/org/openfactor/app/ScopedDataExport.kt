@@ -108,6 +108,8 @@ object ScopedDataExport {
                     .put("pounds", data.preferences.pounds).put("restSeconds", data.preferences.restSeconds)
                     .put("autoRest", data.preferences.autoRest).put("showRir", data.preferences.showRir)
                     .put("rateEffortAfterExercise", data.preferences.rateEffortAfterExercise)
+                    .put("effortPromptTiming", data.preferences.effortPromptTiming.name)
+                    .put("workoutKeypad", data.preferences.workoutKeypad)
                     .put("weeklyWorkoutGoal", data.preferences.weeklyWorkoutGoal ?: JSONObject.NULL)
                     .put("exerciseAutoNext", data.preferences.exerciseAutoNext)
                     .put("keepAlive", data.preferences.keepAlive).put("showWorkoutTimer", data.preferences.showWorkoutTimer)
@@ -116,7 +118,8 @@ object ScopedDataExport {
                     .put("restAfterLastWarmupSet", data.preferences.restAfterLastWarmupSet)
                     .put("restBetweenExercises", data.preferences.restBetweenExercises)
                     .put("supersetAutoNext", data.preferences.supersetAutoNext)
-                    .put("restBetweenSidesPercent", data.preferences.restBetweenSidesPercent))
+                    .put("restBetweenSidesPercent", data.preferences.restBetweenSidesPercent)
+                    .put("palette", data.preferences.palette.name))
                 ExportCategory.WORKOUT_LOG_NOTES -> payload.put(category.key, JSONArray(workouts.map { workout ->
                     JSONObject().put("workoutId", workout.id).put("notes", workout.notes)
                         .put("exercises", JSONArray(workout.exercises.map {

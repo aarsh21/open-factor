@@ -71,7 +71,7 @@ fun WorkoutHome(
         }
         items(data.routines.take(3), key = { it.id }) { routine ->
             var menu by remember { mutableStateOf(false) }
-            Surface(Modifier.padding(horizontal = 18.dp).fillMaxWidth(), shape = OF.shape, color = OF.top) {
+            Surface(Modifier.itemMotion(this).padding(horizontal = 18.dp).fillMaxWidth(), shape = OF.shape, color = OF.top) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(routine.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -103,11 +103,11 @@ fun WorkoutHome(
             item { Box(Modifier.padding(horizontal = 18.dp)) { SectionTitle("Recent workouts", "All", onHistory) } }
             items(data.history.take(5), key = { "history-${it.id}" }) { workout ->
                 Row(
-                    Modifier.fillMaxWidth().clickable(onClick = onHistory).padding(horizontal = 18.dp, vertical = 18.dp),
+                    Modifier.itemMotion(this).fillMaxWidth().clickable(onClick = onHistory).padding(horizontal = 18.dp, vertical = 18.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Icon(Icons.Rounded.CheckCircle, null, tint = OF.green)
+                    Icon(Icons.Rounded.CheckCircle, null, tint = OF.complete)
                     Text(workout.name, Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(workout.localDate().format(DateTimeFormatter.ofPattern("d MMM")), color = OF.muted)
                     Icon(Icons.Rounded.ChevronRight, null)

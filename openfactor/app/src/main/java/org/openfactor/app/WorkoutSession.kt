@@ -1,7 +1,15 @@
 package org.openfactor.app
 
 import androidx.compose.foundation.*
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -34,6 +42,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.CancellationException
@@ -55,10 +66,20 @@ fun WorkoutSession(
     onWorkoutSettings: () -> Unit,
     onGymSettings: () -> Unit,
     onOpenWorkout: ((String) -> Unit)? = null,
+    onSwapSearch: ((String) -> Unit)? = null,
+    swapPick: Pair<String, String>? = null,
+    onSwapPickHandled: () -> Unit = {},
+    onExerciseSwapped: (ExerciseSwapUndo, String) -> Unit = { _, _ -> },
+    onSetRemoved: (SetRemovalUndo, String) -> Unit = { _, _ -> },
+    /** An Undo snackbar is showing; effort sheets wait so they never end it. */
+    undoOffered: Boolean = false,
+    /** Live keypad height, so snackbars sit above the keys instead of over Log set. */
+    onKeypadInset: (Dp) -> Unit = {},
 ) {
     val focus = LocalFocusManager.current
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
+    val motion = LocalAppMotionEnabled.current
     val scope = rememberCoroutineScope()
     var finishing by remember { mutableStateOf(false) }
     var finishError by remember { mutableStateOf<String?>(null) }
@@ -84,21 +105,22 @@ fun WorkoutSession(
     var workoutNotes by remember { mutableStateOf(false) }
     var restSettings by remember { mutableStateOf(false) }
     var rateExerciseId by rememberSaveable(workout.id) { mutableStateOf<String?>(null) }
+    // Finish leaves the current exercise too: ask what is owed first, then continue to the confirmation.
+    var finishAfterEffort by rememberSaveable(workout.id) { mutableStateOf(false) }
+    val requestFinish = { if (vm.askEffortBeforeFinish()) finishAfterEffort = true else confirm = "finish" }
+    var swapEntryId by rememberSaveable(workout.id) { mutableStateOf<String?>(null) }
     val selected =
         workout.exercises.find { it.id == workout.selectedExerciseId }
             ?: workout.exercises.firstOrNull()
     val restUntil = workout.restUntil
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    // Ticks recompose only the clock texts (and this scope once, when rest ends), never set rows.
+    val clock = rememberSessionClock(workout.id, restUntil)
     var saveTemplate by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(workout.id) {
-        while (true) {
-            delay(1000)
-            now = System.currentTimeMillis()
-        }
-    }
-    LaunchedEffect(workout.restUntil) { now = System.currentTimeMillis() }
-    val elapsed = workout.elapsedSeconds(now)
-    val remaining = ((restUntil - now + 999) / 1000).coerceAtLeast(0)
+    val resting by remember(clock, restUntil) { derivedStateOf { restUntil > clock.longValue } }
+    TraceRecomposition("WorkoutSession")
+    val seenExercises = remember(workout.id) { workout.exercises.mapTo(HashSet()) { it.id } }
+    val keypadState = remember { WorkoutKeypad() }
+    val keypad = keypadState.takeIf { data.preferences.workoutKeypad }
     Column(Modifier.fillMaxSize().imePadding()) {
         Row(
             Modifier.fillMaxWidth().background(OF.top).padding(horizontal = 8.dp, vertical = 4.dp),
@@ -109,10 +131,13 @@ fun WorkoutSession(
             Column(Modifier.weight(1f)) {
                 Text(workout.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            val finishPress = remember { MutableInteractionSource() }
             Button(
-                { focus.clearFocus(); confirm = "finish" },
+                { focus.clearFocus(); requestFinish() },
+                Modifier.pressFeedback(finishPress, enabled = workout.completedSets() > 0),
                 enabled = workout.completedSets() > 0,
                 contentPadding = PaddingValues(horizontal = 16.dp),
+                interactionSource = finishPress,
             ) { Text("Finish") }
             Box {
                 IconButton({ menu = true }) { Icon(Icons.Rounded.MoreVert, "Workout options") }
@@ -148,7 +173,8 @@ fun WorkoutSession(
                         enabled = workout.completedSets() > 0,
                         onClick = {
                             menu = false
-                            confirm = "finish"
+                            focus.clearFocus()
+                            requestFinish()
                         },
                     )
                     DropdownMenuItem(
@@ -179,22 +205,49 @@ fun WorkoutSession(
                 }
             }
         }
+        // Rest lives in this fixed-height row: completing a set never pushes the sets under the thumb.
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = 18.dp, end = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             if (data.preferences.showWorkoutTimer || workout.pausedAt != null) {
-                Text(
-                    if (workout.pausedAt != null) "Paused" else "%d:%02d:%02d".format(elapsed / 3600, elapsed / 60 % 60, elapsed % 60),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = OF.muted,
-                )
-            } else Spacer(Modifier.width(1.dp))
-            if (remaining <= 0) TextButton({ restSettings = true }) {
-                Icon(Icons.Rounded.Timer, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Rest timer")
+                SessionElapsedText(workout, clock)
+            }
+            Spacer(Modifier.weight(1f))
+            AnimatedContent(
+                resting,
+                transitionSpec = {
+                    (if (motion) fadeIn(tween(AppMotion.Quick, easing = AppMotion.EaseOut)) else EnterTransition.None)
+                        .togetherWith(if (motion) fadeOut(tween(AppMotion.Quick - 30)) else ExitTransition.None)
+                        .using(SizeTransform(clip = false) { _, _ -> snap() })
+                },
+                contentAlignment = Alignment.CenterEnd,
+                label = "rest controls",
+            ) { isResting ->
+                if (isResting) Row(verticalAlignment = Alignment.CenterVertically) {
+                    val settings = remember { MutableInteractionSource() }
+                    Surface(
+                        onClick = { restSettings = true },
+                        modifier = Modifier.heightIn(min = 40.dp).pressFeedback(settings).semantics { contentDescription = "Rest timer settings" },
+                        shape = RoundedCornerShape(50),
+                        color = OF.elevated,
+                        interactionSource = settings,
+                    ) {
+                        Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.Timer, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            RestCountdownText(restUntil, clock)
+                        }
+                    }
+                    val extend = remember { MutableInteractionSource() }
+                    TextButton({ vm.extendRest(30) }, Modifier.pressFeedback(extend), interactionSource = extend) { Text("+30s") }
+                    val skip = remember { MutableInteractionSource() }
+                    TextButton({ vm.clearRest() }, Modifier.pressFeedback(skip), interactionSource = skip) { Text("Skip") }
+                } else TextButton({ restSettings = true }) {
+                    Icon(Icons.Rounded.Timer, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Rest timer")
+                }
             }
         }
         WorkoutExerciseSelector(
@@ -202,23 +255,8 @@ fun WorkoutSession(
             onSelect = { focus.clearFocus(); vm.selectExercise(it) },
             onAdd = { focus.clearFocus(); onAdd() },
         )
-        if (remaining > 0)
-            Surface(color = OF.elevated, modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton({ restSettings = true }) { Icon(Icons.Rounded.Timer, "Rest timer settings") }
-                    Text(
-                        "  Rest ${remaining/60}:${(remaining%60).toString().padStart(2,'0')}",
-                        Modifier.weight(1f),
-                    )
-                    TextButton({ vm.extendRest(30) }) { Text("+30s") }
-                    TextButton({ vm.clearRest() }) { Text("Skip") }
-                }
-            }
         LazyColumn(
-            Modifier.weight(1f),
+            Modifier.weight(1f).keypadOutsideTap(keypad) { focus.clearFocus() },
             contentPadding = PaddingValues(18.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
@@ -233,19 +271,32 @@ fun WorkoutSession(
                     )
                 }
             items(listOfNotNull(selected), key = { it.id }) { se ->
+                val knownSets = remember(se.id) { se.sets.map { it.id }.toSet() }
                 val e =
                     exercises.find { it.id == se.exerciseId }
                         ?: Exercise(se.exerciseId, "Exercise", "Other", "Other")
                 val metrics = remember(e) { e.loggingMetrics() }
                 var remove by remember { mutableStateOf(false) }
                 var exerciseMenu by remember { mutableStateOf(false) }
-                var exerciseNotes by remember { mutableStateOf(false) }
+                // Saveable, so a half-written note's dialog comes back after rotation or process death.
+                var exerciseNotes by rememberSaveable(se.id) { mutableStateOf(false) }
+                var templateNote by rememberSaveable(se.id) { mutableStateOf(false) }
+                val sourceRoutine = data.routines.find { it.id == workout.routineId }?.takeIf { se.exerciseId in it.exerciseIds }
+                val lastNote = remember(data.history, se.exerciseId, workout.id) { lastExerciseNote(data.history, se.exerciseId, workout.id) }
                 var superset by remember { mutableStateOf(false) }
                 var mergeSides by remember { mutableStateOf(false) }
                 val logicalSets = se.logicalSets()
+                SideEffect { keypad?.order(logicalSets, metrics) }
                 var targets by remember { mutableStateOf(false) }
                 val showTargets = se.sets.any { it.targetRepsMin != null || it.targetRepsMax != null || it.targetRir != null }
-                Surface(color = OF.background) {
+                // Switching exercises happens between sets (and automatically in supersets): stay instant.
+                // Only an exercise new to this workout (added or swapped in) fades into place.
+                val fresh = se.id !in seenExercises
+                SideEffect { seenExercises += se.id }
+                Surface(color = OF.background, modifier = Modifier.animateItem(
+                    fadeInSpec = if (motion && fresh) tween(AppMotion.State, easing = AppMotion.EaseOut) else null,
+                    placementSpec = null, fadeOutSpec = null,
+                )) {
                     Column {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -261,12 +312,14 @@ fun WorkoutSession(
                                 IconButton({ exerciseMenu = true }) { Icon(Icons.Rounded.MoreVert, "Exercise options for ${e.title}") }
                                 DropdownMenu(exerciseMenu, { exerciseMenu = false }) {
                                     DropdownMenuItem(text = { Text("Exercise guide") }, onClick = { exerciseMenu = false; focus.clearFocus(); guidanceExerciseId = e.id })
+                                    DropdownMenuItem(text = { Text("Swap exercise…") }, onClick = { exerciseMenu = false; focus.clearFocus(); swapEntryId = se.id })
                                     DropdownMenuItem(text = { Text("Targets & rest") }, onClick = { exerciseMenu = false; targets = true })
                                     if (metrics.any { it.isReps }) DropdownMenuItem(
                                         text = { Text(if (data.preferences.rateEffortAfterExercise) "Turn off effort prompt" else "Ask effort after exercise") },
                                         onClick = { exerciseMenu = false; vm.settings { it.copy(rateEffortAfterExercise = !it.rateEffortAfterExercise) } },
                                     )
                                     DropdownMenuItem(text = { Text("Exercise notes") }, onClick = { exerciseMenu = false; exerciseNotes = true })
+                                    if (sourceRoutine != null) DropdownMenuItem(text = { Text("Template note") }, onClick = { exerciseMenu = false; templateNote = true })
                                     DropdownMenuItem(text = { Text(if (se.sets.any { it.side != null }) "Use left logs only…" else "Log left and right separately") }, onClick = {
                                         exerciseMenu = false
                                         if (se.sets.any { it.side != null }) mergeSides = true else vm.splitSides(se.id)
@@ -284,22 +337,11 @@ fun WorkoutSession(
                                 .joinToString(" + ") { entry -> exercises.find { it.id == entry.exerciseId }?.title ?: "Exercise" },
                             Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodySmall, color = OF.muted,
                         )
-                        val pinnedNote = data.exerciseDefaults[e.id]?.note.orEmpty()
-                        if (pinnedNote.isNotBlank()) Row(
-                            Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Icon(Icons.Rounded.PushPin, null, Modifier.size(20.dp), tint = OF.muted)
-                            Column(Modifier.weight(1f)) {
-                                Text("Pinned exercise note", style = MaterialTheme.typography.bodySmall, color = OF.muted)
-                                Text(pinnedNote, style = MaterialTheme.typography.bodyLarge)
-                            }
-                        }
-                        if (se.notes.isNotBlank()) Text(
-                            se.notes,
-                            Modifier.fillMaxWidth().clickable(onClickLabel = "Edit exercise notes") { exerciseNotes = true }
-                                .padding(vertical = 12.dp),
-                            style = MaterialTheme.typography.bodyLarge, color = OF.muted,
+                        ExerciseNotes(
+                            se, pinned = data.exerciseDefaults[e.id]?.note.orEmpty(), templateName = sourceRoutine?.name,
+                            templateNote = sourceRoutine?.prescriptions?.find { it.exerciseId == se.exerciseId }?.note.orEmpty(),
+                            last = lastNote, onEditSession = { exerciseNotes = true }, onEditTemplate = { templateNote = true },
+                            onDismissLast = { vm.dismissLastNote(se.id) },
                         )
                         if (targets)
                             WorkoutTargetsDialog(se, { targets = false }) { values, rest ->
@@ -318,6 +360,7 @@ fun WorkoutSession(
                             }
                             Spacer(Modifier.width(48.dp))
                         }
+                        Column(Modifier.settleSize()) {
                         logicalSets.forEachIndexed { index, group ->
                             group.components.forEachIndexed { componentIndex, logs ->
                                 if (group.root.kind != SetKind.STANDARD || logs.size > 1) Text(
@@ -325,35 +368,49 @@ fun WorkoutSession(
                                     else "Myo component $componentIndex", Modifier.padding(top = 10.dp), color = OF.muted,
                                     style = MaterialTheme.typography.labelMedium,
                                 )
-                                logs.forEach { s -> key(s.id) {
+                                logs.forEach { s -> key(s.id) { Box(Modifier.arrival(s.id !in knownSets)) {
+                                    // Callbacks capture ids, not the per-edit workout/exercise copies, so
+                                    // editing one row leaves the other rows' parameters equal and skippable.
+                                    val seId = se.id
+                                    val workoutId = workout.id
+                                    val setId = s.id
+                                    val displayNumber = logicalSets.take(index + 1).count { it.root.warmup == group.root.warmup }
+                                    val removedLabel = when {
+                                        componentIndex > 0 -> "Myo component $componentIndex"
+                                        group.root.warmup -> "Warm-up $displayNumber"
+                                        else -> "Set $displayNumber"
+                                    }
                                     SetRow(
                                         index, s, data.preferences, metrics,
                                         exerciseName = e.title + (s.side?.let { " ${it.label.lowercase()}" } ?: "") +
                                             (if (componentIndex > 0) " Myo component $componentIndex" else ""),
-                                        onChange = { changed -> vm.editSet(se.id, s.id) { changed } },
+                                        onChange = { changed -> vm.editSet(seId, setId) { changed } },
                                         onComplete = {
-                                            focus.clearFocus()
-                                            val before = vm.data.value.active?.takeIf { it.id == workout.id }
-                                                ?.exercises?.find { it.id == se.id }?.sets?.find { it.id == s.id }
-                                            vm.toggleSetCompletion(se.id, s.id)
-                                            val after = vm.data.value.active?.takeIf { it.id == workout.id }
-                                                ?.exercises?.find { it.id == se.id }?.sets?.find { it.id == s.id }
+                                            if (keypad?.logging != true) focus.clearFocus()
+                                            val before = vm.data.value.active?.takeIf { it.id == workoutId }
+                                                ?.exercises?.find { it.id == seId }?.sets?.find { it.id == setId }
+                                            vm.toggleSetCompletion(seId, setId)
+                                            val after = vm.data.value.active?.takeIf { it.id == workoutId }
+                                                ?.exercises?.find { it.id == seId }?.sets?.find { it.id == setId }
                                             // Acknowledge a committed log, never undo, validation or restoration.
                                             if (before?.completed == false && after?.completed == true)
                                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         },
-                                        onRemove = { vm.removeSet(se.id, s.id) },
-                                        onKind = { kind, isWarmup -> vm.setKind(se.id, s.id, kind, isWarmup) },
+                                        onRemove = { vm.removeSet(seId, setId) },
+                                        onDelete = { vm.removeSetWithUndo(seId, setId)?.let { onSetRemoved(it, removedLabel) } },
+                                        onKind = { kind, isWarmup -> vm.setKind(seId, setId, kind, isWarmup) },
                                         hasExtras = group.components.size > 1,
                                         showTargets = showTargets,
-                                        displayNumber = logicalSets.take(index + 1).count { it.root.warmup == group.root.warmup },
+                                        displayNumber = displayNumber,
+                                        keypad = keypad,
                                     )
-                                } }
+                                } } }
                             }
                             if (group.root.kind == SetKind.MYO && !group.root.warmup) TextButton({ vm.addMyoComponent(se.id, group.root.id) }) {
                                 Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
                                 Text("Add Myo component", Modifier.padding(start = 6.dp))
                             }
+                        }
                         }
                         if (se.sets.any { !it.completed }) {
                             val canLogAll = se.canLogAllSets(metrics)
@@ -388,13 +445,27 @@ fun WorkoutSession(
                                 Icon(Icons.Rounded.Edit, null, Modifier.size(16.dp))
                             }
                         }
+                        // Moving on is the most common navigation between sets; it goes through selectExercise.
+                        val done = se.workoutExerciseProgress().done
+                        val doneOnArrival = remember(se.id) { done }
+                        if (done) workout.upNextExercise(se.id)?.let { next ->
+                            NextExerciseAction(
+                                next, exercises.find { it.id == next.exerciseId }, fresh = !doneOnArrival,
+                                onClick = { focus.clearFocus(); vm.selectExercise(next.id) },
+                                modifier = Modifier.padding(top = 12.dp),
+                            )
+                        }
                         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            OutlinedButton({ focus.clearFocus(); vm.addWarmupSet(se.id) }, Modifier.weight(1f).heightIn(min = 48.dp)) {
+                            val warmupPress = remember { MutableInteractionSource() }
+                            val addPress = remember { MutableInteractionSource() }
+                            OutlinedButton({ focus.clearFocus(); vm.addWarmupSet(se.id) },
+                                Modifier.weight(1f).heightIn(min = 48.dp).pressFeedback(warmupPress), interactionSource = warmupPress) {
                                 Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))
                                 Text("Warmup")
                             }
-                            FilledTonalButton({ focus.clearFocus(); vm.addSet(se.id) }, Modifier.weight(1f).heightIn(min = 48.dp)) {
+                            FilledTonalButton({ focus.clearFocus(); vm.addSet(se.id) },
+                                Modifier.weight(1f).heightIn(min = 48.dp).pressFeedback(addPress), interactionSource = addPress) {
                                 Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))
                                 Text("Add set")
@@ -402,10 +473,17 @@ fun WorkoutSession(
                         }
                     }
                 }
-                if (exerciseNotes) SessionNotesDialog("Exercise notes", se.notes, { exerciseNotes = false }) {
+                // Starts empty: last time's note is a reference, not today's words to re-save.
+                if (exerciseNotes) NoteDialog("Exercise notes", se.notes, { exerciseNotes = false }, {
                     vm.exerciseNotes(se.id, it)
                     exerciseNotes = false
-                }
+                    null
+                }, placeholder = lastNote?.takeIf { se.notes.isBlank() }?.text,
+                    supporting = lastNote?.takeIf { se.notes.isBlank() }?.let { "Starts empty. Last time's note stays with that workout." })
+                if (templateNote && sourceRoutine != null) NoteDialog("Template note",
+                    sourceRoutine.prescriptions.find { it.exerciseId == se.exerciseId }?.note.orEmpty(), { templateNote = false }, {
+                        vm.saveTemplateNote(sourceRoutine.id, se.exerciseId, it).also { error -> if (error == null) templateNote = false }
+                    }, supporting = "Saved to ${sourceRoutine.name}; shows each time you start it.", limit = TEMPLATE_NOTE_LIMIT)
                 if (superset) SupersetDialog(workout, se.id, exercises, { superset = false }) { ids ->
                     vm.groupSuperset(ids)
                     superset = false
@@ -428,22 +506,53 @@ fun WorkoutSession(
                 }
             }
         }
+        keypad?.let {
+            val density = LocalDensity.current
+            DisposableEffect(Unit) { onDispose { onKeypadInset(0.dp) } }
+            Box(Modifier.onSizeChanged { size -> onKeypadInset(with(density) { size.height.toDp() }) }) {
+                WorkoutKeypadPanel(it) { focus.clearFocus() }
+            }
+        }
     }
-    val promptedExercise = workout.exercises.firstOrNull { entry ->
-        data.preferences.rateEffortAfterExercise && entry.pendingEffortSet(
-            exercises.find { it.id == entry.exerciseId }?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS),
-        ) != null
+    // First match wins, as with the linear find it replaces.
+    val catalogById = remember(exercises) { HashMap<String, Exercise>().apply { exercises.forEach { putIfAbsent(it.id, it) } } }
+    fun owesEffort(entry: SessionExercise) = entry.pendingEffortSet(
+        loggingMetricsOf(catalogById[entry.exerciseId]),
+    ) != null
+    val promptedExercise = when {
+        !data.preferences.rateEffortAfterExercise -> null
+        // A modal sheet over a live Undo offer would end it (reviewing counts as an edit): wait it out.
+        undoOffered && !finishAfterEffort -> null
+        data.preferences.effortPromptTiming == EffortPromptTiming.LAST_SET -> workout.exercises.firstOrNull(::owesEffort)
+        // Owed for an exercise already left (recorded by the view model). Never stacked on another
+        // session sheet or dialog; an automatic advance also waits out the running rest timer.
+        guidanceExerciseId != null || swapEntryId != null || restSettings || confirm.isNotEmpty() || rename || workoutNotes -> null
+        else -> workout.effortPrompts.firstNotNullOfOrNull { prompt ->
+            workout.exercises.find { it.id == prompt.exerciseId }
+                // After rest, but never by yanking the keypad away from someone already typing the next set.
+                ?.takeIf { (!prompt.afterRest || (!resting && keypad?.open != true)) && it.exerciseId in catalogById && owesEffort(it) }
+        }
     }
+    if (finishAfterEffort && promptedExercise == null) LaunchedEffect(Unit) { finishAfterEffort = false; confirm = "finish" }
     val ratedExercise = rateExerciseId?.let { id -> workout.exercises.find { it.id == id } } ?: promptedExercise
-    ratedExercise?.let { entry ->
-        val exercise = exercises.find { it.id == entry.exerciseId }
-        val set = entry.lastEffortSet(exercise?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS))
+    // The question takes precedence over the keypad: close it first so the two never stack.
+    val keypadOpen = ratedExercise != null && keypad?.open == true
+    if (keypadOpen) LaunchedEffect(ratedExercise?.id) { focus.clearFocus() }
+    ratedExercise?.takeIf { !keypadOpen }?.let { entry ->
+        val exercise = catalogById[entry.exerciseId]
+        val set = entry.lastEffortSet(loggingMetricsOf(exercise))
         if (exercise != null && set != null) ExerciseEffortSheet(
             exercise, set,
             onDismiss = { vm.reviewExerciseEffort(entry.id, set.id, set.rir); rateExerciseId = null },
             onSave = { vm.reviewExerciseEffort(entry.id, set.id, it); rateExerciseId = null },
         )
     }
+    ExerciseSwapHost(
+        data, workout, exercises, vm,
+        sheetEntryId = swapEntryId, onCloseSheet = { swapEntryId = null },
+        searchPick = swapPick, onSearchPickHandled = onSwapPickHandled, onSearchAll = onSwapSearch,
+        onSwapped = onExerciseSwapped,
+    )
     guidanceExerciseId?.let { id ->
         exercises.firstOrNull { it.id == id }?.let { exercise ->
             ModalBottomSheet(
@@ -696,11 +805,17 @@ private fun SetRow(
     onChange: (LoggedSet) -> Unit,
     onComplete: () -> Unit,
     onRemove: () -> Unit,
+    onDelete: () -> Unit = {},
     onKind: (SetKind, Boolean) -> Unit,
     hasExtras: Boolean,
     showTargets: Boolean,
     displayNumber: Int,
+    keypad: WorkoutKeypad? = null,
 ) {
+    TraceRecomposition("SetRow", set.id)
+    // Stable across recompositions so each field's KeypadField stays equal and unchanged fields skip.
+    val latestComplete by rememberUpdatedState(onComplete)
+    val stableComplete = remember { { latestComplete() } }
     val focus = LocalFocusManager.current
     var remove by remember { mutableStateOf(false) }
     var options by remember { mutableStateOf(false) }
@@ -718,16 +833,31 @@ private fun SetRow(
         tween(completionDuration, easing = AppMotion.EaseOut), label = "set completion surface",
     )
     val checkColor by animateColorAsState(
-        if (set.completed) Color.Black else if (set.canComplete(metrics)) MaterialTheme.colorScheme.onSurface else OF.muted,
+        if (set.completed) OF.onComplete else if (set.canComplete(metrics)) MaterialTheme.colorScheme.onSurface else OF.muted,
         tween(completionDuration, easing = AppMotion.EaseOut), label = "set completion check color",
     )
     val checkScale by animateFloatAsState(
         if (set.completed || !motionEnabled) 1f else .92f,
         tween(completionDuration, easing = AppMotion.EaseOut), label = "set completion check",
     )
+    val canLog = !set.completed && set.canComplete(metrics)
+    // With the keypad on this row, a swipe logs exactly like its Log set key; otherwise like the check button.
+    val logFromRow = {
+        if (keypad != null && keypad.target?.setId == set.id) { if (!keypad.log()) focus.clearFocus() } else onComplete()
+    }
+    // Clearing focus closes the keypad, so the Undo snackbar never covers its keys.
+    val swipe = rememberSetRowSwipe(canLog, logFromRow) { focus.clearFocus(); onDelete() }
+    // Swipe is never the only way: TalkBack offers both actions on every control in the row.
+    val rowActions = listOfNotNull(
+        if (set.completed) CustomAccessibilityAction("Mark set incomplete") { onComplete(); true }
+        else if (canLog) CustomAccessibilityAction("Log set") { logFromRow(); true } else null,
+        CustomAccessibilityAction("Delete set") { swipe.delete(); true },
+    )
     Row(
         Modifier.fillMaxWidth()
+            .setSwipeCollapse(swipe)
             .padding(vertical = 4.dp)
+            .setRowSwipe(swipe)
             .background(
                 rowColor,
                 RoundedCornerShape(8.dp),
@@ -740,6 +870,7 @@ private fun SetRow(
                 { options = true },
                 Modifier.width(40.dp).semantics {
                     contentDescription = "${spokenKind.replaceFirstChar { it.uppercase() }} $displayNumber options for $exerciseName"
+                    customActions = rowActions
                 },
                 contentPadding = PaddingValues(0.dp),
             ) {
@@ -780,7 +911,7 @@ private fun SetRow(
                     mutableStateOf(metric.display(set, prefs.pounds, prefs.distanceImperial))
                 }
                 val invalid = text.isNotBlank() && metric.parse(text, prefs.pounds, prefs.distanceImperial) == null
-                OutlinedTextField(
+                KeypadTextField(
                     text,
                     { entered ->
                         text = entered
@@ -789,6 +920,7 @@ private fun SetRow(
                     },
                     Modifier.weight(if (metric.isLoad) 1.3f else 1f).semantics {
                         contentDescription = "$exerciseName $spokenKind $displayNumber ${metric.catalogName.lowercase()} (${metric.label(prefs.pounds, prefs.distanceImperial)})"
+                        customActions = rowActions
                         if (invalid) error(if (metric.isReps) "Enter a whole number from 1 to 9999" else "Enter a valid ${metric.label(prefs.pounds, prefs.distanceImperial)} value")
                     },
                     isError = invalid,
@@ -800,6 +932,7 @@ private fun SetRow(
                     keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }),
                     textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center, fontWeight = FontWeight.Medium),
                     shape = RoundedCornerShape(10.dp),
+                    field = keypad?.let { KeypadField(it, set.id, metric, prefs, set.completed, set.canComplete(metrics), stableComplete) },
                 )
             }
         }
@@ -807,7 +940,8 @@ private fun SetRow(
             onComplete,
             Modifier.size(48.dp)
                 .pressFeedback(completionSource, enabled = set.completed || set.canComplete(metrics))
-                .background(completionColor, RoundedCornerShape(8.dp)),
+                .background(completionColor, RoundedCornerShape(8.dp))
+                .semantics { customActions = rowActions },
             enabled = set.completed || set.canComplete(metrics),
             interactionSource = completionSource,
         ) {
