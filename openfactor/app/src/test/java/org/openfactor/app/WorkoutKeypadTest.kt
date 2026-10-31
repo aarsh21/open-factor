@@ -11,6 +11,16 @@ class WorkoutKeypadTest {
     private fun digits(text: String) = text.map { if (it == '.') KeypadKey.Decimal else KeypadKey.Digit(it.digitToInt()) }.toTypedArray()
 
     @Test
+    fun stepsSnapToThePlateGridFromConvertedValues() {
+        // 100 kg shown in pounds is 220.462: steps land on 225 / 220, never 225.462.
+        assertEquals("225", type(KeypadEdit("220.462", false), KeypadKey.Increase, pounds = true).text)
+        assertEquals("220", type(KeypadEdit("220.462", false), KeypadKey.Decrease, pounds = true).text)
+        assertEquals("230", type(KeypadEdit("225", false), KeypadKey.Increase, pounds = true).text)
+        assertEquals("62.5", type(KeypadEdit("61", false), KeypadKey.Increase).text)
+        assertEquals("60", type(KeypadEdit("61", false), KeypadKey.Decrease).text)
+    }
+
+    @Test
     fun firstKeyReplacesPrefilledValueThenAppends() {
         val focused = KeypadEdit("47.5", replace = true)
         assertEquals(KeypadEdit("5", false), type(focused, KeypadKey.Digit(5)))
@@ -51,7 +61,7 @@ class WorkoutKeypadTest {
         assertEquals(KeypadEdit("", false), type(KeypadEdit("", false), KeypadKey.Decrease))
         // Above the valid 5000 kg the stepper refuses to produce an invalid value, but can step back down.
         assertEquals(KeypadEdit("5000", false), type(KeypadEdit("5000", false), KeypadKey.Increase))
-        assertEquals(KeypadEdit("4999.5", true), type(KeypadEdit("5002", false), KeypadKey.Decrease))
+        assertEquals(KeypadEdit("5000", true), type(KeypadEdit("5002", false), KeypadKey.Decrease))
         assertEquals("102.5", type(KeypadEdit("100,0", false), KeypadKey.Increase).text)
 
         assertEquals(KeypadEdit("9", true), type(KeypadEdit("8", false), KeypadKey.Increase, metric = SetMetric.REPS))

@@ -6,6 +6,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -162,7 +164,9 @@ fun NuvioWorkoutNavigation(
     val energy by rememberUpdatedState(scrollEnergy)
     LaunchedEffect(motion) {
         snapshotFlow { if (motion) energy() else 0f }.collectLatest { target ->
-            scrollDrift.animateTo(target, tween(if (motion) AppMotion.State else 0, easing = AppMotion.EaseOut))
+            // A critically damped spring keeps its velocity as the target moves every scroll frame.
+            if (motion) scrollDrift.animateTo(target, spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow))
+            else scrollDrift.snapTo(target)
         }
     }
     Box(

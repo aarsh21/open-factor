@@ -206,7 +206,7 @@ private fun LastTimeNote(note: LastExerciseNote, onWrite: () -> Unit, onDismiss:
             if (motion && width > 0) offset.animateTo(
                 direction * width,
                 // A flick keeps its speed on the way out; the button path eases out.
-                if (velocity > 0f) spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMedium, with(density) { 1.dp.toPx() })
+                if (velocity > 0f) spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMedium, with(density) { 24.dp.toPx() })
                 else tween(AppMotion.State, easing = AppMotion.EaseOut),
                 initialVelocity = direction * velocity,
             )
@@ -224,12 +224,7 @@ private fun LastTimeNote(note: LastExerciseNote, onWrite: () -> Unit, onDismiss:
     Box(
         Modifier.fillMaxWidth()
             .onSizeChanged { width = it.width }
-            .graphicsLayer {
-                val progress = if (width == 0) 0f else (offset.value * direction / width).coerceIn(0f, 1f)
-                // Remove animations: no travel, the fade alone shows how close the swipe is to committing.
-                translationX = if (motion) offset.value else 0f
-                alpha = 1f - progress
-            }
+            // Measure the finger before the layer moves the note, or 1:1 tracking cancels the velocity out.
             .pointerInput(motion, direction, leaving) {
                 if (leaving) return@pointerInput
                 awaitEachGesture {
@@ -258,6 +253,12 @@ private fun LastTimeNote(note: LastExerciseNote, onWrite: () -> Unit, onDismiss:
                     }
                     release(tracker.calculateVelocity().x * direction, p)
                 }
+            }
+            .graphicsLayer {
+                val progress = if (width == 0) 0f else (offset.value * direction / width).coerceIn(0f, 1f)
+                // Remove animations: no travel, the fade alone shows how close the swipe is to committing.
+                translationX = if (motion) offset.value else 0f
+                alpha = 1f - progress
             },
     ) {
         val muted = OF.muted.copy(alpha = .78f)
@@ -289,7 +290,6 @@ internal fun NoteDialog(
     val focus = remember { FocusRequester() }
     val tooLong = limit != null && notes.trim().length > limit
     val support = error ?: if (tooLong) "Use $limit characters or fewer." else supporting
-    LaunchedEffect(Unit) { focus.requestFocus() }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -300,6 +300,8 @@ internal fun NoteDialog(
                 placeholder = if (placeholder != null) ({ Text(placeholder, maxLines = 3, overflow = TextOverflow.Ellipsis) }) else null,
                 supportingText = if (support != null) ({ Text(support) }) else null,
             )
+            // The dialog composes in its own window: request focus from there, once the field is attached.
+            LaunchedEffect(Unit) { focus.requestFocus() }
         },
         confirmButton = { TextButton({ error = onSave(notes) }, enabled = !tooLong) { Text("Save") } },
         dismissButton = { TextButton(onDismiss) { Text("Cancel") } },

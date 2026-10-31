@@ -1,5 +1,7 @@
 package org.openfactor.app
 
+import kotlin.math.floor
+import kotlin.math.ceil
 import java.util.Locale
 
 /** One editable cell of the active logger: a set row and one of its metrics. */
@@ -63,7 +65,9 @@ internal fun keypadEdit(
             val current = state.text.replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() }
             if (current == null && !increase) return state
             val step = metric.keypadStep(pounds)
-            val raw = (current ?: 0.0) + if (increase) step else -step
+            // Snap to the step grid: 220.462 lb (a stored 100 kg) steps to 225, not 225.462.
+            val base = (current ?: 0.0) / step
+            val raw = step * if (increase) floor(base + 1e-9) + 1 else ceil(base - 1e-9) - 1
             val bounded = when {
                 metric.isLoad -> maxOf(raw, 0.0) + 0.0
                 metric.isReps -> maxOf(raw, 1.0)
@@ -85,5 +89,12 @@ internal fun nextKeypadTarget(rows: List<LoggedSet>, metrics: List<SetMetric>, c
     val rowIndex = rows.indexOfFirst { it.id == current.setId }
     if (metricIndex < 0 || rowIndex < 0) return null
     if (metricIndex < metrics.lastIndex) return KeypadTarget(current.setId, metrics[metricIndex + 1])
+    return nextUnfinishedSet(rows, metrics, current)
+}
+
+/** First field of the next unfinished row after [current]'s row: where logging a set leads. */
+internal fun nextUnfinishedSet(rows: List<LoggedSet>, metrics: List<SetMetric>, current: KeypadTarget): KeypadTarget? {
+    val rowIndex = rows.indexOfFirst { it.id == current.setId }
+    if (rowIndex < 0 || metrics.isEmpty()) return null
     return rows.drop(rowIndex + 1).firstOrNull { !it.completed }?.let { KeypadTarget(it.id, metrics.first()) }
 }

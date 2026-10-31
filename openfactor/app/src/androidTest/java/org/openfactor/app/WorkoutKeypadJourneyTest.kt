@@ -73,8 +73,10 @@ class WorkoutKeypadJourneyTest {
             key("0").performClick()
             field(1, "reps (Reps)").assertTextEquals("10")
 
+            // Logging a set goes straight to the next unfinished set; the keypad stays up between sets.
             key("Log set").performClick()
-            keypad().assertDoesNotExist()
+            keypad().assertIsDisplayed()
+            field(2, "weight (kg)").assertIsFocused()
             compose.onNodeWithContentDescription("Mark set incomplete 1 for Barbell Bench Press").assertExists()
             compose.runOnIdle {
                 val first = store.load().active!!.exercises.single().sets.first()
@@ -94,7 +96,8 @@ class WorkoutKeypadJourneyTest {
             keypad().assertDoesNotExist()
             compose.onNodeWithText("Keypad test").assertExists()
             field(2, "weight (kg)").assertExists()
-            compose.runOnIdle { assertEquals(6, store.load().active!!.exercises.single().sets.last().reps) }
+            // Typed values reach storage through the coalesced background save.
+            compose.waitUntil(5_000) { store.load().active!!.exercises.single().sets.last().reps == 6 }
 
             compose.onNodeWithContentDescription("Workout options").performClick()
             compose.onNodeWithText("Workout settings").performClick()
@@ -107,7 +110,7 @@ class WorkoutKeypadJourneyTest {
             keypad().assertDoesNotExist()
             field(2, "weight (kg)").performTextReplacement("65")
             field(2, "weight (kg)").assertTextEquals("65")
-            compose.runOnIdle { assertEquals(65.0, store.load().active!!.exercises.single().sets.last().weightKg!!, 0.0001) }
+            compose.waitUntil(5_000) { store.load().active!!.exercises.single().sets.last().weightKg == 65.0 }
         } finally {
             activity?.close()
             store.save(before)

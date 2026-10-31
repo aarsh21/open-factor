@@ -96,7 +96,8 @@ class ExerciseSwapTest {
         assertNotEquals("a", swapped.id)
         assertEquals(swapped.id, result.selectedExerciseId)
         assertEquals(150, swapped.restSeconds)
-        assertEquals("", swapped.notes)
+        // Today's note moves with the in-place swap rather than vanishing with the old entry.
+        assertEquals("Seat 4", swapped.notes)
         assertEquals(listOf(true, false, false), swapped.sets.map { it.warmup })
         assertEquals(listOf(SetKind.STANDARD, SetKind.STANDARD, SetKind.FAILURE), swapped.sets.map { it.kind })
         assertEquals(listOf(null, 6, 6), swapped.sets.map { it.targetRepsMin })
@@ -245,6 +246,24 @@ class ExerciseSwapTest {
         val later = next.copy(active = Workout(name = "Another"))
         assertEquals(later.active, later.withoutExerciseSwap(undo).active)
         assertNull(data.exerciseSwapUndo(data))
+    }
+
+    @Test fun lateUndoNeverErasesWorkLoggedAfterTheSwap() {
+        val data = started()
+        val entry = data.active!!.exercises[1].id
+        val next = data.withExerciseSwap(entry, "db-bench", SwapScope.TEMPLATE, emptyList())
+        val undo = data.exerciseSwapUndo(next)!!
+        assertTrue(next.canUndoExerciseSwap(undo))
+        // A set logged after the swap: Undo is withdrawn and changes nothing.
+        val logged = next.copy(active = next.active!!.copy(exercises = next.active!!.exercises.map { e ->
+            e.copy(sets = e.sets.mapIndexed { i, s -> if (i == 0) s.copy(weightKg = 30.0, reps = 10, completed = true) else s })
+        }))
+        assertFalse(logged.canUndoExerciseSwap(undo))
+        assertEquals(logged, logged.withoutExerciseSwap(undo))
+        // A template note saved after the swap is just as protected.
+        val noted = next.copy(routines = next.routines.map { if (it.id == "r") it.copy(name = "Upper (edited)") else it })
+        assertFalse(noted.canUndoExerciseSwap(undo))
+        assertEquals(noted, noted.withoutExerciseSwap(undo))
     }
 
     @Test fun routineIdSurvivesTheCodec() {

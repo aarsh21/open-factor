@@ -1,14 +1,15 @@
 package org.openfactor.app
 
 import androidx.compose.foundation.*
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -106,6 +107,7 @@ fun WorkoutSession(
     var saveTemplate by rememberSaveable { mutableStateOf(false) }
     val resting by remember(clock, restUntil) { derivedStateOf { restUntil > clock.longValue } }
     TraceRecomposition("WorkoutSession")
+    val seenExercises = remember(workout.id) { workout.exercises.mapTo(HashSet()) { it.id } }
     val keypadState = remember { WorkoutKeypad() }
     val keypad = keypadState.takeIf { data.preferences.workoutKeypad }
     Column(Modifier.fillMaxSize().imePadding()) {
@@ -191,18 +193,49 @@ fun WorkoutSession(
                 }
             }
         }
+        // Rest lives in this fixed-height row: completing a set never pushes the sets under the thumb.
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = 18.dp, end = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             if (data.preferences.showWorkoutTimer || workout.pausedAt != null) {
                 SessionElapsedText(workout, clock)
-            } else Spacer(Modifier.width(1.dp))
-            if (!resting) TextButton({ restSettings = true }) {
-                Icon(Icons.Rounded.Timer, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Rest timer")
+            }
+            Spacer(Modifier.weight(1f))
+            AnimatedContent(
+                resting,
+                transitionSpec = {
+                    (if (motion) fadeIn(tween(AppMotion.Quick, easing = AppMotion.EaseOut)) else EnterTransition.None)
+                        .togetherWith(if (motion) fadeOut(tween(AppMotion.Quick - 30)) else ExitTransition.None)
+                        .using(SizeTransform(clip = false) { _, _ -> snap() })
+                },
+                contentAlignment = Alignment.CenterEnd,
+                label = "rest controls",
+            ) { isResting ->
+                if (isResting) Row(verticalAlignment = Alignment.CenterVertically) {
+                    val settings = remember { MutableInteractionSource() }
+                    Surface(
+                        onClick = { restSettings = true },
+                        modifier = Modifier.heightIn(min = 40.dp).pressFeedback(settings).semantics { contentDescription = "Rest timer settings" },
+                        shape = RoundedCornerShape(50),
+                        color = OF.elevated,
+                        interactionSource = settings,
+                    ) {
+                        Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.Timer, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            RestCountdownText(restUntil, clock)
+                        }
+                    }
+                    val extend = remember { MutableInteractionSource() }
+                    TextButton({ vm.extendRest(30) }, Modifier.pressFeedback(extend), interactionSource = extend) { Text("+30s") }
+                    val skip = remember { MutableInteractionSource() }
+                    TextButton({ vm.clearRest() }, Modifier.pressFeedback(skip), interactionSource = skip) { Text("Skip") }
+                } else TextButton({ restSettings = true }) {
+                    Icon(Icons.Rounded.Timer, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Rest timer")
+                }
             }
         }
         WorkoutExerciseSelector(
@@ -210,25 +243,6 @@ fun WorkoutSession(
             onSelect = { focus.clearFocus(); vm.selectExercise(it) },
             onAdd = { focus.clearFocus(); onAdd() },
         )
-        AnimatedVisibility(
-            resting,
-            enter = if (motion) fadeIn(tween(AppMotion.State, easing = AppMotion.EaseOut)) +
-                expandVertically(tween(AppMotion.State, easing = AppMotion.EaseOut)) else EnterTransition.None,
-            exit = if (motion) fadeOut(tween(AppMotion.Quick)) +
-                shrinkVertically(tween(AppMotion.State, easing = AppMotion.EaseOut)) else ExitTransition.None,
-        ) {
-            Surface(color = OF.elevated, modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton({ restSettings = true }) { Icon(Icons.Rounded.Timer, "Rest timer settings") }
-                    RestCountdownText(restUntil, clock, Modifier.weight(1f))
-                    TextButton({ vm.extendRest(30) }) { Text("+30s") }
-                    TextButton({ vm.clearRest() }) { Text("Skip") }
-                }
-            }
-        }
         LazyColumn(
             Modifier.weight(1f).keypadOutsideTap(keypad) { focus.clearFocus() },
             contentPadding = PaddingValues(18.dp),
@@ -252,8 +266,9 @@ fun WorkoutSession(
                 val metrics = remember(e) { e.loggingMetrics() }
                 var remove by remember { mutableStateOf(false) }
                 var exerciseMenu by remember { mutableStateOf(false) }
-                var exerciseNotes by remember { mutableStateOf(false) }
-                var templateNote by remember { mutableStateOf(false) }
+                // Saveable, so a half-written note's dialog comes back after rotation or process death.
+                var exerciseNotes by rememberSaveable(se.id) { mutableStateOf(false) }
+                var templateNote by rememberSaveable(se.id) { mutableStateOf(false) }
                 val sourceRoutine = data.routines.find { it.id == workout.routineId }?.takeIf { se.exerciseId in it.exerciseIds }
                 val lastNote = remember(data.history, se.exerciseId, workout.id) { lastExerciseNote(data.history, se.exerciseId, workout.id) }
                 var superset by remember { mutableStateOf(false) }
@@ -262,8 +277,12 @@ fun WorkoutSession(
                 SideEffect { keypad?.order(logicalSets, metrics) }
                 var targets by remember { mutableStateOf(false) }
                 val showTargets = se.sets.any { it.targetRepsMin != null || it.targetRepsMax != null || it.targetRir != null }
+                // Switching exercises happens between sets (and automatically in supersets): stay instant.
+                // Only an exercise new to this workout (added or swapped in) fades into place.
+                val fresh = se.id !in seenExercises
+                SideEffect { seenExercises += se.id }
                 Surface(color = OF.background, modifier = Modifier.animateItem(
-                    fadeInSpec = if (motion) tween(AppMotion.State, easing = AppMotion.EaseOut) else null,
+                    fadeInSpec = if (motion && fresh) tween(AppMotion.State, easing = AppMotion.EaseOut) else null,
                     placementSpec = null, fadeOutSpec = null,
                 )) {
                     Column {
@@ -349,7 +368,7 @@ fun WorkoutSession(
                                             (if (componentIndex > 0) " Myo component $componentIndex" else ""),
                                         onChange = { changed -> vm.editSet(seId, setId) { changed } },
                                         onComplete = {
-                                            focus.clearFocus()
+                                            if (keypad?.logging != true) focus.clearFocus()
                                             val before = vm.data.value.active?.takeIf { it.id == workoutId }
                                                 ?.exercises?.find { it.id == seId }?.sets?.find { it.id == setId }
                                             vm.toggleSetCompletion(seId, setId)

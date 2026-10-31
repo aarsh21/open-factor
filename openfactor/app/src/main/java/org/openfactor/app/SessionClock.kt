@@ -41,5 +41,5 @@ internal fun SessionElapsedText(workout: Workout, clock: LongState) {
 @Composable
 internal fun RestCountdownText(restUntil: Long, clock: LongState, modifier: Modifier = Modifier) {
     val remaining = ((restUntil - clock.longValue + 999) / 1000).coerceAtLeast(0)
-    Text("  Rest ${remaining/60}:${(remaining%60).toString().padStart(2,'0')}", modifier)
+    Text("Rest ${remaining/60}:${(remaining%60).toString().padStart(2,'0')}", modifier, maxLines = 1, style = MaterialTheme.typography.labelLarge)
 }

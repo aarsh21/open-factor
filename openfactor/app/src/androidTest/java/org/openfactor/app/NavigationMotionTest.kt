@@ -120,7 +120,7 @@ class NavigationMotionTest {
         val atHalf = left("Workout History")
         assertTrue("The gesture reveals Home beneath History", exists(HOME) && exists("Workout History"))
         assertTrue("History follows the finger ($restingLeft < $atFifth < $atHalf)", restingLeft < atFifth && atFifth < atHalf)
-        val travel = compose.onRoot().fetchSemanticsNode().size.width / 10f
+        val travel = compose.onRoot().fetchSemanticsNode().size.width / 12f
         assertEquals("Half a swipe moves History half its travel", travel / 2, atHalf - restingLeft, travel * .1f)
         // Holding still: nothing commits on its own while the finger is down.
         compose.mainClock.advanceTimeBy(1_000)
@@ -194,7 +194,7 @@ class NavigationMotionTest {
         assertEquals("Existing sets never replay an entrance", firstTop, top(first), .5f)
     }
 
-    @Test fun restBannerOpensAndFoldsInsteadOfJumping() {
+    @Test fun restControlsAppearInPlaceWithoutMovingTheSets() {
         val catalog = context.assets.open("catalog.json").bufferedReader().use { DataCodec.catalog(it.readText()) }
         val bench = catalog.first { it.name.equals("Barbell bench press", ignoreCase = true) }
         val entry = SessionExercise(id = "rest-entry", exerciseId = bench.id,
@@ -204,17 +204,18 @@ class NavigationMotionTest {
             preferences = Preferences(autoRest = true, rateEffortAfterExercise = false),
             active = Workout(name = "Rest test", exercises = listOf(entry), selectedExerciseId = entry.id),
         ))
-        val anchor = "Set 1 options for Barbell Bench Press"
-        val closed = top(anchor)
+        val anchor = "Set 2 options for Barbell Bench Press"
+        val before = top(anchor)
         compose.mainClock.autoAdvance = false
         compose.onNodeWithContentDescription("Complete set 1 for Barbell Bench Press").performClick()
         compose.mainClock.advanceTimeBy(64)
         frame("13-rest-opening")
-        val opening = top(anchor)
+        val during = top(anchor)
         compose.mainClock.advanceTimeBy(600)
         frame("14-rest-open")
-        val open = top(anchor)
-        assertTrue("The banner is visible", exists("Skip"))
-        assertTrue("Sets glide down while the banner opens ($closed < $opening < $open)", closed < opening && opening < open)
+        assertTrue("Rest controls are shown", exists("Skip") && exists("+30s"))
+        // Completing a set happens every set: the next set must stay exactly under the thumb.
+        assertEquals("Sets stay put while rest starts", before, during, .5f)
+        assertEquals("Sets stay put once rest is running", before, top(anchor), .5f)
     }
 }

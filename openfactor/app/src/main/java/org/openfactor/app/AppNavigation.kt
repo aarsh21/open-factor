@@ -9,7 +9,6 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -44,15 +43,14 @@ internal fun routeDepth(route: String): Int = when (route) {
  * new one arrives so the two never compete. Peers (tabs, same-depth swaps) fade through instead
  * of sliding, because they have no spatial relationship to communicate.
  */
-internal fun AnimatedContentTransitionScope<AppDestination>.appTransition(motion: Boolean): ContentTransform {
+internal fun AnimatedContentTransitionScope<AppDestination>.appTransition(motion: Boolean, scrubbing: Boolean = false): ContentTransform {
     if (!motion) return EnterTransition.None togetherWith ExitTransition.None
     val from = routeDepth(initialState.route)
     val to = routeDepth(targetState.route)
     val enter = tween<Float>(AppMotion.Step, easing = AppMotion.EaseOut)
     val transform = if (from == to) {
-        (fadeIn(tween(AppMotion.Step, delayMillis = 40, easing = AppMotion.EaseOut)) +
-            scaleIn(tween(AppMotion.Step, delayMillis = 40, easing = AppMotion.EaseOut), initialScale = .985f))
-            .togetherWith(fadeOut(tween(AppMotion.Quick - 30)))
+        // Tabs are core navigation: no delay and no decorative scale, just a quick fade through.
+        fadeIn(tween(150, easing = AppMotion.EaseOut)).togetherWith(fadeOut(tween(AppMotion.Quick - 30)))
     } else if (to > from) {
         (fadeIn(enter) + slideInHorizontally(tween(AppMotion.Step, easing = AppMotion.EaseOut)) { it / 12 })
             .togetherWith(
@@ -61,12 +59,13 @@ internal fun AnimatedContentTransitionScope<AppDestination>.appTransition(motion
             )
             .apply { targetContentZIndex = 1f }
     } else {
-        // A pop is also what a predictive back gesture scrubs. Linear keeps the departing screen
-        // 1:1 with the finger (half a swipe = half gone) instead of vanishing at the first touch.
+        // A predictive back gesture scrubs the pop: linear keeps the departing screen 1:1 with the
+        // finger (half a swipe = half gone). A tapped back mirrors the push exit instead.
+        val exit = if (scrubbing) LinearEasing else AppMotion.EaseOut
         (fadeIn(enter) + slideInHorizontally(tween(AppMotion.Step, easing = AppMotion.EaseOut)) { -it / 24 })
             .togetherWith(
-                fadeOut(tween(AppMotion.Step, easing = LinearEasing)) +
-                    slideOutHorizontally(tween(AppMotion.Step, easing = LinearEasing)) { it / 10 }
+                fadeOut(tween(if (scrubbing) AppMotion.Step else AppMotion.Quick, easing = exit)) +
+                    slideOutHorizontally(tween(if (scrubbing) AppMotion.Step else AppMotion.State, easing = exit)) { it / 12 }
             )
             .apply { targetContentZIndex = -1f }
     }

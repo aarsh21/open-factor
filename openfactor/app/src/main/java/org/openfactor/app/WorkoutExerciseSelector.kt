@@ -1,6 +1,5 @@
 package org.openfactor.app
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -16,7 +15,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -70,15 +68,12 @@ fun WorkoutExerciseSelector(
                 val current = entry.id == selected?.id
                 val progress = entry.workoutExerciseProgress()
                 val press = remember { MutableInteractionSource() }
-                // Quick, because switching happens between every set; the tab acknowledges, it doesn't perform.
-                val fade = tween<Color>(if (motion) AppMotion.Quick else 0, easing = AppMotion.EaseOut)
-                val container by animateColorAsState(if (current) MaterialTheme.colorScheme.primary else OF.background, fade, label = "tab")
-                val content by animateColorAsState(if (current) MaterialTheme.colorScheme.onPrimary else OF.muted, fade, label = "tab text")
+                // Switching happens between every set: press feedback acknowledges it, the swap is instant.
                 Surface(
                     onClick = { onSelect(entry.id) },
                     shape = RoundedCornerShape(10.dp),
-                    color = container,
-                    contentColor = content,
+                    color = if (current) MaterialTheme.colorScheme.primary else OF.background,
+                    contentColor = if (current) MaterialTheme.colorScheme.onPrimary else OF.muted,
                     border = if (current) null else BorderStroke(1.dp, OF.line),
                     interactionSource = press,
                     modifier = Modifier.widthIn(max = 238.dp).heightIn(min = 48.dp).pressFeedback(press).animateItem(

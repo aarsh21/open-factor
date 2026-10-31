@@ -1,5 +1,6 @@
 package org.openfactor.app
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -169,6 +170,8 @@ private fun ExerciseSwapSheet(
         containerColor = OF.background,
     ) {
         Box(Modifier.fillMaxHeight(.95f)) {
+            // Back from a suggestion's guide returns to the list instead of closing the whole sheet.
+            BackHandler(guideId != null) { guideId = null }
             Crossfade(guideId, animationSpec = tween(if (motion) AppMotion.State else 0, easing = AppMotion.EaseOut), label = "swap sheet content") { id ->
                 val guided = id?.let { g -> exercises.find { it.id == g } }
                 if (guided != null) Column(Modifier.fillMaxSize()) {
@@ -280,7 +283,8 @@ private fun SwapCandidateRow(suggestion: SwapSuggestion, onChoose: () -> Unit, o
                 }
             }
         }
-        TextButton(onGuide, Modifier.heightIn(min = 48.dp).semantics { contentDescription = "Guide for ${e.title}" }) {
+        val guide = remember { MutableInteractionSource() }
+        TextButton(onGuide, Modifier.heightIn(min = 48.dp).pressFeedback(guide).semantics { contentDescription = "Guide for ${e.title}" }, interactionSource = guide) {
             Text("Guide")
         }
     }

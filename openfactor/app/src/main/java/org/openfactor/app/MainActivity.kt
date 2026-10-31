@@ -44,6 +44,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -321,7 +322,12 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     val motion = LocalAppMotionEnabled.current
     val destination = AppDestination.of(contentRoute, detailId, tab)
     val navigation = remember { SeekableTransitionState(destination) }
-    LaunchedEffect(destination) { navigation.animateTo(destination) }
+    // True only while a back gesture drives the transition; taps and 3-button back never set it.
+    var scrubbing by remember { mutableStateOf(false) }
+    LaunchedEffect(destination) {
+        navigation.animateTo(destination)
+        scrubbing = false
+    }
     val screenTransition = rememberTransition(navigation, label = "screen")
     PredictiveBackHandler(route.isNotBlank()) { gesture ->
         val target = backRoute()
@@ -332,12 +338,17 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
             gesture.collect { event ->
                 // The gesture scrubs the same pop transition a tap would play, so lifting the
                 // finger continues from exactly where the screen already is.
-                if (motion && revealed != null && revealed != navigation.currentState)
+                if (motion && revealed != null && revealed != navigation.currentState) {
+                    scrubbing = true
                     navigation.seekTo(event.progress, revealed)
+                }
             }
             if (target == null) programExit = true else route = target
         } catch (cancelled: CancellationException) {
-            scope.launch { navigation.animateTo(navigation.currentState) }
+            scope.launch {
+                navigation.animateTo(navigation.currentState)
+                scrubbing = false
+            }
             throw cancelled
         }
     }
@@ -352,7 +363,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         Box(Modifier.fillMaxSize().background(OF.background)) {
             screenTransition.AnimatedContent(
                 Modifier.fillMaxSize().nestedScroll(rootScroll).padding(top = padding.calculateTopPadding()),
-                transitionSpec = { appTransition(motion) },
+                transitionSpec = { appTransition(motion, scrubbing) },
                 contentKey = { it },
             ) { screen ->
             val shownId = screen.key
@@ -611,7 +622,13 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                 scope.launch {
                                     // A newer swap replaces the old offer instead of queueing behind it.
                                     snackbar.currentSnackbarData?.dismiss()
+                                    // The offer ends with the first later edit, so Undo can never erase new work.
+                                    val offer = launch {
+                                        vm.data.first { !it.canUndoExerciseSwap(undo) }
+                                        snackbar.currentSnackbarData?.dismiss()
+                                    }
                                     val result = snackbar.showSnackbar("Swapped for $title", "Undo", duration = SnackbarDuration.Long)
+                                    offer.cancel()
                                     if (result == SnackbarResult.ActionPerformed) vm.undoExerciseSwap(undo)
                                 }
                             },
@@ -758,7 +775,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                 Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding()),
                 enter = if (!motion) EnterTransition.None else
                     fadeIn(tween(AppMotion.Step, easing = AppMotion.EaseOut)) +
-                        slideInVertically(tween(AppMotion.Enter, easing = AppMotion.EaseOut)) { it / 2 },
+                        // Never longer than the screen pop, or a back gesture would outrun its own scrub.
+                        slideInVertically(tween(AppMotion.Step, easing = AppMotion.EaseOut)) { it / 2 },
                 exit = if (!motion) ExitTransition.None else
                     fadeOut(tween(AppMotion.Quick)) +
                         slideOutVertically(tween(AppMotion.State, easing = AppMotion.EaseOut)) { it / 3 },

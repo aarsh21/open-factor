@@ -1,5 +1,9 @@
 package org.openfactor.app
 
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -16,7 +20,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
-import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.*
@@ -124,8 +127,22 @@ internal class WorkoutKeypad {
     /** False when nothing follows, so the caller hides the keypad instead. */
     fun advance(): Boolean = next?.let(fields::get)?.let { runCatching { it.focus.requestFocus() }.isSuccess } == true
 
-    /** The row's own completion callback: same validation, haptic, rest timer and effort prompt. */
-    fun log() { active()?.takeIf { !it.completed && it.canLog }?.onLog?.invoke() }
+    /** True while the keypad itself completes a set, so the row keeps focus instead of clearing it. */
+    var logging = false
+        private set
+
+    /**
+     * The row's own completion callback (same validation, haptic, rest timer and effort prompt), then
+     * straight to the next unfinished set: the keypad stays up between sets instead of sliding away
+     * and back. False when nothing is left, so the caller hides it.
+     */
+    fun log(): Boolean {
+        val node = active()?.takeIf { !it.completed && it.canLog } ?: return true
+        val following = nextUnfinishedSet(rows, metrics, node.target)
+        logging = true
+        try { node.onLog() } finally { logging = false }
+        return following?.let(fields::get)?.let { runCatching { it.focus.requestFocus() }.isSuccess } == true
+    }
 
     fun containsField(rootPosition: Offset) = fields.values.any { node ->
         node.coordinates?.takeIf { it.isAttached }?.boundsInRoot()?.contains(rootPosition) == true
@@ -265,7 +282,8 @@ private fun KeypadKeys(keypad: WorkoutKeypad, node: KeypadFieldNode, onHide: () 
     val tick = { view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP) }
     val metric = node.target.metric
     val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
-    val keyHeight = if (windowHeight < 600.dp) 48.dp else 54.dp
+    // At most ~42% of the window (header and gaps included), so landscape and large text keep the list visible.
+    val keyHeight = ((windowHeight * .42f - 70.dp) / 4).coerceIn(36.dp, 54.dp)
     val step = keypadNumber(metric.keypadStep(node.pounds))
     val unit = node.unit.lowercase()
     val hasNext = keypad.next != null
@@ -281,7 +299,8 @@ private fun KeypadKeys(keypad: WorkoutKeypad, node: KeypadFieldNode, onHide: () 
             ) {
                 Row(Modifier.fillMaxWidth().heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(node.unit, Modifier.weight(1f).padding(start = 8.dp), style = MaterialTheme.typography.labelLarge, color = OF.muted)
-                    IconButton({ tick(); onHide() }, Modifier.focusProperties { canFocus = false }) {
+                    val hide = remember { MutableInteractionSource() }
+                    IconButton({ tick(); onHide() }, Modifier.focusProperties { canFocus = false }.pressFeedback(hide), interactionSource = hide) {
                         Icon(Icons.Rounded.KeyboardHide, "Hide keypad")
                     }
                 }
@@ -317,10 +336,13 @@ private fun KeypadKeys(keypad: WorkoutKeypad, node: KeypadFieldNode, onHide: () 
                     }
                     val logged = node.completed
                     KeypadButton(if (logged) "Set logged" else "Log set", keyHeight, tone = KeyTone.Primary,
-                        enabled = !logged && node.canLog, onClick = { keypad.log() }) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Rounded.Check, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
+                        enabled = !logged && node.canLog, onClick = { if (!keypad.log()) onHide() }) {
+                        Row(Modifier.padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            // Large text: the label matters more than the icon on a quarter-width key.
+                            if (LocalDensity.current.fontScale <= 1.15f) {
+                                Icon(Icons.Rounded.Check, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(4.dp))
+                            }
                             KeyLabel(if (logged) "Logged" else "Log set")
                         }
                     }
@@ -337,7 +359,10 @@ private fun KeyRow(content: @Composable RowScope.() -> Unit) =
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), content = content)
 
 @Composable
-private fun KeyLabel(text: String) = Text(text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+private fun KeyLabel(text: String) = BasicText(
+    text, style = LocalTextStyle.current.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = LocalContentColor.current),
+    maxLines = 1, autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = 15.sp),
+)
 
 /**
  * Keys never take input focus (the field keeps it) and only acknowledge presses with the shared
@@ -367,8 +392,9 @@ private fun RowScope.KeypadButton(
     }
     val scope = rememberCoroutineScope()
     val repeatAction by rememberUpdatedState(repeat)
+    // Keys are pressed 100+ times a session: an instant tint, not an expanding ripple that stacks.
+    val pressed by source.collectIsPressedAsState()
     val input = if (repeat != null) Modifier
-        .indication(source, ripple())
         .pointerInput(enabled) {
             if (!enabled) return@pointerInput
             awaitEachGesture {
@@ -397,12 +423,13 @@ private fun RowScope.KeypadButton(
             role = Role.Button
             if (enabled) onClick { repeatAction?.invoke(); true }
         }
-    else Modifier.clickable(source, ripple(), enabled = enabled, role = Role.Button) { onClick?.invoke() }
+    else Modifier.clickable(source, null, enabled = enabled, role = Role.Button) { onClick?.invoke() }
     Box(
         Modifier.weight(1f).height(height)
             .pressFeedback(source, enabled)
             .clip(shape)
-            .background(if (tone == KeyTone.Primary && !enabled) OF.elevated.copy(alpha = .6f) else container)
+            .background(if (tone == KeyTone.Primary && !enabled) OF.elevated.copy(alpha = .6f)
+                else if (pressed && enabled) lerp(container, foreground, .16f) else container)
             .focusProperties { canFocus = false }
             .then(input)
             .semantics { contentDescription = description },

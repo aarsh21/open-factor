@@ -17,7 +17,13 @@ enum class SwapScope { TODAY, TEMPLATE, PROGRAM }
 data class SwapPlan(val scope: SwapScope, val name: String, val alreadyContainsReplacement: Boolean)
 
 /** Exact pre-swap values; plans are null when the swap did not change them. */
-data class ExerciseSwapUndo(val workout: Workout, val routine: Routine? = null, val program: TrainingProgram? = null)
+data class ExerciseSwapUndo(
+    val workout: Workout,
+    val routine: Routine? = null,
+    val program: TrainingProgram? = null,
+    /** The swap's own result: Undo only applies while nothing has changed since. */
+    val after: AppData? = null,
+)
 
 private fun Exercise.primaryMuscles(): Set<String> =
     muscles.ifEmpty { listOf(muscle) }.filterNot { it.equals("Other", true) }.mapTo(HashSet()) { it.lowercase() }
@@ -125,6 +131,8 @@ fun Workout.withSwappedExercise(
     val replacement = SessionExercise(
         exerciseId = replacementId,
         sets = sets,
+        // In place, today's note would otherwise vanish with the entry; with a kept original it stays there.
+        notes = if (done.isEmpty()) original.notes else "",
         restSeconds = original.restSeconds ?: replacementDefaults?.restSeconds,
         supersetId = original.supersetId,
     ).validateSetLinks()
@@ -198,11 +206,19 @@ fun AppData.exerciseSwapUndo(next: AppData): ExerciseSwapUndo? {
         workout,
         routines.firstOrNull { r -> next.routines.any { it.id == r.id && it != r } },
         programs.firstOrNull { p -> next.programs.any { it.id == p.id && it != p } },
+        next,
     )
 }
 
+/** Undo can arrive late (a long snackbar); it must never erase sets logged or notes saved after the swap. */
+fun AppData.canUndoExerciseSwap(undo: ExerciseSwapUndo): Boolean = undo.after == null || (
+    active == undo.after.active &&
+        undo.routine?.let { r -> routines.find { it.id == r.id } == undo.after.routines.find { it.id == r.id } } != false &&
+        undo.program?.let { p -> programs.find { it.id == p.id } == undo.after.programs.find { it.id == p.id } } != false
+    )
+
 /** Restores only the swapped workout and plans; other workouts and plans are never touched. */
-fun AppData.withoutExerciseSwap(undo: ExerciseSwapUndo): AppData = copy(
+fun AppData.withoutExerciseSwap(undo: ExerciseSwapUndo): AppData = if (!canUndoExerciseSwap(undo)) this else copy(
     active = if (active?.id == undo.workout.id) undo.workout else active,
     routines = undo.routine?.let { saved -> routines.map { if (it.id == saved.id) saved else it } } ?: routines,
     programs = undo.program?.let { saved -> programs.map { if (it.id == saved.id) saved else it } } ?: programs,
