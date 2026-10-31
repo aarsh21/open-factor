@@ -248,6 +248,9 @@ fun WorkoutSession(
                 var remove by remember { mutableStateOf(false) }
                 var exerciseMenu by remember { mutableStateOf(false) }
                 var exerciseNotes by remember { mutableStateOf(false) }
+                var templateNote by remember { mutableStateOf(false) }
+                val sourceRoutine = data.routines.find { it.id == workout.routineId }?.takeIf { se.exerciseId in it.exerciseIds }
+                val lastNote = remember(data.history, se.exerciseId, workout.id) { lastExerciseNote(data.history, se.exerciseId, workout.id) }
                 var superset by remember { mutableStateOf(false) }
                 var mergeSides by remember { mutableStateOf(false) }
                 val logicalSets = se.logicalSets()
@@ -279,6 +282,7 @@ fun WorkoutSession(
                                         onClick = { exerciseMenu = false; vm.settings { it.copy(rateEffortAfterExercise = !it.rateEffortAfterExercise) } },
                                     )
                                     DropdownMenuItem(text = { Text("Exercise notes") }, onClick = { exerciseMenu = false; exerciseNotes = true })
+                                    if (sourceRoutine != null) DropdownMenuItem(text = { Text("Template note") }, onClick = { exerciseMenu = false; templateNote = true })
                                     DropdownMenuItem(text = { Text(if (se.sets.any { it.side != null }) "Use left logs only…" else "Log left and right separately") }, onClick = {
                                         exerciseMenu = false
                                         if (se.sets.any { it.side != null }) mergeSides = true else vm.splitSides(se.id)
@@ -296,22 +300,11 @@ fun WorkoutSession(
                                 .joinToString(" + ") { entry -> exercises.find { it.id == entry.exerciseId }?.title ?: "Exercise" },
                             Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodySmall, color = OF.muted,
                         )
-                        val pinnedNote = data.exerciseDefaults[e.id]?.note.orEmpty()
-                        if (pinnedNote.isNotBlank()) Row(
-                            Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Icon(Icons.Rounded.PushPin, null, Modifier.size(20.dp), tint = OF.muted)
-                            Column(Modifier.weight(1f)) {
-                                Text("Pinned exercise note", style = MaterialTheme.typography.bodySmall, color = OF.muted)
-                                Text(pinnedNote, style = MaterialTheme.typography.bodyLarge)
-                            }
-                        }
-                        if (se.notes.isNotBlank()) Text(
-                            se.notes,
-                            Modifier.fillMaxWidth().clickable(onClickLabel = "Edit exercise notes") { exerciseNotes = true }
-                                .padding(vertical = 12.dp),
-                            style = MaterialTheme.typography.bodyLarge, color = OF.muted,
+                        ExerciseNotes(
+                            se, pinned = data.exerciseDefaults[e.id]?.note.orEmpty(), templateName = sourceRoutine?.name,
+                            templateNote = sourceRoutine?.prescriptions?.find { it.exerciseId == se.exerciseId }?.note.orEmpty(),
+                            last = lastNote, onEditSession = { exerciseNotes = true }, onEditTemplate = { templateNote = true },
+                            onDismissLast = { vm.dismissLastNote(se.id) },
                         )
                         if (targets)
                             WorkoutTargetsDialog(se, { targets = false }) { values, rest ->
@@ -426,10 +419,17 @@ fun WorkoutSession(
                         }
                     }
                 }
-                if (exerciseNotes) SessionNotesDialog("Exercise notes", se.notes, { exerciseNotes = false }) {
+                // Starts empty: last time's note is a reference, not today's words to re-save.
+                if (exerciseNotes) NoteDialog("Exercise notes", se.notes, { exerciseNotes = false }, {
                     vm.exerciseNotes(se.id, it)
                     exerciseNotes = false
-                }
+                    null
+                }, placeholder = lastNote?.takeIf { se.notes.isBlank() }?.text,
+                    supporting = lastNote?.takeIf { se.notes.isBlank() }?.let { "Starts empty. Last time's note stays with that workout." })
+                if (templateNote && sourceRoutine != null) NoteDialog("Template note",
+                    sourceRoutine.prescriptions.find { it.exerciseId == se.exerciseId }?.note.orEmpty(), { templateNote = false }, {
+                        vm.saveTemplateNote(sourceRoutine.id, se.exerciseId, it).also { error -> if (error == null) templateNote = false }
+                    }, supporting = "Saved to ${sourceRoutine.name}; shows each time you start it.", limit = TEMPLATE_NOTE_LIMIT)
                 if (superset) SupersetDialog(workout, se.id, exercises, { superset = false }) { ids ->
                     vm.groupSuperset(ids)
                     superset = false
