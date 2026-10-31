@@ -1046,6 +1046,14 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun groupSuperset(ids: Set<String>) = editActive { it.withSuperset(ids) }
 
+    fun swapExercise(entryId: String, replacementId: String, scope: SwapScope): ExerciseSwapUndo? {
+        var undo: ExerciseSwapUndo? = null
+        update { d -> d.withExerciseSwap(entryId, replacementId, scope, exercises(d)).also { undo = d.exerciseSwapUndo(it) } }
+        return undo
+    }
+
+    fun undoExerciseSwap(undo: ExerciseSwapUndo) = update { it.withoutExerciseSwap(undo) }
+
     fun leaveSuperset(id: String) = editActive { w ->
         w.copy(exercises = w.exercises.map { if (it.id == id) it.copy(supersetId = null) else it }).normalizeSupersets()
     }

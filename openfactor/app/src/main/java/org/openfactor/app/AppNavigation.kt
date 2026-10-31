@@ -34,7 +34,7 @@ internal data class AppDestination(val route: String, val key: String = "") {
 internal fun routeDepth(route: String): Int = when (route) {
     "" -> 0
     "profile", "body-data", "programs", "gyms", "levels", "session", "workout-draft", "history", "templates" -> 1
-    "body-charts", "weight-entry", "program-setup", "program-editor", "gym", "picker", "draft-picker", "routine" -> 2
+    "body-charts", "weight-entry", "program-setup", "program-editor", "gym", "picker", "swap-picker", "draft-picker", "routine" -> 2
     "program-picker", "history-detail", "exercise", "custom" -> 3
     else -> 4
 }

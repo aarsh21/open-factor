@@ -103,7 +103,7 @@ fun AppData.withTemplateNote(routineId: String, exerciseId: String, note: String
 fun AppData.withStartedRoutine(id: String, catalog: List<Exercise>, now: Long): AppData {
     require(active == null) { "Finish or discard the active workout first." }
     val routine = routines.find { it.id == id } ?: throw IllegalArgumentException("This template is no longer available.")
-    return copy(active = routine.toWorkout(now, exerciseDefaults, catalog))
+    return copy(active = routine.toWorkout(now, exerciseDefaults, catalog).copy(routineId = routine.id))
 }
 
 object TemplateCodec {

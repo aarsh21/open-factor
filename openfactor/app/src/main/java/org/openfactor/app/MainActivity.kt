@@ -140,6 +140,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     var bodyChartMetric by rememberSaveable { mutableStateOf("weight") }
     var bodyChartRange by rememberSaveable { mutableStateOf(BodyChartRange.WEEK) }
     var bodyEntryReturn by rememberSaveable { mutableStateOf("body-data") }
+    var swapEntryId by rememberSaveable { mutableStateOf("") }
+    var swapPickId by rememberSaveable { mutableStateOf("") }
     val contentRoute =
         if (route == "measurement-entry" || route == "photo-entry") bodyEntryReturn else route
     val exercises = remember(vm, customExercises, libraryReady) { vm.exercises(data) }
@@ -224,6 +226,10 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                 vm.addDraftExercise(id)
                 route = "workout-draft"
             }
+            "swap-picker" -> {
+                swapPickId = id
+                route = "session"
+            }
             else -> {
                 if (data.active != null) {
                     vm.addExercise(id)
@@ -301,7 +307,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         "exercise" -> previousRoute
         "exercise-settings" -> exerciseSettingsReturnRoute
         "custom" -> customReturnRoute
-        "picker" -> "session"
+        "picker", "swap-picker" -> "session"
         "draft-picker" -> "workout-draft"
         "gym" -> "gyms"
         "gyms" -> gymsReturn
@@ -517,6 +523,21 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             equipmentCatalog = vm.equipmentCatalog,
                         )
                     }
+                    "swap-picker" -> routeState.SaveableStateProvider("swap-picker") {
+                        ExerciseLibrary(
+                            exercises,
+                            data.favorites,
+                            vm::favorite,
+                            ::openExercise,
+                            { id -> pickExercise(id, "swap-picker") },
+                            onBack = { route = "session" },
+                            onCustom = ::openCustom,
+                            picking = true,
+                            gyms = data.gyms,
+                            equipmentCatalog = vm.equipmentCatalog,
+                            pickTitle = "Swap exercise",
+                        )
+                    }
                     "custom" -> {
                         val initial = remember(duplicateId) {
                             exercises.find { it.id == duplicateId }?.let { e ->
@@ -582,6 +603,17 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             onFinished = {
                                 detailId = it
                                 route = "history-detail"
+                            },
+                            onSwapSearch = { swapEntryId = it; swapPickId = ""; route = "swap-picker" },
+                            swapPick = (swapEntryId to swapPickId).takeIf { swapEntryId.isNotEmpty() && swapPickId.isNotEmpty() },
+                            onSwapPickHandled = { swapEntryId = ""; swapPickId = "" },
+                            onExerciseSwapped = { undo, title ->
+                                scope.launch {
+                                    // A newer swap replaces the old offer instead of queueing behind it.
+                                    snackbar.currentSnackbarData?.dismiss()
+                                    val result = snackbar.showSnackbar("Swapped for $title", "Undo", duration = SnackbarDuration.Long)
+                                    if (result == SnackbarResult.ActionPerformed) vm.undoExerciseSwap(undo)
+                                }
                             },
                         )
                     "history" ->

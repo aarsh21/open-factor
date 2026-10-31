@@ -62,6 +62,10 @@ fun WorkoutSession(
     onWorkoutSettings: () -> Unit,
     onGymSettings: () -> Unit,
     onOpenWorkout: ((String) -> Unit)? = null,
+    onSwapSearch: ((String) -> Unit)? = null,
+    swapPick: Pair<String, String>? = null,
+    onSwapPickHandled: () -> Unit = {},
+    onExerciseSwapped: (ExerciseSwapUndo, String) -> Unit = { _, _ -> },
 ) {
     val focus = LocalFocusManager.current
     val context = LocalContext.current
@@ -92,6 +96,7 @@ fun WorkoutSession(
     var workoutNotes by remember { mutableStateOf(false) }
     var restSettings by remember { mutableStateOf(false) }
     var rateExerciseId by rememberSaveable(workout.id) { mutableStateOf<String?>(null) }
+    var swapEntryId by rememberSaveable(workout.id) { mutableStateOf<String?>(null) }
     val selected =
         workout.exercises.find { it.id == workout.selectedExerciseId }
             ?: workout.exercises.firstOrNull()
@@ -276,6 +281,7 @@ fun WorkoutSession(
                                 IconButton({ exerciseMenu = true }) { Icon(Icons.Rounded.MoreVert, "Exercise options for ${e.title}") }
                                 DropdownMenu(exerciseMenu, { exerciseMenu = false }) {
                                     DropdownMenuItem(text = { Text("Exercise guide") }, onClick = { exerciseMenu = false; focus.clearFocus(); guidanceExerciseId = e.id })
+                                    DropdownMenuItem(text = { Text("Swap exercise…") }, onClick = { exerciseMenu = false; focus.clearFocus(); swapEntryId = se.id })
                                     DropdownMenuItem(text = { Text("Targets & rest") }, onClick = { exerciseMenu = false; targets = true })
                                     if (metrics.any { it.isReps }) DropdownMenuItem(
                                         text = { Text(if (data.preferences.rateEffortAfterExercise) "Turn off effort prompt" else "Ask effort after exercise") },
@@ -471,6 +477,12 @@ fun WorkoutSession(
             onSave = { vm.reviewExerciseEffort(entry.id, set.id, it); rateExerciseId = null },
         )
     }
+    ExerciseSwapHost(
+        data, workout, exercises, vm,
+        sheetEntryId = swapEntryId, onCloseSheet = { swapEntryId = null },
+        searchPick = swapPick, onSearchPickHandled = onSwapPickHandled, onSearchAll = onSwapSearch,
+        onSwapped = onExerciseSwapped,
+    )
     guidanceExerciseId?.let { id ->
         exercises.firstOrNull { it.id == id }?.let { exercise ->
             ModalBottomSheet(
