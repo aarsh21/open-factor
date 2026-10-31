@@ -36,6 +36,31 @@ The debug APK is `openfactor/app/build/outputs/apk/debug/app-debug.apk`, package
 
 `tooling/build_media_release.sh` builds and signs the intended original-static-media variant using the same external credentials. `tooling/verify_media_apk.py` checks the packaged file manifest, original hashes, media counts and exact video identities against the backend index. Pass `--reference /path/to/reference` to compare the APK against untouched imported source bytes as well. Signature and deployed-video checks are separate receipts.
 
+## Run it locally
+
+Use an emulator you can wipe: restoring a backup replaces the device's data. Install the SDK packages and create an API 35 virtual device once:
+
+```sh
+sdkmanager 'platform-tools' 'platforms;android-36' 'build-tools;35.0.0' \
+  'emulator' 'system-images;android-35;google_apis;x86_64'
+avdmanager create avd -n openfactor-api35 \
+  -k 'system-images;android-35;google_apis;x86_64' -d pixel_7
+```
+
+If `emulator -list-avds` prints nothing, `avdmanager` wrote the device to `~/.config/.android/avd`; set `ANDROID_AVD_HOME` to that directory. On Linux, the emulator needs read/write access to `/dev/kvm`.
+
+Start the emulator, then rebuild, install and relaunch after each change:
+
+```sh
+emulator -avd openfactor-api35 &
+cd openfactor
+./gradlew :app:installDebug -PopenfactorMediaMode=source
+adb shell am start -n org.openfactor.app/.MainActivity
+adb logcat --pid=$(adb shell pidof org.openfactor.app)
+```
+
+Installing over the existing debug app keeps its data; `adb uninstall org.openfactor.app` resets it to first-run setup. Alternatively, open `openfactor/` in Android Studio and use Run, which installs the same `debug` variant in `auto` mode (source-only unless a reference pack is present). To pin a mode for IDE builds, add `openfactorMediaMode=source` to `~/.gradle/gradle.properties`.
+
 ## Original media and source-only fallback
 
 The recovered collection contains **1,831 original MP4s for 619 exercises**, **1,832 exercise photos**, **44 muscle SVGs**, **four body assets**, **297 equipment images**, and 1,213 instruction files, of which 1,212 contain text. These are asset counts, not complete guidance coverage for the 1,345-exercise catalog.
