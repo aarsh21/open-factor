@@ -6,6 +6,10 @@ Open Factor helps you log your gym sessions without the clutter. Pick an exercis
 
 [**⬇️ Download the latest version**](https://github.com/aarsh21/open-factor/releases/latest/download/open-factor.apk) · [What's new in 0.9.0](docs/open-factor/releases/v0.9.0.md)
 
+[![Open Factor in 49 seconds: log a set, watch the exercise, see your week](docs/media/open-factor-intro-poster.jpg)](docs/media/open-factor-intro.mp4)
+
+**▶ [Watch the 49-second intro](docs/media/open-factor-intro.mp4)**
+
 ## What you can do with it
 
 - **Log your workouts quickly.** Type your weight and reps on a built-in number pad made for the gym, then swipe a set to mark it done (or swipe the other way to delete it).
