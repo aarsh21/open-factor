@@ -108,7 +108,7 @@ class EffortPromptOnLeaveJourneyTest {
         }
     }
 
-    @Test fun automaticAdvanceWaitsOutRestAndTheQuestionTakesPrecedenceOverTheKeypad() {
+    @Test fun automaticAdvanceWaitsOutRestAndNeverInterruptsTypingOnTheKeypad() {
         val store = WorkoutStore(context)
         val before = store.load()
         var activity: ActivityScenario<MainActivity>? = null
@@ -127,8 +127,12 @@ class EffortPromptOnLeaveJourneyTest {
             compose.onNodeWithContentDescription("${other.title} set 1 weight (kg)").performScrollTo().performClick()
             keypad().assertIsDisplayed()
             compose.onNodeWithText("Skip").performClick()
+            compose.waitForIdle()
+            // Rest is over, but someone typing the next set keeps the keypad; the question waits for it.
+            compose.onNodeWithText("Rate your last set").assertDoesNotExist()
+            keypad().assertIsDisplayed()
+            compose.onNodeWithContentDescription("Hide keypad").performClick()
             awaitText("Rate your last set")
-            compose.waitUntil(5_000) { compose.onAllNodesWithTag("Workout keypad").fetchSemanticsNodes().isEmpty() }
             compose.onNodeWithContentDescription("4 or more reps left").performClick()
             compose.onNodeWithText("Done").performScrollTo().performClick()
             awaitGone("Rate your last set")
