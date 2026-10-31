@@ -135,7 +135,9 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     val onboardingPending by remember(vm) { derivedStateOf { !data.onboarding.completed && !data.onboarding.deferred } }
     TraceRecomposition("OpenFactorApp")
     var tab by rememberSaveable { mutableIntStateOf(1) }
-    var route by rememberSaveable { mutableStateOf(when { data.pastWorkoutEdit != null -> "history-edit"; data.active != null -> "session"; else -> "" }) }
+    // Initial values come from vm.data.value, not data: reading data inside a remember calculation subscribes
+    // the whole shell to it, and then every keystroke recomposes the shell.
+    var route by rememberSaveable { vm.data.value.let { d -> mutableStateOf(when { d.pastWorkoutEdit != null -> "history-edit"; d.active != null -> "session"; else -> "" }) } }
     var detailId by rememberSaveable { mutableStateOf("") }
     var previousRoute by rememberSaveable { mutableStateOf("") }
     var exerciseInfo by rememberSaveable { mutableStateOf(false) }
@@ -162,7 +164,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     var swapPickId by rememberSaveable { mutableStateOf("") }
     val contentRoute =
         if (route == "measurement-entry" || route == "photo-entry") bodyEntryReturn else route
-    val exercises = remember(vm, customExercises, libraryReady) { vm.exercises(data) }
+    val exercises = remember(vm, customExercises, libraryReady) { vm.exercises() }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val routeState = rememberSaveableStateHolder()
