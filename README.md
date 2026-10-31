@@ -6,7 +6,7 @@ Open Factor helps you log your gym sessions without the clutter. Pick an exercis
 
 > **Open Factor is in beta.** It works well for everyday logging, but expect a few rough edges. Your [feedback and bug reports](https://github.com/aarsh21/open-factor/issues) help make it better.
 
-[**⬇️ Download the latest version**](https://github.com/aarsh21/open-factor/releases/latest/download/open-factor.apk) · [What's new in 0.9.0](docs/open-factor/releases/v0.9.0.md)
+[**⬇️ Download the latest version**](https://github.com/aarsh21/open-factor/releases/latest/download/open-factor.apk) · [What's new in 0.9.1](docs/open-factor/releases/v0.9.1.md)
 
 [![Open Factor in 49 seconds: log a set, watch the exercise, see your week](docs/media/open-factor-intro-poster.jpg)](docs/media/open-factor-intro.mp4)
 
