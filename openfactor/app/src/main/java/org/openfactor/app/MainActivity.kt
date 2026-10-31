@@ -82,6 +82,17 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle =
                 androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.P) {
+            // Android 8 focuses a window's first focusable view even in touch mode, and refocuses it whenever
+            // focus is cleared. Compose hands that to the first set field, so the workout keypad opened by itself
+            // and Back or an outside tap could never close it. Android 9 dropped both; on 8 the frame absorbs it.
+            findViewById<android.view.ViewGroup>(android.R.id.content).apply {
+                isFocusableInTouchMode = true
+                descendantFocusability = android.view.ViewGroup.FOCUS_BEFORE_DESCENDANTS
+                // Focusable would make it one screen-sized accessibility node; its children stay accessible.
+                importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+        }
         setContent {
             val vm: WorkoutViewModel = viewModel()
             val data by vm.data.collectAsState()
