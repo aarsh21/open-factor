@@ -90,7 +90,7 @@ fun HistoryScreen(
                                 Text(day.dayOfMonth.toString(), style = MaterialTheme.typography.titleMedium,
                                     color = if (day == today) MaterialTheme.colorScheme.primary else OF.muted)
                                 Text(if (saved.isEmpty()) "·" else "${saved.sumOf { it.elapsedSeconds(it.finishedAt ?: it.startedAt) } / 60}m",
-                                    style = MaterialTheme.typography.labelSmall, color = if (saved.isEmpty()) OF.muted else OF.green)
+                                    style = MaterialTheme.typography.labelSmall, color = if (saved.isEmpty()) OF.muted else OF.complete)
                             }
                         }
                     }

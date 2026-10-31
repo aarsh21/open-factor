@@ -266,7 +266,7 @@ fun ProgramSetup(
         LinearProgressIndicator(
             progress = { if (step == 0) .5f else .85f },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-            color = Color.White,
+            color = MaterialTheme.colorScheme.primary,
             trackColor = OF.line,
         )
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(18.dp)) {
@@ -317,7 +317,7 @@ private fun ProgramColorChoices(selected: Long, icon: String, onSelect: (Long) -
                 onClick = { onSelect(color) },
                 shape = RoundedCornerShape(10.dp),
                 color = Color(color),
-                border = if (selected == color) BorderStroke(3.dp, Color.White) else null,
+                border = if (selected == color) BorderStroke(3.dp, MaterialTheme.colorScheme.onSurface) else null,
                 modifier =
                     Modifier.size(48.dp).semantics {
                         contentDescription =
@@ -350,7 +350,7 @@ private fun ProgramIconChoices(selected: String, onSelect: (String) -> Unit) {
                             },
                         shape = RoundedCornerShape(8.dp),
                         color = Color.Transparent,
-                        border = if (selected == id) BorderStroke(1.dp, Color.White) else null,
+                        border = if (selected == id) BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface) else null,
                     ) {
                         Box(contentAlignment = Alignment.Center) { Icon(icon, null) }
                     }
@@ -373,7 +373,7 @@ private fun ProgramDayAction(
         colors =
             ButtonDefaults.filledTonalButtonColors(
                 containerColor = OF.elevated,
-                contentColor = Color.White,
+                contentColor = MaterialTheme.colorScheme.onSurface,
             ),
         shape = RoundedCornerShape(50),
         content = content,
@@ -409,7 +409,7 @@ fun ProgramEditor(
             p.days.indexOf(day),
             edgePadding = 0.dp,
             containerColor = OF.top,
-            contentColor = Color.White,
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ) {
             p.days.forEach { d ->
                 Tab(d.id == day.id, { onSelectDay(d.id) }, text = { Text(d.name) })
@@ -548,7 +548,7 @@ fun ProgramEditor(
                                 Box(
                                     Modifier.clip(RoundedCornerShape(6.dp))
                                         .background(
-                                            if (selected) Color.White else Color.Transparent
+                                            if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
                                         )
                                         .selectable(
                                             selected,
@@ -559,7 +559,7 @@ fun ProgramEditor(
                                         .padding(horizontal = 14.dp),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    Text(label, color = if (selected) Color.Black else Color.White)
+                                    Text(label, color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
                                 }
                             }
                         }
@@ -765,7 +765,7 @@ fun ProgramEditor(
                 colors =
                     ButtonDefaults.buttonColors(
                         containerColor = OF.elevated,
-                        contentColor = Color.White,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
                     ),
             ) {
                 Text("Save to Library")

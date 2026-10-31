@@ -1,6 +1,6 @@
 ---
 name: Open Factor
-description: Simple native workout logging in charcoal and white, with Nuvio navigation and grouped settings.
+description: Simple native workout logging in charcoal and white by default, five curated palettes, Nuvio navigation and grouped settings.
 colors:
   primary: "#FFFFFF"
   on-primary: "#000000"
@@ -19,6 +19,9 @@ colors:
   light-surface: "#FFFFFF"
   light-elevated: "#E5E5E7"
   light-muted: "#55555B"
+  light-line: "#DCDCE0"
+  light-outline: "#8A8A90"
+  light-complete: "#18785A"
   light-error: "#B3261E"
   navigation: "#1C1C1E"
   navigation-selected: "#393939"
@@ -151,13 +154,31 @@ Compact exercise previews fill their existing rounded frames with a centered cro
 
 ## Colors
 
-Frontmatter records the dark palette and the explicit light substitutions in `OpenFactorTheme`. `OF.top` and `OF.card` resolve to the theme surface; `OF.elevated` resolves to surface variant. Dark is the default; Light and System are available.
+Frontmatter records the default Charcoal palette (dark, plus its `light-*` substitutions). Every color comes from a `PaletteColors` role in `Palette.kt`; `OpenFactorTheme` builds the Material scheme from it and provides it as `OF.palette`. `OF.top` and `OF.card` resolve to the surface; `OF.elevated` to surface variant; `OF.line`, `OF.complete`/`OF.onComplete` and `OF.accent` to palette roles (`OF.green`/`OF.blue` remain as aliases). Screens never write hex values; the only fixed colors left are media chrome over photos/video (speed capsule, camera rail), user-picked program/shortcut colors, the white canvas behind licensed line illustrations and the anatomy figures' own base tones. Dark is the default; Light and System are available. See [Color palettes](#color-palettes).
 
 - **Primary:** white on dark surfaces, black ink on the primary action. In light mode the primary action becomes charcoal with white text. Use theme `primary` and `onPrimary` together.
 - **Neutrals:** base charcoal, surface charcoal and raised charcoal create page, header and control layers. Muted gray carries secondary values; separator gray carries outlines and lines. Light mode substitutes the `light-*` values for those theme roles.
-- **State and training:** completion green marks completed controls and an 8% completed-row wash; validation rose is the dark error color, with the explicit light error substitution. Training blue and purple remain available to existing analytics/training surfaces. They do not replace the neutral logging actions.
-- **Navigation:** the shell, selected capsule, inactive icon/label tones and two rim colors are scoped Nuvio values. Navigation remains dark in light mode.
-- **Settings:** the `settings-*` values describe its dark treatment. In light mode Settings uses the theme background, card, elevated and muted roles instead.
+- **State and training:** `complete` marks completed controls (with `onComplete` checks) and an 8% completed-row wash; `error` is the validation color. Completion never relies on color alone (a check glyph), errors always carry text. Training `accent` draws charts and counters; it does not replace the neutral logging actions. In light mode completion is a deep green (`light-complete`) with white checks so it also reads as text on the page.
+- **Navigation:** the shell, selected capsule, inactive icon/label tones, rim and plus button are palette roles. Navigation remains a dark material in light mode in every palette.
+- **Settings:** the `settings-*` roles describe its grouped treatment. In light variants they resolve to the background, card, elevated and muted roles.
+
+## Color palettes
+
+`AppPalette` (Settings → Appearance → Color palette, stored as `preferences.palette`, missing or unknown ⇒ Charcoal, included in backups and the scoped Workout Settings export) selects one of five complete systems. Each defines every role in a dark and a light variant; the Light/Dark/System mode picks the variant. Taste over quantity: one action color per palette, neutrals tinted toward it, and completion/error hues chosen together.
+
+| Palette | Intent | Dark: background / surface / elevated | Dark: primary · complete · error · accent | Light: background / surface | Light: primary · complete · error · accent | Nav material / plus |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Charcoal** (default) | Neutral graphite, white ink; the shipped look | `#131313` / `#202020` / `#353535` | `#FFFFFF` · `#91D8AD` · `#FF9696` · `#3982FF` | `#F5F5F5` / `#FFFFFF` | `#202020` · `#18785A` · `#B3261E` · `#2A6FE8` | `#1C1C1E` / `#FFFFFF` |
+| **Midnight** | Blue-black, cool periwinkle action | `#0A0D14` / `#141925` / `#232A3A` | `#9DB8FF` · `#72D7D0` · `#F59273` · `#6E97FF` | `#EEF1F7` / `#FFFFFF` | `#3451B2` · `#0B7366` · `#B93A12` · `#3366E6` | `#121725` / `#9DB8FF` |
+| **Ember** | Warm graphite; amber for actions and finished sets | `#14120F` / `#211E1A` / `#37322C` | `#F5A54A` · `#FFC46B` · `#FF96B4` · `#F29A3D` | `#F6F2EC` / `#FFFDFA` | `#B0500C` · `#9A6200` · `#A3165E` · `#C2600F` | `#1E1B17` / `#F5A54A` |
+| **Moss** | Green-grey neutrals, quiet sage action | `#0E1210` / `#18201B` / `#29332D` | `#CFE6C4` · `#87DFC1` · `#F7866A` · `#6CC7A4` | `#F0F3EF` / `#FFFFFF` | `#2F5A3A` · `#1F7A5E` · `#992317` · `#1F7F65` | `#161D19` / `#CFE6C4` |
+| **Mono** | Pure black and white, highest contrast | `#000000` / `#121212` / `#262626` | `#FFFFFF` · `#FFFFFF` · `#FF8A80` · `#FFFFFF` | `#FAFAF8` / `#FFFFFF` | `#0A0A0A` · `#0A0A0A` · `#B00020` · `#0A0A0A` | `#121212` / `#FFFFFF` (white selected capsule) |
+
+Role mapping: `background`→page; `surface`→cards, headers, sheets, dialogs (`surfaceContainer*`); `elevated`→wells, chips, tracks, incomplete set buttons (`surfaceVariant`, `primaryContainer`); `content`/`muted`→`onSurface`/`onSurfaceVariant`; `line`→dividers and chart keylines; `outline`→control boundaries; `primary`/`onPrimary`→primary actions, selected chips (`secondaryContainer`) and text buttons; `inverseSurface`/`inverseContent`→snackbars; `warning`/`onWarning`→caution panels; `highlight`/`highlightMid`/`highlightSoft`→the anatomy heat ramp and its legend. The anatomy figures stay dark artwork in both modes, so the ramp is shared by a palette's two variants (Charcoal: `#3982FF`/`#79ACFF`/`#B9D3FF`).
+
+`PaletteContrastTest` checks every palette × variant × foreground/background pair the app paints: text roles ≥ 4.5:1 (content, muted, primary, complete and error on page/surface/elevated, on-colors on their fills, snackbar, warning, Settings, navigation labels) and icons/marks ≥ 3:1 (accent, Settings icon wells, navigation icons and plus). Completion and error also stay ≥ 8 OKLab ΔE apart under simulated deuteranopia and protanopia (Machado 2009) and ≥ 15 for normal vision; Charcoal dark keeps its shipped values (ΔE ≈ 4 under deuteranopia) and relies on the check glyph and written errors. Charcoal dark is asserted value-for-value against the shipped tokens; Charcoal light fixes the old dark `#414141` divider and a completion green that was unreadable as text on white.
+
+Changing palette or mode cross-fades every role together in Oklab over `AppMotion.Palette` (250ms, `EaseOut`), starting from what is on screen if interrupted; settled frames are exact. With Remove animations it swaps on the next frame. The window background and system-bar icon appearance follow the palette's page tone. Each picker swatch is a live miniature (page, card, text, a finished-set check, the action bar and the nav capsule), uses the shared 0.975 press feedback and gains a 2dp ring in the content color with a 2dp gap around the miniature. `PaletteShotsTest` saves every palette in dark and light (session, home, dashboard, Settings, Appearance) to `files/design-shots` and measures the cross-fade.
 
 ## Typography
 
@@ -187,7 +208,7 @@ Ordinary surfaces use tonal fills and restrained outlines, with transparent them
 
 Navigation selection moves over 280ms with `FastOutSlowInEasing`; the shell responds over 180ms with the same easing. Selected icons scale to 1.04 over 180ms. Scroll energy affects shell translation by at most 2dp and width by at most 0.8%; the tab targets remain fixed. The root scroll-energy reset is 140ms. Android animation settings govern the native animation paths.
 
-Screen changes use one depth-aware transition (`AppNavigation.kt`). Deeper routes push in from 1/12 of the width with a 220ms fade while the departing screen drifts 1/24 left and fades in 120ms; a tapped back mirrors it. Tabs and same-depth swaps fade through in place (150ms in, 90ms out) without delay, scale or sliding. The floating navigation rides the same transition, sinking away under pushed screens. Android 14+ predictive back scrubs the pop transition with the gesture (linear only while scrubbing, so half a swipe is half the travel) and cancelling returns the screen; programs keep their discard confirmation. In a workout, rest controls (countdown pill, +30s, Skip) cross-fade inside the fixed-height timer row, so completing a set never moves the sets; newly added sets settle in from 8dp above while existing and restored sets stay still; switching exercises and exercise-tab colors change instantly, and only an exercise new to the workout (added or swapped in) fades in. Snackbars use the charcoal palette. User-ordered lists animate reorder and removal; search results update instantly. With Remove animations, screens swap without overlapping and nothing moves. `NavigationMotionTest` measures these at fixed clock times. The workout keypad enters by sliding up its own height with a fade over `AppMotion.Step` (220ms) `EaseOut` and leaves over `AppMotion.Quick` (120ms); moving focus between fields never replays it, Log set moves straight to the next unfinished set without closing it, keys acknowledge with an instant tint instead of a ripple, key presses use only the shared 0.975 press feedback plus a keyboard haptic tick, values change instantly, and Remove animations makes it appear and disappear without motion.
+Screen changes use one depth-aware transition (`AppNavigation.kt`). Deeper routes push in from 1/12 of the width with a 220ms fade while the departing screen drifts 1/24 left and fades in 120ms; a tapped back mirrors it. Tabs and same-depth swaps fade through in place (150ms in, 90ms out) without delay, scale or sliding. The floating navigation rides the same transition, sinking away under pushed screens. Android 14+ predictive back scrubs the pop transition with the gesture (linear only while scrubbing, so half a swipe is half the travel) and cancelling returns the screen; programs keep their discard confirmation. In a workout, rest controls (countdown pill, +30s, Skip) cross-fade inside the fixed-height timer row, so completing a set never moves the sets; newly added sets settle in from 8dp above while existing and restored sets stay still; switching exercises and exercise-tab colors change instantly, and only an exercise new to the workout (added or swapped in) fades in. Snackbars use the palette's inverse surface. User-ordered lists animate reorder and removal; search results update instantly. With Remove animations, screens swap without overlapping and nothing moves. `NavigationMotionTest` measures these at fixed clock times. The workout keypad enters by sliding up its own height with a fade over `AppMotion.Step` (220ms) `EaseOut` and leaves over `AppMotion.Quick` (120ms); moving focus between fields never replays it, Log set moves straight to the next unfinished set without closing it, keys acknowledge with an instant tint instead of a ripple, key presses use only the shared 0.975 press feedback plus a keyboard haptic tick, values change instantly, and Remove animations makes it appear and disappear without motion.
 
 ## Shapes
 

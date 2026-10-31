@@ -93,7 +93,7 @@ internal fun DashboardTiles(
                                                 if (done) Icons.Rounded.CheckCircle
                                                 else Icons.Rounded.RadioButtonUnchecked,
                                                 "${date}: ${if (done) "logged" else "not logged"}",
-                                                tint = if (done) OF.green else OF.muted,
+                                                tint = if (done) OF.complete else OF.muted,
                                                 modifier = Modifier.size(22.dp),
                                             )
                                             Text(

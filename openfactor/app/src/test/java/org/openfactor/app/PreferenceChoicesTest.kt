@@ -13,7 +13,7 @@ class PreferenceChoicesTest {
         val preferences = Preferences(
             pounds = true, keepAlive = true, showWorkoutTimer = false,
             showBodyweightContribution = false, distanceImperial = true,
-            heightInFeet = true, clock24Hour = true, theme = AppTheme.LIGHT,
+            heightInFeet = true, clock24Hour = true, theme = AppTheme.LIGHT, palette = AppPalette.MIDNIGHT,
             shortcuts = ShortcutPreferences(listOf(WorkoutShortcut.HISTORY, WorkoutShortcut.PHOTOS, WorkoutShortcut.WEIGHT),
                 mapOf(WorkoutShortcut.HISTORY to ShortcutColor.TEAL, WorkoutShortcut.WEIGHT to ShortcutColor.RED), false),
         )
@@ -28,6 +28,8 @@ class PreferenceChoicesTest {
         assertFalse(legacy.heightInFeet)
         assertFalse(legacy.clock24Hour)
         assertEquals(AppTheme.DARK, legacy.theme)
+        assertEquals(AppPalette.CHARCOAL, legacy.palette)
+        assertEquals(AppPalette.CHARCOAL, DataCodec.decode("""{"schemaVersion":1,"preferences":{"palette":"FUTURE"}}""").preferences.palette)
         assertEquals(listOf(WorkoutShortcut.WEIGHT, WorkoutShortcut.PHOTOS, WorkoutShortcut.MEASUREMENTS,
             WorkoutShortcut.HISTORY, WorkoutShortcut.EMPTY_WORKOUT,
             WorkoutShortcut.NEW_WORKOUT), legacy.shortcuts.order)

@@ -18,7 +18,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.ReportDrawnWhen
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.verticalScroll
@@ -26,6 +25,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.toArgb
+import androidx.core.graphics.drawable.toDrawable
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
@@ -86,11 +87,16 @@ class MainActivity : ComponentActivity() {
             val data by vm.data.collectAsState()
             // The window root needs only the theme; set-row edits must not recompose it.
             val theme by remember { derivedStateOf { data.preferences.theme } }
+            val palette by remember { derivedStateOf { data.preferences.palette } }
             val libraryReady by vm.libraryReady.collectAsState()
             ReportDrawnWhen { libraryReady }
-            OpenFactorTheme(theme) {
-                val dark = isSystemInDarkTheme()
+            OpenFactorTheme(theme, palette) {
+                // Bar icons and the window behind the app follow the palette's actual page tone,
+                // including mid cross-fade, so neither keeps charcoal under another palette.
+                val page = OF.palette.background
+                val dark = OF.palette.isDark
                 SideEffect {
+                    window.setBackgroundDrawable(page.toArgb().toDrawable())
                     androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
                         isAppearanceLightStatusBars = !dark
                         isAppearanceLightNavigationBars = !dark

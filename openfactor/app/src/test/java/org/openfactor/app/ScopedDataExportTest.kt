@@ -109,7 +109,8 @@ class ScopedDataExportTest {
         val data = AppData(
             preferences = Preferences(pounds = true, restSeconds = 73, autoRest = false, displayName = "Renée", dismissedTutorials = setOf("bodyCharts"),
                 keepAlive = true, showWorkoutTimer = false, showBodyweightContribution = false, distanceImperial = true,
-                restAfterLastWarmupSet = false, restBetweenExercises = true, supersetAutoNext = false, restBetweenSidesPercent = 37),
+                restAfterLastWarmupSet = false, restBetweenExercises = true, supersetAutoNext = false, restBetweenSidesPercent = 37,
+                palette = AppPalette.EMBER),
             routines = listOf(Routine("routine", "Library routine", listOf("custom"))),
             programs = listOf(TrainingProgram(id = "plan", name = "Manual plan")),
             gyms = listOf(GymProfile(id = "gym", name = "Garage")),
@@ -120,7 +121,8 @@ class ScopedDataExportTest {
         val payload = ScopedDataExport.document(data, emptyList(), ScopedExportRequest(false, ExportTimeFrame.LAST_MONTH, selected), today, zone).getJSONObject("data")
         assertEquals(setOf("userProfile", "workoutSettings", "workouts", "trainingPrograms", "gymProfiles", "exerciseSettings", "customExercises"), payload.keys().asSequence().toSet())
         assertEquals("Renée", payload.getJSONObject("userProfile").getString("displayName"))
-        assertEquals(setOf("pounds", "restSeconds", "autoRest", "showRir", "exerciseAutoNext", "keepAlive", "showWorkoutTimer", "showBodyweightContribution", "distanceImperial", "restAfterLastWarmupSet", "restBetweenExercises", "supersetAutoNext", "restBetweenSidesPercent", "rateEffortAfterExercise", "workoutKeypad", "weeklyWorkoutGoal"), payload.getJSONObject("workoutSettings").keys().asSequence().toSet())
+        assertEquals(setOf("pounds", "restSeconds", "autoRest", "showRir", "exerciseAutoNext", "keepAlive", "showWorkoutTimer", "showBodyweightContribution", "distanceImperial", "restAfterLastWarmupSet", "restBetweenExercises", "supersetAutoNext", "restBetweenSidesPercent", "rateEffortAfterExercise", "workoutKeypad", "weeklyWorkoutGoal", "palette"), payload.getJSONObject("workoutSettings").keys().asSequence().toSet())
+        assertEquals("EMBER", payload.getJSONObject("workoutSettings").getString("palette"))
         assertEquals(73, payload.getJSONObject("workoutSettings").getInt("restSeconds"))
         assertTrue(payload.getJSONObject("workoutSettings").getBoolean("keepAlive"))
         assertFalse(payload.getJSONObject("workoutSettings").getBoolean("showWorkoutTimer"))

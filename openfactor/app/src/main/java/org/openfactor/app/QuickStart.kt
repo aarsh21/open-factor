@@ -196,7 +196,7 @@ private fun SetupHealthConnect(data: AppData, onConnect: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(Icons.Rounded.HealthAndSafety, null, Modifier.size(24.dp))
                 Text("Health Connect", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                if (data.healthConnect.lastSyncedAtMillis != null) Icon(Icons.Rounded.CheckCircle, "Health Connect has synced", tint = OF.green, modifier = Modifier.size(20.dp))
+                if (data.healthConnect.lastSyncedAtMillis != null) Icon(Icons.Rounded.CheckCircle, "Health Connect has synced", tint = OF.complete, modifier = Modifier.size(20.dp))
             }
             if (availability == HealthConnectAvailability.UNAVAILABLE) {
                 Text("Unavailable on this device. Manual works too.", color = OF.muted, style = MaterialTheme.typography.bodyMedium)
