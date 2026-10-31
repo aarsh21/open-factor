@@ -1,6 +1,9 @@
 package org.openfactor.app
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -13,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -41,6 +45,7 @@ fun WorkoutExerciseSelector(
     onAdd: () -> Unit,
 ) {
     val byId = remember(exercises) { exercises.associateBy { it.id } }
+    val motion = LocalAppMotionEnabled.current
     val listState = rememberLazyListState()
     val position = workout.exercises.indexOfFirst { it.id == selected?.id }
     LaunchedEffect(workout.id, selected?.id, workout.exercises.map { it.id }) {
@@ -64,13 +69,23 @@ fun WorkoutExerciseSelector(
                 val exercise = byId[entry.exerciseId]
                 val current = entry.id == selected?.id
                 val progress = entry.workoutExerciseProgress()
+                val press = remember { MutableInteractionSource() }
+                // Quick, because switching happens between every set; the tab acknowledges, it doesn't perform.
+                val fade = tween<Color>(if (motion) AppMotion.Quick else 0, easing = AppMotion.EaseOut)
+                val container by animateColorAsState(if (current) MaterialTheme.colorScheme.primary else OF.background, fade, label = "tab")
+                val content by animateColorAsState(if (current) MaterialTheme.colorScheme.onPrimary else OF.muted, fade, label = "tab text")
                 Surface(
                     onClick = { onSelect(entry.id) },
                     shape = RoundedCornerShape(10.dp),
-                    color = if (current) MaterialTheme.colorScheme.primary else OF.background,
-                    contentColor = if (current) MaterialTheme.colorScheme.onPrimary else OF.muted,
+                    color = container,
+                    contentColor = content,
                     border = if (current) null else BorderStroke(1.dp, OF.line),
-                    modifier = Modifier.widthIn(max = 238.dp).heightIn(min = 48.dp).semantics {
+                    interactionSource = press,
+                    modifier = Modifier.widthIn(max = 238.dp).heightIn(min = 48.dp).pressFeedback(press).animateItem(
+                        fadeInSpec = if (motion) tween(AppMotion.State, easing = AppMotion.EaseOut) else null,
+                        placementSpec = if (motion) tween(AppMotion.State, easing = AppMotion.EaseOut) else null,
+                        fadeOutSpec = null,
+                    ).semantics {
                         role = Role.Tab
                         this.selected = current
                         contentDescription = "Select ${exercise?.title ?: "exercise"}, ${index + 1} of ${workout.exercises.size}, ${progress.complete} of ${progress.total} working sets complete"

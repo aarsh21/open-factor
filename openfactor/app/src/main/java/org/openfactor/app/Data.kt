@@ -943,20 +943,6 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         data.withSpreadsheetPrograms(programs, exercises(data))
     }
 
-    internal fun appendFitbodHistory(
-        preview: FitbodPreview,
-        choices: Map<String, String>,
-        skipped: Set<String>,
-        newExercises: List<Exercise> = emptyList(),
-    ): Int {
-        var imported = 0
-        update { data ->
-            data.withFitbodImport(preview, choices, skipped, newExercises, exercises(data))
-                .also { imported = it.history.size - data.history.size }
-        }
-        return imported
-    }
-
     fun beginProgram(program: TrainingProgram) = update { it.copy(programDraft = program) }
 
     fun discardProgramDraft() = update { it.copy(programDraft = null) }

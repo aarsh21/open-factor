@@ -1,7 +1,14 @@
 package org.openfactor.app
 
 import androidx.compose.foundation.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -59,6 +66,7 @@ fun WorkoutSession(
     val focus = LocalFocusManager.current
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
+    val motion = LocalAppMotionEnabled.current
     val scope = rememberCoroutineScope()
     var finishing by remember { mutableStateOf(false) }
     var finishError by remember { mutableStateOf<String?>(null) }
@@ -109,10 +117,13 @@ fun WorkoutSession(
             Column(Modifier.weight(1f)) {
                 Text(workout.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            val finishPress = remember { MutableInteractionSource() }
             Button(
                 { focus.clearFocus(); confirm = "finish" },
+                Modifier.pressFeedback(finishPress, enabled = workout.completedSets() > 0),
                 enabled = workout.completedSets() > 0,
                 contentPadding = PaddingValues(horizontal = 16.dp),
+                interactionSource = finishPress,
             ) { Text("Finish") }
             Box {
                 IconButton({ menu = true }) { Icon(Icons.Rounded.MoreVert, "Workout options") }
@@ -202,7 +213,13 @@ fun WorkoutSession(
             onSelect = { focus.clearFocus(); vm.selectExercise(it) },
             onAdd = { focus.clearFocus(); onAdd() },
         )
-        if (remaining > 0)
+        AnimatedVisibility(
+            remaining > 0,
+            enter = if (motion) fadeIn(tween(AppMotion.State, easing = AppMotion.EaseOut)) +
+                expandVertically(tween(AppMotion.State, easing = AppMotion.EaseOut)) else EnterTransition.None,
+            exit = if (motion) fadeOut(tween(AppMotion.Quick)) +
+                shrinkVertically(tween(AppMotion.State, easing = AppMotion.EaseOut)) else ExitTransition.None,
+        ) {
             Surface(color = OF.elevated, modifier = Modifier.fillMaxWidth()) {
                 Row(
                     Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
@@ -217,6 +234,7 @@ fun WorkoutSession(
                     TextButton({ vm.clearRest() }) { Text("Skip") }
                 }
             }
+        }
         LazyColumn(
             Modifier.weight(1f),
             contentPadding = PaddingValues(18.dp),
@@ -233,6 +251,7 @@ fun WorkoutSession(
                     )
                 }
             items(listOfNotNull(selected), key = { it.id }) { se ->
+                val knownSets = remember(se.id) { se.sets.map { it.id }.toSet() }
                 val e =
                     exercises.find { it.id == se.exerciseId }
                         ?: Exercise(se.exerciseId, "Exercise", "Other", "Other")
@@ -245,7 +264,10 @@ fun WorkoutSession(
                 val logicalSets = se.logicalSets()
                 var targets by remember { mutableStateOf(false) }
                 val showTargets = se.sets.any { it.targetRepsMin != null || it.targetRepsMax != null || it.targetRir != null }
-                Surface(color = OF.background) {
+                Surface(color = OF.background, modifier = Modifier.animateItem(
+                    fadeInSpec = if (motion) tween(AppMotion.State, easing = AppMotion.EaseOut) else null,
+                    placementSpec = null, fadeOutSpec = null,
+                )) {
                     Column {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -318,6 +340,7 @@ fun WorkoutSession(
                             }
                             Spacer(Modifier.width(48.dp))
                         }
+                        Column(Modifier.settleSize()) {
                         logicalSets.forEachIndexed { index, group ->
                             group.components.forEachIndexed { componentIndex, logs ->
                                 if (group.root.kind != SetKind.STANDARD || logs.size > 1) Text(
@@ -325,7 +348,7 @@ fun WorkoutSession(
                                     else "Myo component $componentIndex", Modifier.padding(top = 10.dp), color = OF.muted,
                                     style = MaterialTheme.typography.labelMedium,
                                 )
-                                logs.forEach { s -> key(s.id) {
+                                logs.forEach { s -> key(s.id) { Box(Modifier.arrival(s.id !in knownSets)) {
                                     SetRow(
                                         index, s, data.preferences, metrics,
                                         exerciseName = e.title + (s.side?.let { " ${it.label.lowercase()}" } ?: "") +
@@ -348,12 +371,13 @@ fun WorkoutSession(
                                         showTargets = showTargets,
                                         displayNumber = logicalSets.take(index + 1).count { it.root.warmup == group.root.warmup },
                                     )
-                                } }
+                                } } }
                             }
                             if (group.root.kind == SetKind.MYO && !group.root.warmup) TextButton({ vm.addMyoComponent(se.id, group.root.id) }) {
                                 Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
                                 Text("Add Myo component", Modifier.padding(start = 6.dp))
                             }
+                        }
                         }
                         if (se.sets.any { !it.completed }) {
                             val canLogAll = se.canLogAllSets(metrics)
@@ -389,12 +413,16 @@ fun WorkoutSession(
                             }
                         }
                         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            OutlinedButton({ focus.clearFocus(); vm.addWarmupSet(se.id) }, Modifier.weight(1f).heightIn(min = 48.dp)) {
+                            val warmupPress = remember { MutableInteractionSource() }
+                            val addPress = remember { MutableInteractionSource() }
+                            OutlinedButton({ focus.clearFocus(); vm.addWarmupSet(se.id) },
+                                Modifier.weight(1f).heightIn(min = 48.dp).pressFeedback(warmupPress), interactionSource = warmupPress) {
                                 Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))
                                 Text("Warmup")
                             }
-                            FilledTonalButton({ focus.clearFocus(); vm.addSet(se.id) }, Modifier.weight(1f).heightIn(min = 48.dp)) {
+                            FilledTonalButton({ focus.clearFocus(); vm.addSet(se.id) },
+                                Modifier.weight(1f).heightIn(min = 48.dp).pressFeedback(addPress), interactionSource = addPress) {
                                 Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))
                                 Text("Add set")

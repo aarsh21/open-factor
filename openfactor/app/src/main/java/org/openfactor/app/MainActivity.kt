@@ -2,7 +2,18 @@ package org.openfactor.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.SeekableTransitionState
+import androidx.compose.animation.core.rememberTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.activity.compose.setContent
 import androidx.activity.compose.ReportDrawnWhen
 import androidx.activity.enableEdgeToEdge
@@ -30,6 +41,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -265,28 +277,44 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         delay(140)
         scrollEnergy = 0f
     }
-    BackHandler(route.isNotBlank()) {
-        route =
-            when (route) {
-                "exercise" -> previousRoute
-                "exercise-settings" -> exerciseSettingsReturnRoute
-                "custom" -> customReturnRoute
-                "picker" -> "session"
-                "draft-picker" -> "workout-draft"
-                "gym" -> "gyms"
-                "gyms" -> gymsReturn
-                "measurement-entry", "photo-entry" -> bodyEntryReturn
-                "weight-entry" -> "body-data"
-                "body-charts" -> "body-data"
-                "program-picker" -> "program-editor"
-                "program-editor",
-                "program-setup" -> {
-                    programExit = true
-                    route
-                }
-                "programs" -> ""
-                else -> ""
+    /** Null means back asks first instead of leaving. */
+    fun backRoute(): String? = when (route) {
+        "exercise" -> previousRoute
+        "exercise-settings" -> exerciseSettingsReturnRoute
+        "custom" -> customReturnRoute
+        "picker" -> "session"
+        "draft-picker" -> "workout-draft"
+        "gym" -> "gyms"
+        "gyms" -> gymsReturn
+        "measurement-entry", "photo-entry" -> bodyEntryReturn
+        "weight-entry" -> "body-data"
+        "body-charts" -> "body-data"
+        "program-picker" -> "program-editor"
+        "program-editor", "program-setup" -> null
+        else -> ""
+    }
+    val motion = LocalAppMotionEnabled.current
+    val destination = AppDestination.of(contentRoute, detailId, tab)
+    val navigation = remember { SeekableTransitionState(destination) }
+    LaunchedEffect(destination) { navigation.animateTo(destination) }
+    val screenTransition = rememberTransition(navigation, label = "screen")
+    PredictiveBackHandler(route.isNotBlank()) { gesture ->
+        val target = backRoute()
+        val revealed = target?.let {
+            AppDestination.of(it, detailId, tab)
+        }
+        try {
+            gesture.collect { event ->
+                // The gesture scrubs the same pop transition a tap would play, so lifting the
+                // finger continues from exactly where the screen already is.
+                if (motion && revealed != null && revealed != navigation.currentState)
+                    navigation.seekTo(event.progress, revealed)
             }
+            if (target == null) programExit = true else route = target
+        } catch (cancelled: CancellationException) {
+            scope.launch { navigation.animateTo(navigation.currentState) }
+            throw cancelled
+        }
     }
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -296,17 +324,20 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
             SnackbarHost(snackbar, Modifier.padding(bottom = if (route.isBlank()) 94.dp else 0.dp))
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize()) {
-            Column(
-                Modifier.fillMaxSize()
-                    .nestedScroll(rootScroll)
-                    .padding(
-                        top = padding.calculateTopPadding(),
-                        bottom = if (contentRoute.isBlank()) 0.dp else padding.calculateBottomPadding(),
-                    )
-                    .background(OF.background)
-            ) {
-                when (contentRoute) {
+        Box(Modifier.fillMaxSize().background(OF.background)) {
+            screenTransition.AnimatedContent(
+                Modifier.fillMaxSize().nestedScroll(rootScroll).padding(top = padding.calculateTopPadding()),
+                transitionSpec = { appTransition(motion) },
+                contentKey = { it },
+            ) { screen ->
+            val shownId = screen.key
+            val shownTab = screen.key.removePrefix("tab:").toIntOrNull() ?: tab
+            // A departing screen keeps rendering its own record; only the current one redirects.
+            fun leave(to: String) { if (route == screen.route) route = to }
+            // Without motion there is nothing to watch leave: never stack two opaque screens.
+            if (motion || screen == screenTransition.targetState)
+            Column(Modifier.fillMaxSize().padding(bottom = if (screen.route.isBlank()) 0.dp else padding.calculateBottomPadding())) {
+                when (screen.route) {
                     "profile" -> ProfileEditor(data, vm) { route = "" }
                     "body-data" -> {
                         BodyDataScreen(
@@ -328,12 +359,12 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                         },
                         onLogWeight = { quickWeight = true },
                     )
-                    "weight-entry" -> key(detailId) {
+                    "weight-entry" -> key(shownId) {
                         ScaleWeightEditor(
-                            data.scaleWeights.find { it.id == detailId }, data.preferences.pounds,
+                            data.scaleWeights.find { it.id == shownId }, data.preferences.pounds,
                             { route = "body-data" },
                             { vm.saveScaleWeight(it); bodyDataTab = 0; route = "body-data" },
-                            { vm.deleteScaleWeight(detailId); bodyDataTab = 0; route = "body-data" },
+                            { vm.deleteScaleWeight(shownId); bodyDataTab = 0; route = "body-data" },
                         )
                     }
                     "programs" ->
@@ -407,7 +438,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                         }
                     "gym" ->
                         data.gyms
-                            .firstOrNull { it.id == detailId }
+                            .firstOrNull { it.id == shownId }
                             ?.let { gym ->
                                 GymEditorScreen(gym, data, vm, { route = "gyms" }) { detailId = it }
                             }
@@ -416,7 +447,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             openExercise(it)
                         })
                     }
-                    "exercise-settings" -> exercises.firstOrNull { it.id == detailId }?.let { e ->
+                    "exercise-settings" -> exercises.firstOrNull { it.id == shownId }?.let { e ->
                         ExerciseSettingsScreen(
                             e, data.exerciseDefaults[e.id] ?: ExerciseDefaults(), data.preferences.restSeconds,
                             { route = exerciseSettingsReturnRoute }, { vm.saveExerciseDefaults(e.id, it) }, { exerciseInfo = true },
@@ -435,7 +466,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                     }
                     "exercise" ->
                         exercises
-                            .firstOrNull { it.id == detailId }
+                            .firstOrNull { it.id == shownId }
                             ?.let { e ->
                                 ExerciseDetail(
                                     e,
@@ -514,7 +545,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                 onDiscard = { vm.discardWorkoutDraft(); route = "" },
                                 canStart = data.active == null,
                             )
-                        } ?: run { LaunchedEffect(Unit) { route = "" } }
+                        } ?: run { LaunchedEffect(Unit) { leave("") } }
                     "session" ->
                         WorkoutSession(
                             data,
@@ -552,7 +583,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                         )
                     "history-detail" ->
                         data.history
-                            .firstOrNull { it.id == detailId }
+                            .firstOrNull { it.id == shownId }
                             ?.let { w ->
                                 WorkoutSummary(
                                     w,
@@ -570,7 +601,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                     repeatLabel = if (data.active != null) "Resume active workout" else "Repeat workout",
                                     onEdit = { vm.beginPastWorkoutEdit(w.id); route = "history-edit" },
                                 )
-                            } ?: run { LaunchedEffect(Unit) { route = "history" } }
+                            } ?: run { LaunchedEffect(Unit) { leave("history") } }
                     "history-edit" -> data.pastWorkoutEdit?.let { edit ->
                         PastWorkoutEditor(edit, exercises, data, vm,
                             onChange = vm::editPastWorkout,
@@ -578,7 +609,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             onSave = vm::savePastWorkoutEdit,
                             onSaved = { detailId = edit.original.id; route = "history-detail" },
                         )
-                    } ?: run { LaunchedEffect(Unit) { route = "history" } }
+                    } ?: run { LaunchedEffect(Unit) { leave("history") } }
                     "templates" -> routeState.SaveableStateProvider("template-library") {
                         TemplateLibraryScreen(data, exercises, { route = "" },
                             onCreate = { editTemplate(returnRoute = "templates") },
@@ -597,7 +628,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             })
                     }
                     else ->
-                        when (tab) {
+                        when (shownTab) {
                             0 ->
                                 DashboardScreen(
                                     data,
@@ -668,18 +699,29 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                         }
                 }
             }
-            if (contentRoute.isBlank())
+            }
+            // The bar belongs to the root screens, so it rides the same (scrubbable) transition:
+            // it sinks away as a screen pushes over it and rises back when that screen pops.
+            screenTransition.AnimatedVisibility(
+                { it.route.isBlank() },
+                Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding()),
+                enter = if (!motion) EnterTransition.None else
+                    fadeIn(tween(AppMotion.Step, easing = AppMotion.EaseOut)) +
+                        slideInVertically(tween(AppMotion.Enter, easing = AppMotion.EaseOut)) { it / 2 },
+                exit = if (!motion) ExitTransition.None else
+                    fadeOut(tween(AppMotion.Quick)) +
+                        slideOutVertically(tween(AppMotion.State, easing = AppMotion.EaseOut)) { it / 3 },
+            ) {
                 NuvioWorkoutNavigation(
                     tab,
                     scrollEnergy,
                     onAdd = {
                         shortcuts = true
                     },
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                        .padding(bottom = padding.calculateBottomPadding()),
                 ) {
                     tab = it
                 }
+            }
         }
     }
     if (route == "measurement-entry") key(detailId) {

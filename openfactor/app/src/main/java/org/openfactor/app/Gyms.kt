@@ -347,7 +347,7 @@ fun GymProfilesScreen(
                 )
             }
             items(data.gyms, key = { it.id }) { gym ->
-                Surface(onClick = { onEdit(gym.id) }, shape = OF.shape, color = OF.card) {
+                Surface(onClick = { onEdit(gym.id) }, Modifier.itemMotion(this), shape = OF.shape, color = OF.card) {
                     Row(
                         Modifier.padding(18.dp),
                         verticalAlignment = Alignment.CenterVertically,

@@ -73,7 +73,7 @@ internal fun DashboardCustomization(
             items(draft.sections, key = { it.name }, contentType = { "section" }) { section ->
                 val selected = draft.selected(section)
                 val visible = selected.filter { section != DashboardSection.BODY || data.preferences.dataVisibility.isVisible(it) }
-                Surface(shape = OF.shape, color = OF.card) {
+                Surface(Modifier.itemMotion(this), shape = OF.shape, color = OF.card) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {

@@ -86,7 +86,7 @@ fun BodyDataScreen(
                     }
                 items(data.bodyMeasurements.sortedByDescending { it.date }, key = { it.id }) {
                     record ->
-                    Surface(shape = OF.shape, color = OF.card) {
+                    Surface(Modifier.itemMotion(this), shape = OF.shape, color = OF.card) {
                         ListItem(
                             headlineContent = { Text(record.date.toString()) },
                             supportingContent = {
@@ -124,7 +124,7 @@ fun BodyDataScreen(
                         )
                     }
                 items(data.scaleWeights.sortedByDescending { it.date }, key = { it.id }) { record ->
-                    Surface(shape = OF.shape, color = OF.card) {
+                    Surface(Modifier.itemMotion(this), shape = OF.shape, color = OF.card) {
                         ListItem(
                             headlineContent = {
                                 Text(
