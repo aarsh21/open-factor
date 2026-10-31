@@ -1,6 +1,8 @@
 name: Open Factor Android
 on:
+  # Branch work is checked through its pull request; pushes only run on main, where they gate releases.
   push:
+    branches: [main]
     paths: ['openfactor/**', 'tooling/**', '.github/workflows/open-factor-android.yml']
   pull_request:
     paths: ['openfactor/**', 'tooling/**', '.github/workflows/open-factor-android.yml']
@@ -9,7 +11,8 @@ permissions:
   contents: read
 concurrency:
   group: open-factor-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer commit replaces a pull request's run; runs on main always finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   build:
     runs-on: ubuntu-latest
