@@ -6,6 +6,23 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DataCodecSafetyTest {
+    @Test fun schemaVersionRejectsFractionsStringsBooleansAndOverflowInsteadOfCoercing() {
+        val invalid = listOf("1.5", "1.0", "1e0", "\"1\"", "\"1.5\"", "true", "null",
+            "4294967297", "-4294967295", "1.0000001", "999999999999999999999999999999")
+        invalid.forEach { version ->
+            assertThrows("Unsupported version $version must reject the whole document", IllegalArgumentException::class.java) {
+                DataCodec.decode("{\"schemaVersion\":$version}")
+            }
+        }
+    }
+
+    @Test fun schemaVersionAcceptsBothIntegerRepresentationsUsedByJsonReaders() {
+        listOf<Number>(1, 1L).forEach { version ->
+            DataCodec.requireSupportedVersion(JSONObject().put("schemaVersion", version))
+        }
+        assertEquals(AppData(), DataCodec.decode(DataCodec.encode(AppData())))
+    }
+
     @Test fun malformedPresentArraysRejectTheWholeBackupInsteadOfBecomingEmpty() {
         val fields = listOf("history", "programs", "routines", "favorites", "customExercises", "gyms", "templateSplits")
         for (field in fields) for (invalid in listOf(JSONObject(), "damaged", 1, JSONObject.NULL)) {
