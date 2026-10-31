@@ -91,12 +91,12 @@ class MainActivity : ComponentActivity() {
             val libraryReady by vm.libraryReady.collectAsState()
             ReportDrawnWhen { libraryReady }
             OpenFactorTheme(theme, palette) {
-                // Bar icons and the window behind the app follow the palette's actual page tone,
-                // including mid cross-fade, so neither keeps charcoal under another palette.
-                val page = OF.palette.background
+                // Bar icons follow the palette's actual tone, mid cross-fade included, so neither they nor
+                // the window behind the app keep charcoal under another palette.
                 val dark = OF.palette.isDark
+                // Only a settled tone replaces the window drawable, not every frame of the cross-fade.
+                LaunchedEffect(palette, dark) { window.setBackgroundDrawable(palette.colors(dark).background.toArgb().toDrawable()) }
                 SideEffect {
-                    window.setBackgroundDrawable(page.toArgb().toDrawable())
                     androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
                         isAppearanceLightStatusBars = !dark
                         isAppearanceLightNavigationBars = !dark
@@ -329,6 +329,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     val destination = AppDestination.of(contentRoute, detailId, tab)
     val navigation = remember { SeekableTransitionState(destination) }
     // True only while a back gesture drives the transition; taps and 3-button back never set it.
+    var keypadInset by remember { mutableStateOf(0.dp) }
     var scrubbing by remember { mutableStateOf(false) }
     LaunchedEffect(destination) {
         navigation.animateTo(destination)
@@ -363,7 +364,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         containerColor = OF.background,
         contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
         snackbarHost = {
-            SnackbarHost(snackbar, Modifier.padding(bottom = if (route.isBlank()) 94.dp else 0.dp))
+            SnackbarHost(snackbar, Modifier.padding(bottom = if (route.isBlank()) 94.dp else if (route == "session") keypadInset else 0.dp))
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().background(OF.background)) {
@@ -638,6 +639,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                     if (result == SnackbarResult.ActionPerformed) vm.undoExerciseSwap(undo)
                                 }
                             },
+                            undoOffered = snackbar.currentSnackbarData != null,
+                            onKeypadInset = { keypadInset = it },
                             onSetRemoved = { undo, label ->
                                 scope.launch {
                                     snackbar.currentSnackbarData?.dismiss()

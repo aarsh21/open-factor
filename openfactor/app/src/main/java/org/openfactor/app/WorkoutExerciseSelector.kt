@@ -203,7 +203,8 @@ private fun NavigatorItem(
     val track = onSurface.copy(alpha = .08f)
     val trackLine = onSurface.copy(alpha = .22f)
     // The current exercise's ring lights up: its remaining sets read brighter than everyone else's.
-    val pending = if (current) onSurface.copy(alpha = .62f) else trackLine
+    // Kept well below full ink: in Mono, "complete" is full ink, and progress must still read.
+    val pending = if (current) onSurface.copy(alpha = .4f) else trackLine
     val complete = OF.green
     val background = OF.background
     TooltipBox(
@@ -276,10 +277,10 @@ private fun NavigatorItem(
                 else Box(Modifier.fillMaxSize().background(OF.elevated))
             }
             // The finished badge settles in from slightly smaller, never from nothing.
-            val badge = closed.value
-            if (badge > 0f) Box(
+            // Always composed; the animation is read only while drawing, so a closing ring never recomposes.
+            Box(
                 Modifier.align(Alignment.Center).offset(14.dp, 14.dp).size(17.dp)
-                    .graphicsLayer { alpha = badge; scaleX = .8f + .2f * badge; scaleY = .8f + .2f * badge }
+                    .graphicsLayer { val badge = closed.value; alpha = badge; scaleX = .8f + .2f * badge; scaleY = .8f + .2f * badge }
                     .clip(CircleShape).background(complete).border(2.dp, background, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {

@@ -176,6 +176,18 @@ class SetRowSwipeJourneyTest {
         compose.onNodeWithTag("Workout keypad").assertDoesNotExist()
     }
 
+    @Test fun aDeleteSwipeStillRemovesTheSetWhenTheRowIsDisposedMidAnimation() {
+        launch()
+        compose.mainClock.autoAdvance = false
+        // A fast left swipe, then leave the workout while the row is still sliding out.
+        drag(3, -rowWidth * .6f, .5f)
+        compose.mainClock.advanceTimeBy(32)
+        compose.onNodeWithContentDescription("Minimize workout").performClick()
+        compose.mainClock.advanceTimeBy(2_000)
+        compose.mainClock.autoAdvance = true
+        compose.waitUntil(5_000) { sets().map { it.id } == listOf("swipe-1", "swipe-2") }
+    }
+
     @Test fun talkBackGetsLogUnlogAndDeleteAsCustomActions() {
         launch()
         val check3 = "Complete set 3 for $name"

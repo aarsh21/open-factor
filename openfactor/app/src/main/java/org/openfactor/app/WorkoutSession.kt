@@ -42,6 +42,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.CancellationException
@@ -68,6 +71,10 @@ fun WorkoutSession(
     onSwapPickHandled: () -> Unit = {},
     onExerciseSwapped: (ExerciseSwapUndo, String) -> Unit = { _, _ -> },
     onSetRemoved: (SetRemovalUndo, String) -> Unit = { _, _ -> },
+    /** An Undo snackbar is showing; effort sheets wait so they never end it. */
+    undoOffered: Boolean = false,
+    /** Live keypad height, so snackbars sit above the keys instead of over Log set. */
+    onKeypadInset: (Dp) -> Unit = {},
 ) {
     val focus = LocalFocusManager.current
     val context = LocalContext.current
@@ -499,7 +506,13 @@ fun WorkoutSession(
                 }
             }
         }
-        keypad?.let { WorkoutKeypadPanel(it) { focus.clearFocus() } }
+        keypad?.let {
+            val density = LocalDensity.current
+            DisposableEffect(Unit) { onDispose { onKeypadInset(0.dp) } }
+            Box(Modifier.onSizeChanged { size -> onKeypadInset(with(density) { size.height.toDp() }) }) {
+                WorkoutKeypadPanel(it) { focus.clearFocus() }
+            }
+        }
     }
     // First match wins, as with the linear find it replaces.
     val catalogById = remember(exercises) { HashMap<String, Exercise>().apply { exercises.forEach { putIfAbsent(it.id, it) } } }
@@ -508,13 +521,16 @@ fun WorkoutSession(
     ) != null
     val promptedExercise = when {
         !data.preferences.rateEffortAfterExercise -> null
+        // A modal sheet over a live Undo offer would end it (reviewing counts as an edit): wait it out.
+        undoOffered && !finishAfterEffort -> null
         data.preferences.effortPromptTiming == EffortPromptTiming.LAST_SET -> workout.exercises.firstOrNull(::owesEffort)
         // Owed for an exercise already left (recorded by the view model). Never stacked on another
         // session sheet or dialog; an automatic advance also waits out the running rest timer.
         guidanceExerciseId != null || swapEntryId != null || restSettings || confirm.isNotEmpty() || rename || workoutNotes -> null
         else -> workout.effortPrompts.firstNotNullOfOrNull { prompt ->
             workout.exercises.find { it.id == prompt.exerciseId }
-                ?.takeIf { (!prompt.afterRest || !resting) && it.exerciseId in catalogById && owesEffort(it) }
+                // After rest, but never by yanking the keypad away from someone already typing the next set.
+                ?.takeIf { (!prompt.afterRest || (!resting && keypad?.open != true)) && it.exerciseId in catalogById && owesEffort(it) }
         }
     }
     if (finishAfterEffort && promptedExercise == null) LaunchedEffect(Unit) { finishAfterEffort = false; confirm = "finish" }

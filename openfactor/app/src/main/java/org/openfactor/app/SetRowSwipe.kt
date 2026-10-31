@@ -1,5 +1,6 @@
 package org.openfactor.app
 
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -156,12 +157,15 @@ fun AppData.setRemovalUndo(next: AppData): SetRemovalUndo? {
  * Undo can arrive late (a long snackbar); any edit after the removal withdraws it, so it can never
  * erase new work. Moving between exercises is not an edit and keeps the offer.
  */
-fun AppData.canUndoSetRemoval(undo: SetRemovalUndo): Boolean =
-    active?.let { it.copy(selectedExerciseId = undo.after.selectedExerciseId) == undo.after } == true
+fun AppData.canUndoSetRemoval(undo: SetRemovalUndo): Boolean = active?.let {
+    // Effort prompts are bookkeeping of that navigation, not an edit.
+    it.copy(selectedExerciseId = undo.after.selectedExerciseId, effortPrompts = undo.after.effortPrompts) == undo.after
+} == true
 
 /** Restores the set with its ids, values, completion, kind and side/Myo links, at its old position. */
 fun AppData.withoutSetRemoval(undo: SetRemovalUndo): AppData =
-    if (!canUndoSetRemoval(undo)) this else copy(active = undo.before.copy(selectedExerciseId = active?.selectedExerciseId))
+    if (!canUndoSetRemoval(undo)) this
+    else copy(active = undo.before.copy(selectedExerciseId = active?.selectedExerciseId, effortPrompts = active?.effortPrompts.orEmpty()))
 
 private class SwipeColors(
     val idle: Color,
@@ -248,7 +252,9 @@ internal class SetRowSwipeState(private val scope: CoroutineScope) {
         if (leaving) return
         leaving = true
         scope.launch {
-            if (motion && width > 0) {
+            // The person watched the row leave: the removal must happen even if the row is disposed
+            // mid-animation (switching exercise, minimizing, rotating).
+            try { if (motion && width > 0) {
                 // Leaves in the swipe direction at release speed, then its space closes and neighbours glide up.
                 launch { armed.animateTo(1f, tween(AppMotion.Quick, easing = AppMotion.EaseOut)) }
                 offset.animateTo(
@@ -257,8 +263,7 @@ internal class SetRowSwipeState(private val scope: CoroutineScope) {
                     initialVelocity = velocity.coerceAtMost(0f),
                 )
                 height.animateTo(0f, tween(AppMotion.State, easing = AppMotion.EaseOut))
-            }
-            onDelete()
+            } } finally { onDelete() }
         }
     }
 }
@@ -307,6 +312,8 @@ internal fun Modifier.setRowSwipe(state: SetRowSwipeState): Modifier {
         delete = MaterialTheme.colorScheme.error, onDelete = MaterialTheme.colorScheme.onError,
     )
     return onSizeChanged { state.width = it.width }
+        // Rows run close to the screen edges: a row swipe must not become the system back gesture.
+        .systemGestureExclusion()
         .drawBehind { drawSwipeReveal(state, colors, check, trash, motion, direction) }
         .pointerInput(state, direction) {
             awaitEachGesture {
