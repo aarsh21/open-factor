@@ -72,6 +72,8 @@ data class SessionExercise(
     val restSeconds: Int? = null,
     val supersetId: String? = null,
     val reviewedEffortSetIds: Set<String> = emptySet(),
+    // The "Last time" note is a placeholder; hiding it never touches the historical note.
+    val lastNoteDismissed: Boolean = false,
 )
 
 data class Workout(
@@ -89,6 +91,8 @@ data class Workout(
     val programDayId: String? = null,
     val programCycle: Int? = null,
     val gymId: String? = null,
+    /** Template this session was started from; null for empty, program and older workouts. */
+    val routineId: String? = null,
 )
 
 data class Routine(val id: String = newId(), val name: String, val exerciseIds: List<String>,
@@ -307,6 +311,7 @@ object DataCodec {
             .put("restSeconds", restSeconds)
             .put("supersetId", supersetId)
             .put("reviewedEffortSetIds", JSONArray(reviewedEffortSetIds.sorted()))
+            .put("lastNoteDismissed", lastNoteDismissed.takeIf { it })
 
     private fun Workout.json() =
         JSONObject()
@@ -322,6 +327,7 @@ object DataCodec {
             .put("programDayId", programDayId)
             .put("programCycle", programCycle)
             .put("gymId", gymId)
+            .put("routineId", routineId)
             .put("exercises", JSONArray(exercises.map { it.json() }))
             .put("notes", notes)
 
@@ -469,6 +475,7 @@ object DataCodec {
             if (isNull("restSeconds")) null else getInt("restSeconds"),
             supersetId = if (isNull("supersetId")) null else getString("supersetId").also { require(it.isNotBlank()) },
             reviewedEffortSetIds = array("reviewedEffortSetIds").strings().toSet(),
+            lastNoteDismissed = optBoolean("lastNoteDismissed"),
         ).validateSetLinks()
 
     private fun JSONObject.workout(): Workout =
@@ -487,6 +494,7 @@ object DataCodec {
             optString("programDayId").takeIf { it.isNotBlank() && it != "null" },
             if (isNull("programCycle")) null else getInt("programCycle"),
             optString("gymId").takeIf { it.isNotBlank() && it != "null" },
+            optString("routineId").takeIf { it.isNotBlank() && it != "null" },
         )
 
     fun decode(text: String, historyOverride: List<Workout>? = null): AppData = decode(JSONObject(text), historyOverride)
@@ -1095,6 +1103,19 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun exerciseNotes(id: String, notes: String) = editActive { w ->
         w.copy(exercises = w.exercises.map { if (it.id == id) it.copy(notes = notes) else it })
+    }
+
+    fun dismissLastNote(id: String) = editActive { w ->
+        w.copy(exercises = w.exercises.map { if (it.id == id) it.copy(lastNoteDismissed = true) else it })
+    }
+
+    fun saveTemplateNote(routineId: String, exerciseId: String, note: String): String? {
+        var error: String? = null
+        update { data ->
+            try { data.withTemplateNote(routineId, exerciseId, note) }
+            catch (failure: IllegalArgumentException) { error = failure.message; data }
+        }
+        return error
     }
 
     fun workoutNotes(notes: String) = editActive { it.copy(notes = notes) }
