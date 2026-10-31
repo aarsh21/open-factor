@@ -43,6 +43,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -53,6 +54,12 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         if (intent.action == WorkoutNotifications.OPEN_WORKOUT) workoutOpenRequest++
+    }
+
+    override fun onPause() {
+        // Typed set values are saved off the main thread; make them durable before the app can be killed.
+        androidx.lifecycle.ViewModelProvider(this)[WorkoutViewModel::class.java].flushPendingSaves()
+        super.onPause()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,9 +83,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             val vm: WorkoutViewModel = viewModel()
             val data by vm.data.collectAsState()
+            // The window root needs only the theme; set-row edits must not recompose it.
+            val theme by remember { derivedStateOf { data.preferences.theme } }
             val libraryReady by vm.libraryReady.collectAsState()
             ReportDrawnWhen { libraryReady }
-            OpenFactorTheme(data.preferences.theme) {
+            OpenFactorTheme(theme) {
                 val dark = isSystemInDarkTheme()
                 SideEffect {
                     androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -100,6 +109,13 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     val data by vm.data.collectAsState()
     val libraryReady by vm.libraryReady.collectAsState()
     val libraryLoad by vm.libraryLoad.collectAsState()
+    // Each typed digit replaces data.active. The shell reads data only through these slices (routes
+    // and dialogs below read it in their own scopes), so it does not recompose per keystroke.
+    val customExercises by remember(vm) { derivedStateOf { data.customExercises } }
+    val healthConnectState by remember(vm) { derivedStateOf { data.healthConnect } }
+    val activeId by remember(vm) { derivedStateOf { data.active?.id } }
+    val onboardingPending by remember(vm) { derivedStateOf { !data.onboarding.completed && !data.onboarding.deferred } }
+    TraceRecomposition("OpenFactorApp")
     var tab by rememberSaveable { mutableIntStateOf(1) }
     var route by rememberSaveable { mutableStateOf(when { data.pastWorkoutEdit != null -> "history-edit"; data.active != null -> "session"; else -> "" }) }
     var detailId by rememberSaveable { mutableStateOf("") }
@@ -126,20 +142,19 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     var bodyEntryReturn by rememberSaveable { mutableStateOf("body-data") }
     val contentRoute =
         if (route == "measurement-entry" || route == "photo-entry") bodyEntryReturn else route
-    val exercises = remember(vm, data.customExercises, libraryReady) { vm.exercises(data) }
+    val exercises = remember(vm, customExercises, libraryReady) { vm.exercises(data) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val routeState = rememberSaveableStateHolder()
     val context = LocalContext.current
-    HealthConnectForegroundSync(data, vm::importHealthConnectSync, enabled = !healthConnect)
+    HealthConnectForegroundSync(healthConnectState, vm::importHealthConnectSync, enabled = !healthConnect)
     val view = LocalView.current
     val lifecycleOwner = LocalLifecycleOwner.current
     StorageRecoveryAlert(vm)
-    val currentData by rememberUpdatedState(data)
     val notificationPermission = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-    ) { WorkoutNotifications.sync(context, currentData, forceRefresh = true) }
-    LaunchedEffect(data.active?.id) {
+    ) { WorkoutNotifications.sync(context, vm.data.value, forceRefresh = true) }
+    LaunchedEffect(activeId) {
         if (data.active != null && android.os.Build.VERSION.SDK_INT >= 33) {
             val prefs = context.getSharedPreferences("notification-permission", android.content.Context.MODE_PRIVATE)
             if (!prefs.getBoolean("requested", false) && !WorkoutNotifications.notificationsAllowed(context)) {
@@ -153,13 +168,13 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) WorkoutNotifications.sync(context, currentData, forceRefresh = true)
+            if (event == Lifecycle.Event.ON_RESUME) WorkoutNotifications.sync(context, vm.data.value, forceRefresh = true)
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    val keepAlive = data.preferences.keepAlive && route == "session" && data.active != null &&
-        (data.onboarding.completed || data.onboarding.deferred)
+    val keepAlive by remember(vm) { derivedStateOf { data.preferences.keepAlive && route == "session" && data.active != null &&
+        (data.onboarding.completed || data.onboarding.deferred) } }
     DisposableEffect(view, lifecycleOwner, keepAlive) {
         if (!keepAlive) return@DisposableEffect onDispose { }
         val original = view.keepScreenOn
@@ -232,7 +247,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         onClose = { quickWeight = false },
         onSave = { vm.saveScaleWeight(it); quickWeight = false },
     )
-    if (!data.onboarding.completed && !data.onboarding.deferred) {
+    if (onboardingPending) {
         QuickStartScreen(data, vm, onConnect = { autoConnectHealth = true; healthConnect = true }) { tab = 1 }
         return
     }
@@ -273,9 +288,13 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                 }
             }
         }
-    LaunchedEffect(scrollEnergy, tab) {
-        delay(140)
-        scrollEnergy = 0f
+    // Scroll energy changes every scroll frame: observe it outside composition so scrolling a tab
+    // never recomposes the shell. Each change restarts the 140ms settle, as a keyed effect did.
+    LaunchedEffect(tab) {
+        snapshotFlow { scrollEnergy }.collectLatest {
+            delay(140)
+            scrollEnergy = 0f
+        }
     }
     /** Null means back asks first instead of leaving. */
     fun backRoute(): String? = when (route) {
@@ -673,9 +692,9 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                     onCustom = ::openCustom,
                                     gyms = data.gyms,
                                     equipmentCatalog = vm.equipmentCatalog,
-                                    performedIds = data.history.flatMap { w -> w.exercises.filter { entry -> entry.sets.any { it.completed } }.map { it.exerciseId } }.toSet(),
-                                    deprioritizedIds = data.exerciseDefaults.filterValues { it.doNotRecommend }.keys,
-                                    modifiedIds = data.exerciseDefaults.filterValues { it.hasOverrides }.keys,
+                                    performedIds = remember(data.history) { data.history.flatMap { w -> w.exercises.filter { entry -> entry.sets.any { it.completed } }.map { it.exerciseId } }.toSet() },
+                                    deprioritizedIds = remember(data.exerciseDefaults) { data.exerciseDefaults.filterValues { it.doNotRecommend }.keys },
+                                    modifiedIds = remember(data.exerciseDefaults) { data.exerciseDefaults.filterValues { it.hasOverrides }.keys },
                                 )
                             }
                             3 ->
@@ -714,7 +733,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
             ) {
                 NuvioWorkoutNavigation(
                     tab,
-                    scrollEnergy,
+                    { scrollEnergy },
                     onAdd = {
                         shortcuts = true
                     },

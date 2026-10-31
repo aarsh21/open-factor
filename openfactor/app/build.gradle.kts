@@ -96,6 +96,11 @@ android {
         sourceSets.getByName("main").assets.srcDir(it)
     }
 }
+// Opt-in Compose compiler stability reports: -PopenfactorComposeReports=true writes build/compose-reports.
+if (providers.gradleProperty("openfactorComposeReports").orNull == "true") composeCompiler {
+    reportsDestination = layout.buildDirectory.dir("compose-reports")
+    metricsDestination = layout.buildDirectory.dir("compose-reports")
+}
 tasks.named("preBuild").configure { dependsOn(bundledAssets) }
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.04.01"))

@@ -96,17 +96,11 @@ fun WorkoutSession(
         workout.exercises.find { it.id == workout.selectedExerciseId }
             ?: workout.exercises.firstOrNull()
     val restUntil = workout.restUntil
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    // Ticks recompose only the clock texts (and this scope once, when rest ends), never set rows.
+    val clock = rememberSessionClock(workout.id, restUntil)
     var saveTemplate by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(workout.id) {
-        while (true) {
-            delay(1000)
-            now = System.currentTimeMillis()
-        }
-    }
-    LaunchedEffect(workout.restUntil) { now = System.currentTimeMillis() }
-    val elapsed = workout.elapsedSeconds(now)
-    val remaining = ((restUntil - now + 999) / 1000).coerceAtLeast(0)
+    val resting by remember(clock, restUntil) { derivedStateOf { restUntil > clock.longValue } }
+    TraceRecomposition("WorkoutSession")
     Column(Modifier.fillMaxSize().imePadding()) {
         Row(
             Modifier.fillMaxWidth().background(OF.top).padding(horizontal = 8.dp, vertical = 4.dp),
@@ -196,13 +190,9 @@ fun WorkoutSession(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             if (data.preferences.showWorkoutTimer || workout.pausedAt != null) {
-                Text(
-                    if (workout.pausedAt != null) "Paused" else "%d:%02d:%02d".format(elapsed / 3600, elapsed / 60 % 60, elapsed % 60),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = OF.muted,
-                )
+                SessionElapsedText(workout, clock)
             } else Spacer(Modifier.width(1.dp))
-            if (remaining <= 0) TextButton({ restSettings = true }) {
+            if (!resting) TextButton({ restSettings = true }) {
                 Icon(Icons.Rounded.Timer, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text("Rest timer")
@@ -214,7 +204,7 @@ fun WorkoutSession(
             onAdd = { focus.clearFocus(); onAdd() },
         )
         AnimatedVisibility(
-            remaining > 0,
+            resting,
             enter = if (motion) fadeIn(tween(AppMotion.State, easing = AppMotion.EaseOut)) +
                 expandVertically(tween(AppMotion.State, easing = AppMotion.EaseOut)) else EnterTransition.None,
             exit = if (motion) fadeOut(tween(AppMotion.Quick)) +
@@ -226,10 +216,7 @@ fun WorkoutSession(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton({ restSettings = true }) { Icon(Icons.Rounded.Timer, "Rest timer settings") }
-                    Text(
-                        "  Rest ${remaining/60}:${(remaining%60).toString().padStart(2,'0')}",
-                        Modifier.weight(1f),
-                    )
+                    RestCountdownText(restUntil, clock, Modifier.weight(1f))
                     TextButton({ vm.extendRest(30) }) { Text("+30s") }
                     TextButton({ vm.clearRest() }) { Text("Skip") }
                 }
@@ -349,24 +336,29 @@ fun WorkoutSession(
                                     style = MaterialTheme.typography.labelMedium,
                                 )
                                 logs.forEach { s -> key(s.id) { Box(Modifier.arrival(s.id !in knownSets)) {
+                                    // Callbacks capture ids, not the per-edit workout/exercise copies, so
+                                    // editing one row leaves the other rows' parameters equal and skippable.
+                                    val seId = se.id
+                                    val workoutId = workout.id
+                                    val setId = s.id
                                     SetRow(
                                         index, s, data.preferences, metrics,
                                         exerciseName = e.title + (s.side?.let { " ${it.label.lowercase()}" } ?: "") +
                                             (if (componentIndex > 0) " Myo component $componentIndex" else ""),
-                                        onChange = { changed -> vm.editSet(se.id, s.id) { changed } },
+                                        onChange = { changed -> vm.editSet(seId, setId) { changed } },
                                         onComplete = {
                                             focus.clearFocus()
-                                            val before = vm.data.value.active?.takeIf { it.id == workout.id }
-                                                ?.exercises?.find { it.id == se.id }?.sets?.find { it.id == s.id }
-                                            vm.toggleSetCompletion(se.id, s.id)
-                                            val after = vm.data.value.active?.takeIf { it.id == workout.id }
-                                                ?.exercises?.find { it.id == se.id }?.sets?.find { it.id == s.id }
+                                            val before = vm.data.value.active?.takeIf { it.id == workoutId }
+                                                ?.exercises?.find { it.id == seId }?.sets?.find { it.id == setId }
+                                            vm.toggleSetCompletion(seId, setId)
+                                            val after = vm.data.value.active?.takeIf { it.id == workoutId }
+                                                ?.exercises?.find { it.id == seId }?.sets?.find { it.id == setId }
                                             // Acknowledge a committed log, never undo, validation or restoration.
                                             if (before?.completed == false && after?.completed == true)
                                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         },
-                                        onRemove = { vm.removeSet(se.id, s.id) },
-                                        onKind = { kind, isWarmup -> vm.setKind(se.id, s.id, kind, isWarmup) },
+                                        onRemove = { vm.removeSet(seId, setId) },
+                                        onKind = { kind, isWarmup -> vm.setKind(seId, setId, kind, isWarmup) },
                                         hasExtras = group.components.size > 1,
                                         showTargets = showTargets,
                                         displayNumber = logicalSets.take(index + 1).count { it.root.warmup == group.root.warmup },
@@ -457,14 +449,16 @@ fun WorkoutSession(
             }
         }
     }
+    // First match wins, as with the linear find it replaces.
+    val catalogById = remember(exercises) { HashMap<String, Exercise>().apply { exercises.forEach { putIfAbsent(it.id, it) } } }
     val promptedExercise = workout.exercises.firstOrNull { entry ->
         data.preferences.rateEffortAfterExercise && entry.pendingEffortSet(
-            exercises.find { it.id == entry.exerciseId }?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS),
+            catalogById[entry.exerciseId]?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS),
         ) != null
     }
     val ratedExercise = rateExerciseId?.let { id -> workout.exercises.find { it.id == id } } ?: promptedExercise
     ratedExercise?.let { entry ->
-        val exercise = exercises.find { it.id == entry.exerciseId }
+        val exercise = catalogById[entry.exerciseId]
         val set = entry.lastEffortSet(exercise?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS))
         if (exercise != null && set != null) ExerciseEffortSheet(
             exercise, set,
@@ -729,6 +723,7 @@ private fun SetRow(
     showTargets: Boolean,
     displayNumber: Int,
 ) {
+    TraceRecomposition("SetRow", set.id)
     val focus = LocalFocusManager.current
     var remove by remember { mutableStateOf(false) }
     var options by remember { mutableStateOf(false) }
