@@ -307,6 +307,11 @@ fun WorkoutSettings(p: Preferences, vm: WorkoutViewModel, onDismiss: () -> Unit)
                 PreferenceSwitch("Rate effort after exercise", "Ask for reps left after all sets are logged", p.rateEffortAfterExercise) { checked ->
                     vm.settings { it.copy(rateEffortAfterExercise = checked) }
                 }
+                if (p.rateEffortAfterExercise) Column(Modifier.selectableGroup()) {
+                    EffortPromptTiming.entries.forEach { timing ->
+                        PreferenceChoice(timing.label, p.effortPromptTiming == timing) { vm.settings { it.copy(effortPromptTiming = timing) } }
+                    }
+                }
                 PreferenceSwitch("Advance after exercise", "Move to unfinished exercises after the last set", p.exerciseAutoNext) { checked ->
                     vm.settings { it.copy(exerciseAutoNext = checked) }
                 }
