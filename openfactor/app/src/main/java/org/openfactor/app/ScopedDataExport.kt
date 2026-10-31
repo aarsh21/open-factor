@@ -117,7 +117,8 @@ object ScopedDataExport {
                     .put("restAfterLastWarmupSet", data.preferences.restAfterLastWarmupSet)
                     .put("restBetweenExercises", data.preferences.restBetweenExercises)
                     .put("supersetAutoNext", data.preferences.supersetAutoNext)
-                    .put("restBetweenSidesPercent", data.preferences.restBetweenSidesPercent))
+                    .put("restBetweenSidesPercent", data.preferences.restBetweenSidesPercent)
+                    .put("palette", data.preferences.palette.name))
                 ExportCategory.WORKOUT_LOG_NOTES -> payload.put(category.key, JSONArray(workouts.map { workout ->
                     JSONObject().put("workoutId", workout.id).put("notes", workout.notes)
                         .put("exercises", JSONArray(workout.exercises.map {

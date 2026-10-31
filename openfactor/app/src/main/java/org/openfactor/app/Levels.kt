@@ -115,9 +115,10 @@ fun LevelsScreen(
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Weighted sets", style = MaterialTheme.typography.labelMedium, color = OF.muted)
+                    val ramp = OF.palette
                     listOf("0" to 0.0, "1–4" to 1.0, "5–9" to 5.0, "10+" to 10.0).forEach { (label, value) ->
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Canvas(Modifier.size(9.dp)) { drawCircle(androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(muscleWorkloadColor(value)))) }
+                            Canvas(Modifier.size(9.dp)) { drawCircle(androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(muscleWorkloadColor(value, ramp)))) }
                             Text(label, style = MaterialTheme.typography.labelSmall, color = OF.muted)
                         }
                     }

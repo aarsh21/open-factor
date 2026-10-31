@@ -87,7 +87,7 @@ fun CustomExercise(data: AppData, catalog: EquipmentCatalog, onBack: () -> Unit,
                                         ) {
                                             Box {
                                                 MuscleImage(muscle, Modifier.fillMaxWidth().aspectRatio(1f))
-                                                if (role != "Unselected") Icon(Icons.Rounded.CheckCircle, role, Modifier.align(Alignment.TopEnd), tint = if (role == "Primary") OF.blue else MaterialTheme.colorScheme.primary)
+                                                if (role != "Unselected") Icon(Icons.Rounded.CheckCircle, role, Modifier.align(Alignment.TopEnd), tint = if (role == "Primary") OF.accent else MaterialTheme.colorScheme.primary)
                                             }
                                             Text(muscle, style = MaterialTheme.typography.bodyMedium)
                                             if (role != "Unselected") Text(role, color = OF.muted, style = MaterialTheme.typography.labelMedium)
@@ -139,7 +139,7 @@ fun CustomExercise(data: AppData, catalog: EquipmentCatalog, onBack: () -> Unit,
                         OutlinedTextField(draft.instructions, { draft = draft.copy(instructions = it) }, Modifier.fillMaxWidth(), label = { Text("Instructions and technique notes") }, minLines = 2, maxLines = 6)
                     }
                     4 -> {
-                        Surface(color = Color(0xFF443500), contentColor = Color.White, shape = OF.shape) {
+                        Surface(color = OF.palette.warning, contentColor = OF.palette.onWarning, shape = OF.shape) {
                             Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Icon(Icons.Rounded.Warning, null)
                                 Column {
@@ -265,7 +265,7 @@ private fun RatingField(label: String, value: Int, change: (Int) -> Unit) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(label, style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                repeat(5) { Box(Modifier.size(18.dp, 6.dp).background(if (it < value) OF.blue else OF.line)) }
+                repeat(5) { Box(Modifier.size(18.dp, 6.dp).background(if (it < value) OF.accent else OF.line)) }
             }
         }
         IconButton({ change(value - 1) }, enabled = value > 0) { Icon(Icons.Rounded.Remove, "Decrease $label") }

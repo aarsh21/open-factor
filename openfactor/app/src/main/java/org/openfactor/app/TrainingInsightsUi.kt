@@ -82,7 +82,7 @@ internal fun TrainingPeriodPanel(
 @Composable
 private fun TrainingCircle(label: String, count: Int, icon: ImageVector, modifier: Modifier, prominent: Boolean = false) {
     val line = OF.line
-    val accent = OF.blue
+    val accent = OF.accent
     val surface = OF.card
     val foreground = MaterialTheme.colorScheme.onSurface
     val number = count.toString()
@@ -118,17 +118,18 @@ private fun TrainingCircle(label: String, count: Int, icon: ImageVector, modifie
     }
 }
 
-internal fun muscleWorkloadColor(sets: Double): String = when {
-    sets >= 10 -> "#3982FF"
-    sets >= 5 -> "#79ACFF"
-    sets > 0 -> "#B9D3FF"
+internal fun muscleWorkloadColor(sets: Double, ramp: PaletteColors = AppPalette.CHARCOAL.colors(dark = true)): String = when {
+    sets >= 10 -> ramp.highlight.svgHex()
+    sets >= 5 -> ramp.highlightMid.svgHex()
+    sets > 0 -> ramp.highlightSoft.svgHex()
     else -> "#555555"
 }
 
 @Composable
 internal fun TrainingMuscleMap(totals: Map<String, Double>, modifier: Modifier = Modifier, back: Boolean = false) {
     val context = LocalContext.current
-    val art by produceState<ByteBuffer?>(null, context, totals, back) {
+    val ramp = OF.palette
+    val art by produceState<ByteBuffer?>(null, context, totals, back, ramp.highlight) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val xml = context.assets.open("reference/body/avatar_male_${if (back) "back" else "front"}.svg").bufferedReader().use { it.readText() }
@@ -136,7 +137,7 @@ internal fun TrainingMuscleMap(totals: Map<String, Double>, modifier: Modifier =
                 val colored = Regex("<path[^>]*>").replace(themed) { match ->
                     val id = Regex("id=\"([^\"]+)\"").find(match.value)?.groupValues?.get(1)
                     val entry = totals.entries.find { it.key.replace(" ", "").equals(id, true) }
-                    if (entry != null) match.value.replace("#555555", muscleWorkloadColor(entry.value)) else match.value
+                    if (entry != null) match.value.replace("#555555", muscleWorkloadColor(entry.value, ramp)) else match.value
                 }
                 ByteBuffer.wrap(colored.toByteArray())
             }.getOrNull()
@@ -176,10 +177,11 @@ internal fun TrainingMusclePanel(week: TrainingWeek, onDetails: () -> Unit, onMu
                             }
                             val relative = (muscle.weightedSets / week.muscles.maxOf { it.weightedSets }).toFloat()
                             val track = OF.elevated
+                            val accent = OF.accent
                             Canvas(Modifier.fillMaxWidth().height(4.dp)) {
                                 val corners = CornerRadius(2.dp.toPx())
                                 drawRoundRect(track, cornerRadius = corners)
-                                drawRoundRect(OF.blue, size = size.copy(width = size.width * relative), cornerRadius = corners)
+                                drawRoundRect(accent, size = size.copy(width = size.width * relative), cornerRadius = corners)
                             }
                         }
                     }
@@ -241,6 +243,8 @@ internal fun WeightTrendPlot(readings: List<WeightTrendReading>, pounds: Boolean
     val last = readings.last().date
     val days = ChronoUnit.DAYS.between(first, last).coerceAtLeast(1)
     val foreground = MaterialTheme.colorScheme.onSurface
+    val line = OF.line
+    val accent = OF.accent
     Column {
         Text(if (pounds) "lb" else "kg", Modifier.align(Alignment.End), color = OF.muted, style = MaterialTheme.typography.labelSmall)
         Row(modifier) {
@@ -250,7 +254,7 @@ internal fun WeightTrendPlot(readings: List<WeightTrendReading>, pounds: Boolean
                 Text(low.bodyNumber(), color = OF.muted, style = MaterialTheme.typography.labelSmall)
             }
             Canvas(Modifier.weight(1f).fillMaxHeight().semantics {
-                contentDescription = "Weight chart, ${readings.size} dated readings, ${first} to ${last}. Latest ${readings.last().weightKg * factor} ${if (pounds) "pounds" else "kilograms"}. Blue line is the seven-day average."
+                contentDescription = "Weight chart, ${readings.size} dated readings, ${first} to ${last}. Latest ${readings.last().weightKg * factor} ${if (pounds) "pounds" else "kilograms"}. The bold line is the seven-day average."
             }) {
                 val inset = 8.dp.toPx()
                 fun point(date: LocalDate, kg: Double) = Offset(
@@ -258,14 +262,14 @@ internal fun WeightTrendPlot(readings: List<WeightTrendReading>, pounds: Boolean
                     inset + (((high - kg * factor) / (high - low)) * (size.height - inset * 2)).toFloat(),
                 )
                 listOf(inset, size.height / 2, size.height - inset).forEach { y ->
-                    drawLine(OF.line.copy(alpha = .7f), Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
+                    drawLine(line.copy(alpha = .7f), Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
                 }
                 if (readings.size > 1) {
                     val raw = Path().apply { readings.forEachIndexed { i, value -> val p = point(value.date, value.weightKg); if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) } }
                     val trend = Path().apply { readings.forEachIndexed { i, value -> val p = point(value.date, value.averageKg); if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) } }
                     drawPath(raw, foreground.copy(alpha = .5f), style = Stroke(1.5.dp.toPx()))
-                    drawPath(trend, OF.blue, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round))
-                } else drawCircle(OF.blue, 6.dp.toPx(), point(readings.single().date, readings.single().averageKg))
+                    drawPath(trend, accent, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round))
+                } else drawCircle(accent, 6.dp.toPx(), point(readings.single().date, readings.single().averageKg))
                 readings.forEach { value -> drawCircle(foreground, 3.dp.toPx(), point(value.date, value.weightKg)) }
             }
         }
@@ -279,7 +283,7 @@ internal fun WeightTrendPlot(readings: List<WeightTrendReading>, pounds: Boolean
                 Text("Readings", color = OF.muted, style = MaterialTheme.typography.labelSmall)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Canvas(Modifier.width(14.dp).height(8.dp)) { drawLine(OF.blue, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), 3.dp.toPx()) }
+                Canvas(Modifier.width(14.dp).height(8.dp)) { drawLine(accent, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), 3.dp.toPx()) }
                 Text("7-day average", color = OF.muted, style = MaterialTheme.typography.labelSmall)
             }
         }

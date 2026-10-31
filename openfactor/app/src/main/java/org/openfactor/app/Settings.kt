@@ -17,7 +17,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -117,6 +116,10 @@ fun SettingsScreen(
         UnitsSettings(p, vm) { dialog = "" }
         return
     }
+    if (dialog == "theme") {
+        AppearanceSettings(p, vm) { dialog = "" }
+        return
+    }
     if (dialog == "media-credits") {
         MediaCreditsScreen { dialog = "" }
         return
@@ -124,7 +127,7 @@ fun SettingsScreen(
     Column(
         Modifier.fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .background(if (isSystemInDarkTheme()) Color(0xFF0D0D0D) else OF.background)
+            .background(OF.palette.settingsBackground)
             .padding(horizontal = 18.dp)
             .padding(top = 42.dp, bottom = 112.dp)
     ) {
@@ -203,21 +206,6 @@ fun SettingsScreen(
         )
     }
     when (dialog) {
-        "theme" ->
-            AlertDialog(
-                onDismissRequest = { dialog = "" },
-                title = { Text("Appearance") },
-                text = {
-                    Column(Modifier.selectableGroup()) {
-                        AppTheme.entries.forEach { theme ->
-                            PreferenceChoice(theme.label, p.theme == theme) {
-                                vm.settings { it.copy(theme = theme) }
-                            }
-                        }
-                    }
-                },
-                confirmButton = { TextButton({ dialog = "" }) { Text("Done") } },
-            )
         "rest" -> {
             var seconds by rememberSaveable { mutableStateOf(p.restSeconds.toString()) }
             var automatic by rememberSaveable { mutableStateOf(p.autoRest) }
@@ -326,20 +314,20 @@ fun WorkoutSettings(p: Preferences, vm: WorkoutViewModel, onDismiss: () -> Unit)
 }
 
 @Composable
-private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+internal fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Text(
         title,
         Modifier.padding(top = 24.dp, bottom = 12.dp),
         fontSize = 13.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = 0.6.sp,
-        color = if (isSystemInDarkTheme()) Color(0xFF96999F) else OF.muted,
+        color = OF.palette.settingsMuted,
     )
     Column(
         Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(if (isSystemInDarkTheme()) Color(0xFF1A1A1A) else OF.card)
-            .border(0.5.dp, if (isSystemInDarkTheme()) Color(0xFF272727) else OF.elevated, RoundedCornerShape(14.dp)),
+            .background(OF.palette.settingsGroup)
+            .border(0.5.dp, OF.palette.settingsBorder, RoundedCornerShape(14.dp)),
         content = content,
     )
 }
@@ -356,7 +344,7 @@ internal fun SettingsRow(icon: ImageVector, title: String, subtitle: String, onC
         ) {
             Box(
                 Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
-                    .background(if (isSystemInDarkTheme()) Color(0xFF343434) else OF.elevated),
+                    .background(OF.palette.settingsIcon),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(icon, null, Modifier.size(25.dp))
@@ -369,7 +357,7 @@ internal fun SettingsRow(icon: ImageVector, title: String, subtitle: String, onC
         HorizontalDivider(
             Modifier.padding(start = 71.dp),
             thickness = 0.5.dp,
-            color = if (isSystemInDarkTheme()) Color(0xFF252525) else OF.elevated,
+            color = OF.palette.settingsDivider,
         )
     }
 }
@@ -396,7 +384,7 @@ internal fun PreferenceSwitch(title: String, subtitle: String, checked: Boolean,
 }
 
 @Composable
-private fun PreferenceChoice(label: String, selected: Boolean, onSelect: () -> Unit) {
+internal fun PreferenceChoice(label: String, selected: Boolean, onSelect: () -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
         .selectable(selected, role = Role.RadioButton, onClick = onSelect).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

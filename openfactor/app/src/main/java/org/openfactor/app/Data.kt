@@ -122,6 +122,7 @@ data class Preferences(
     val dataVisibility: DataVisibility = DataVisibility(),
     val dismissedTutorials: Set<String> = emptySet(),
     val theme: AppTheme = AppTheme.DARK,
+    val palette: AppPalette = AppPalette.CHARCOAL,
     val shortcuts: ShortcutPreferences = ShortcutPreferences(),
     val dashboard: DashboardPreferences = DashboardPreferences(),
     // Older backups keep rest enabled at these boundaries; these are compatibility defaults.
@@ -429,6 +430,7 @@ object DataCodec {
                     .put("dataVisibility", DataVisibilityCodec.encode(d.preferences.dataVisibility))
                     .put("dismissedTutorials", JSONArray(d.preferences.dismissedTutorials.sorted()))
                     .put("theme", d.preferences.theme.name)
+                    .put("palette", d.preferences.palette.name)
                     .put("shortcuts", d.preferences.shortcuts.json())
                     .put("dashboard", d.preferences.dashboard.json())
                     .put("restAfterLastWarmupSet", d.preferences.restAfterLastWarmupSet)
@@ -541,6 +543,8 @@ object DataCodec {
                 dismissedTutorials = if (p.has("dismissedTutorials"))
                     p.getJSONArray("dismissedTutorials").strings().toSet() else emptySet(),
                 theme = AppTheme.valueOf(p.optString("theme", AppTheme.DARK.name)),
+                // Cosmetic: a missing or unknown palette (older or newer backup) falls back to Charcoal.
+                palette = AppPalette.entries.firstOrNull { it.name == p.optString("palette") } ?: AppPalette.CHARCOAL,
                 shortcuts = ShortcutPreferences.decode(p.optJSONObject("shortcuts")),
                 dashboard = DashboardPreferences.decode(p.optJSONObject("dashboard")),
                 restAfterLastWarmupSet = p.optBoolean("restAfterLastWarmupSet", true),

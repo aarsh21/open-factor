@@ -778,7 +778,7 @@ private fun SetRow(
         tween(completionDuration, easing = AppMotion.EaseOut), label = "set completion surface",
     )
     val checkColor by animateColorAsState(
-        if (set.completed) Color.Black else if (set.canComplete(metrics)) MaterialTheme.colorScheme.onSurface else OF.muted,
+        if (set.completed) OF.onComplete else if (set.canComplete(metrics)) MaterialTheme.colorScheme.onSurface else OF.muted,
         tween(completionDuration, easing = AppMotion.EaseOut), label = "set completion check color",
     )
     val checkScale by animateFloatAsState(

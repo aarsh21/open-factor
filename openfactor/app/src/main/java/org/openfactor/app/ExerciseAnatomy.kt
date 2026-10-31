@@ -63,7 +63,7 @@ fun ExerciseAnatomy(exercise: Exercise, initialFigure: String = "male") {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    val color = if (isPrimary) OF.blue else Color(0xFFB9D3FF)
+                    val color = if (isPrimary) OF.palette.highlight else OF.palette.highlightSoft
                     Canvas(Modifier.size(8.dp)) { drawCircle(color) }
                     Text(muscle, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
                     Text(if (isPrimary) "Primary" else "Secondary", color = OF.muted, style = MaterialTheme.typography.labelMedium)
@@ -89,12 +89,14 @@ private fun TargetMuscleFigure(
     modifier: Modifier,
 ) {
     val context = LocalContext.current
-    val art by produceState<ByteBuffer?>(null, context, primary, secondary, figure, back) {
+    val strong = OF.palette.highlight.svgHex()
+    val soft = OF.palette.highlightSoft.svgHex()
+    val art by produceState<ByteBuffer?>(null, context, primary, secondary, figure, back, strong, soft) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val xml = context.assets.open("reference/body/avatar_${figure}_${if (back) "back" else "front"}.svg")
                     .bufferedReader().use { it.readText() }
-                ByteBuffer.wrap(highlightExerciseAnatomySvg(xml, primary, secondary).toByteArray())
+                ByteBuffer.wrap(highlightExerciseAnatomySvg(xml, primary, secondary, strong, soft).toByteArray())
             }.getOrNull()
         }
     }
@@ -106,7 +108,10 @@ private fun TargetMuscleFigure(
 }
 
 /** Only recolor named original paths; never mutate the packaged anatomy source. */
-internal fun highlightExerciseAnatomySvg(xml: String, primary: List<String>, secondary: List<String>): String {
+internal fun highlightExerciseAnatomySvg(
+    xml: String, primary: List<String>, secondary: List<String>,
+    primaryColor: String = "#3982FF", secondaryColor: String = "#B9D3FF",
+): String {
     fun String.key() = filter(Char::isLetterOrDigit).lowercase()
     val primaryIds = primary.map { it.key() }.toSet()
     val secondaryIds = secondary.map { it.key() }.toSet()
@@ -114,8 +119,8 @@ internal fun highlightExerciseAnatomySvg(xml: String, primary: List<String>, sec
     return Regex("<path\\b[^>]*>").replace(themed) { match ->
         val id = Regex("id=\"([^\"]+)\"").find(match.value)?.groupValues?.get(1)?.key()
         val color = when (id) {
-            in primaryIds -> "#3982FF"
-            in secondaryIds -> "#B9D3FF"
+            in primaryIds -> primaryColor
+            in secondaryIds -> secondaryColor
             else -> null
         }
         if (color == null) match.value else match.value.replace("#555555", color)

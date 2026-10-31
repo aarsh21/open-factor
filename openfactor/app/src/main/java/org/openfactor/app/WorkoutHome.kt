@@ -107,7 +107,7 @@ fun WorkoutHome(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Icon(Icons.Rounded.CheckCircle, null, tint = OF.green)
+                    Icon(Icons.Rounded.CheckCircle, null, tint = OF.complete)
                     Text(workout.name, Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(workout.localDate().format(DateTimeFormatter.ofPattern("d MMM")), color = OF.muted)
                     Icon(Icons.Rounded.ChevronRight, null)

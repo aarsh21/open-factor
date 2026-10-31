@@ -32,6 +32,8 @@ internal object AppMotion {
     const val State = 180
     const val Step = 220
     const val Enter = 280
+    /** Palette and light/dark cross-fade: rare, deliberate, quick. */
+    const val Palette = 250
     val EaseOut = CubicBezierEasing(.16f, 1f, .3f, 1f)
 }
 

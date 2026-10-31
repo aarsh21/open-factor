@@ -91,7 +91,7 @@ fun OnboardingScreen(
     fun next() = edit { it.copy(step = (it.step + 1).coerceAtMost(7)) }
     var exit by remember { mutableStateOf(false) }
     BackHandler { if (s.step > 0) edit { it.copy(step = it.step - 1) } else exit = true }
-    Surface(color = OF.top, contentColor = androidx.compose.ui.graphics.Color.White) {
+    Surface(color = OF.top, contentColor = MaterialTheme.colorScheme.onSurface) {
         Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp),
@@ -177,8 +177,7 @@ fun OnboardingScreen(
                                         Box(
                                             Modifier.size(40.dp)
                                                 .background(
-                                                    if (i == stage)
-                                                        androidx.compose.ui.graphics.Color.White
+                                                    if (i == stage) MaterialTheme.colorScheme.primary
                                                     else OF.elevated,
                                                     CircleShape,
                                                 ),
@@ -188,14 +187,13 @@ fun OnboardingScreen(
                                                 Icon(
                                                     Icons.Rounded.Check,
                                                     null,
-                                                    tint = androidx.compose.ui.graphics.Color.White,
+                                                    tint = MaterialTheme.colorScheme.onSurface,
                                                 )
                                             else
                                                 Text(
                                                     "${i+1}",
                                                     color =
-                                                        if (i == stage)
-                                                            androidx.compose.ui.graphics.Color.Black
+                                                        if (i == stage) MaterialTheme.colorScheme.onPrimary
                                                         else OF.muted,
                                                     style = MaterialTheme.typography.titleLarge,
                                                 )
@@ -211,8 +209,7 @@ fun OnboardingScreen(
                                         Text(
                                             label,
                                             color =
-                                                if (i <= stage)
-                                                    androidx.compose.ui.graphics.Color.White
+                                                if (i <= stage) MaterialTheme.colorScheme.onSurface
                                                 else OF.muted,
                                             style = MaterialTheme.typography.titleLarge,
                                         )

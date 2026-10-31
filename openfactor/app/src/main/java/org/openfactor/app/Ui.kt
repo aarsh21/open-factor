@@ -46,15 +46,24 @@ object OF {
     val card: Color @Composable get() = MaterialTheme.colorScheme.surface
     val elevated: Color @Composable get() = MaterialTheme.colorScheme.surfaceVariant
     val muted: Color @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
-    val line = Color(0xFF414141)
-    val blue = Color(0xFF3982FF)
-    val green = Color(0xFF91D8AD)
-    val purple = Color(0xFFB794F4)
+    /** Every palette role, including the navigation and Settings materials. */
+    val palette: PaletteColors @Composable get() = LocalPalette.current
+    val line: Color @Composable get() = LocalPalette.current.line
+    val complete: Color @Composable get() = LocalPalette.current.complete
+    val onComplete: Color @Composable get() = LocalPalette.current.onComplete
+    val accent: Color @Composable get() = LocalPalette.current.accent
+    // Original names, kept so existing callers follow the palette as well.
+    val blue: Color @Composable get() = accent
+    val green: Color @Composable get() = complete
     val shape = RoundedCornerShape(16.dp)
 }
 
 @Composable
-fun OpenFactorTheme(theme: AppTheme = AppTheme.DARK, content: @Composable () -> Unit) {
+fun OpenFactorTheme(
+    theme: AppTheme = AppTheme.DARK,
+    palette: AppPalette = AppPalette.CHARCOAL,
+    content: @Composable () -> Unit,
+) {
     val context = LocalContext.current
     val motionEnabled = rememberAppMotionEnabled()
     val configuration = LocalConfiguration.current
@@ -74,49 +83,11 @@ fun OpenFactorTheme(theme: AppTheme = AppTheme.DARK, content: @Composable () -> 
         dmSans(context, 500)
     }
     val bold = remember { dmSans(context, 700) }
+    val colors = rememberCrossfadedPalette(palette.colors(dark), motionEnabled)
+    val colorScheme = remember(colors) { colors.colorScheme() }
 
     MaterialTheme(
-        colorScheme =
-            if (dark) darkColorScheme(
-                primary = Color.White,
-                onPrimary = Color.Black,
-                background = Color(0xFF131313),
-                onBackground = Color.White,
-                surface = Color(0xFF202020),
-                surfaceVariant = Color(0xFF353535),
-                onSurface = Color.White,
-                onSurfaceVariant = Color(0xFFB8B8BC),
-                outline = OF.line,
-                secondary = OF.blue,
-                secondaryContainer = Color.White,
-                onSecondaryContainer = Color.Black,
-                primaryContainer = Color(0xFF353535),
-                onPrimaryContainer = Color.White,
-                surfaceTint = Color.Transparent,
-                surfaceContainerLowest = Color(0xFF131313),
-                surfaceContainerLow = Color(0xFF202020),
-                surfaceContainer = Color(0xFF202020),
-                surfaceContainerHigh = Color(0xFF202020),
-                surfaceContainerHighest = Color(0xFF353535),
-                error = Color(0xFFFF9696),
-                // Snackbars (e.g. "Swapped for … · Undo") stay in the charcoal palette, not Material lavender.
-                inverseSurface = Color(0xFF353535),
-                inverseOnSurface = Color.White,
-                inversePrimary = Color.White,
-            ) else lightColorScheme(
-                primary = Color(0xFF202020), onPrimary = Color.White,
-                background = Color(0xFFF5F5F5), onBackground = Color(0xFF202020),
-                surface = Color.White, onSurface = Color(0xFF202020),
-                surfaceVariant = Color(0xFFE5E5E7), onSurfaceVariant = Color(0xFF55555B),
-                outline = OF.line, secondary = OF.blue,
-                secondaryContainer = Color(0xFF202020), onSecondaryContainer = Color.White,
-                primaryContainer = Color(0xFFE5E5E7), onPrimaryContainer = Color(0xFF202020),
-                surfaceContainerLowest = Color(0xFFF5F5F5), surfaceContainerLow = Color.White,
-                surfaceContainer = Color.White, surfaceContainerHigh = Color.White,
-                surfaceContainerHighest = Color(0xFFE5E5E7), surfaceTint = Color.Transparent,
-                error = Color(0xFFB3261E),
-                inverseSurface = Color(0xFF202020), inverseOnSurface = Color.White, inversePrimary = Color.White,
-            ),
+        colorScheme = colorScheme,
         typography =
             Typography().let { t ->
                 t.copy(
@@ -136,7 +107,7 @@ fun OpenFactorTheme(theme: AppTheme = AppTheme.DARK, content: @Composable () -> 
             },
         content = {
             CompositionLocalProvider(LocalConfiguration provides appConfiguration,
-                LocalAppMotionEnabled provides motionEnabled, content = content)
+                LocalAppMotionEnabled provides motionEnabled, LocalPalette provides colors, content = content)
         },
     )
 }
@@ -155,6 +126,7 @@ fun NuvioWorkoutNavigation(
 ) {
     val labels = listOf("Dashboard", "Workout", "Exercises", "Settings")
     val motion = LocalAppMotionEnabled.current
+    val colors = OF.palette
     val textMeasurer = rememberTextMeasurer()
     val icons =
         listOf(
@@ -201,10 +173,10 @@ fun NuvioWorkoutNavigation(
                         shape = RoundedCornerShape(50)
                         clip = true
                     }
-                    .background(Color(0xFF1C1C1E))
+                    .background(colors.navigation)
                     .border(
                         1.dp,
-                        Color(0xFF414143),
+                        colors.navigationRim,
                         RoundedCornerShape(50),
                     )
             ) {
@@ -214,7 +186,7 @@ fun NuvioWorkoutNavigation(
                         .width(slot)
                         .height(58.dp)
                         .clip(RoundedCornerShape(50))
-                        .background(Color(0xFF393939))
+                        .background(colors.navigationSelected)
                 )
             }
             Row(Modifier.fillMaxSize().padding(4.dp)) {
@@ -230,8 +202,8 @@ fun NuvioWorkoutNavigation(
                                 Modifier.size(48.dp).pressFeedback(interactions),
                                 interactionSource = interactions,
                                 colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = Color.White,
-                                    contentColor = Color.Black,
+                                    containerColor = colors.navigationAction,
+                                    contentColor = colors.onNavigationAction,
                                 ),
                             ) {
                                 Icon(Icons.Rounded.Add, "Quick actions", Modifier.size(28.dp))
@@ -268,12 +240,12 @@ fun NuvioWorkoutNavigation(
                                 scaleX = iconScale
                                 scaleY = iconScale
                             },
-                            tint = if (i == selected) Color.White else Color(0xFF92969C),
+                            tint = if (i == selected) colors.navigationSelectedContent else colors.navigationIcon,
                         )
                         Text(
                             label,
                             style = labelStyle.copy(fontSize = 12.sp * labelScale, lineHeight = 16.sp * labelScale),
-                            color = if (i == selected) Color.White else Color(0xFFA1A4AA),
+                            color = if (i == selected) colors.navigationSelectedContent else colors.navigationLabel,
                             maxLines = 1,
                         )
                     }
