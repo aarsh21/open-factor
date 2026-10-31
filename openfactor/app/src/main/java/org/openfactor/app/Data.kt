@@ -4,6 +4,10 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.ByteArrayInputStream
@@ -715,6 +719,9 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     val photoStore = ProgressPhotoStore(application)
     private val _data = MutableStateFlow(store.load())
     val data = _data.asStateFlow()
+    private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val saver = CoalescedSaver<AppData>(TYPED_SAVE_DELAY_MS, saveScope,
+        { android.util.Log.w("WorkoutStore", "Deferred save failed; retrying on the next save", it) }, store::save)
     private val _storageRecovery = MutableStateFlow(store.recovery())
     val storageRecovery = _storageRecovery.asStateFlow()
     val hasStorageRecovery: Boolean get() = store.hasRecoveryPayloads()
@@ -783,11 +790,20 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun exercises(d: AppData = _data.value) = catalog + d.customExercises
 
-    @Synchronized private fun update(block: (AppData) -> AppData) {
+    /** Writes typed set values still queued for the worker; call before the process may be killed. */
+    fun flushPendingSaves() = saver.flush()
+
+    override fun onCleared() {
+        saver.flush()
+        saveScope.cancel()
+    }
+
+    @Synchronized private fun update(coalesce: (AppData, AppData) -> Boolean = { _, _ -> false }, block: (AppData) -> AppData) {
         val previous = _data.value
         val next = block(previous)
         if (next == previous) return
-        store.save(next)
+        // Only typed set values may trail on a worker; every other change is durable before it publishes.
+        if (coalesce(previous, next)) saver.saveLater(next) else saver.saveNow(next)
         _data.value = next
         if (previous.active != next.active) WorkoutNotifications.sync(getApplication(), next)
     }
@@ -1016,7 +1032,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         it.copy(name = name.trim().ifBlank { "Workout" })
     }
 
-    private fun editActive(block: (Workout) -> Workout) = update { d ->
+    private fun editActive(coalesce: (AppData, AppData) -> Boolean = { _, _ -> false }, block: (Workout) -> Workout) = update(coalesce) { d ->
         d.copy(active = d.active?.let(block))
     }
 
@@ -1068,7 +1084,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun removeSet(exerciseId: String, setId: String) = editSessionExercise(exerciseId) { it.withoutSet(setId) }
 
     fun editSet(exerciseId: String, setId: String, block: (LoggedSet) -> LoggedSet) =
-        editActive { w ->
+        editActive({ previous, next -> previous.onlyTypedSetValuesChanged(next, exerciseId, setId) }) { w ->
             w.copy(
                 exercises =
                     w.exercises.map {
@@ -1230,7 +1246,8 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
                 )
             else decoded
         backup.install()
-        store.save(d)
+        // Through the saver, so a queued typed edit can never overwrite the restored data.
+        saver.saveNow(d)
         _data.value = d
         WorkoutNotifications.sync(getApplication(), d)
         cleanPhotos()
@@ -1241,8 +1258,19 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     fun export(): String = ByteArrayOutputStream().also { export(it) }.toString("UTF-8")
 }
 
+/** True when an edit changed only typed metric values of one set, never its completion or kind. */
+internal fun AppData.onlyTypedSetValuesChanged(next: AppData, exerciseId: String, setId: String): Boolean {
+    val before = active?.exercises?.find { it.id == exerciseId }?.sets?.find { it.id == setId } ?: return false
+    val after = next.active?.takeIf { it.id == active?.id }?.exercises?.find { it.id == exerciseId }?.sets?.find { it.id == setId } ?: return false
+    return after.copy(weightKg = before.weightKg, reps = before.reps, assistanceKg = before.assistanceKg,
+        durationSeconds = before.durationSeconds, distanceMeters = before.distanceMeters) == before
+}
+
+// Compiled once: titles are derived in list rows and set rows during composition.
+private val titleWordStart = Regex("(^|[\\s(\\-/])([\\p{L}])")
+
 val Exercise.title: String
     get() =
-        name.replace(Regex("(^|[\\s(\\-/])([\\p{L}])")) {
+        name.replace(titleWordStart) {
             it.groupValues[1] + it.groupValues[2].uppercase()
         }

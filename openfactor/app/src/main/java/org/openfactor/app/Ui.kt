@@ -2,6 +2,7 @@ package org.openfactor.app
 
 import android.content.res.Configuration
 import android.graphics.Typeface
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -31,9 +32,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.flow.collectLatest
 
 object OF {
     val background: Color @Composable get() = MaterialTheme.colorScheme.background
@@ -64,21 +67,11 @@ fun OpenFactorTheme(theme: AppTheme = AppTheme.DARK, content: @Composable () -> 
                 if (dark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
         }
     }
-    fun importedFamily(path: String, weight: Int): FontFamily =
-        runCatching {
-                FontFamily(
-                    Typeface.Builder(context.assets, path)
-                        .setWeight(weight)
-                        .setFontVariationSettings("'wght' $weight")
-                        .build()
-                )
-            }
-            .getOrDefault(FontFamily.SansSerif)
-    val body = remember { importedFamily("fonts/DM-Sans.ttf", 400) }
+    val body = remember { dmSans(context, 400) }
     val medium = remember {
-        importedFamily("fonts/DM-Sans.ttf", 500)
+        dmSans(context, 500)
     }
-    val bold = remember { importedFamily("fonts/DM-Sans.ttf", 700) }
+    val bold = remember { dmSans(context, 700) }
 
     MaterialTheme(
         colorScheme =
@@ -148,7 +141,7 @@ fun OpenFactorTheme(theme: AppTheme = AppTheme.DARK, content: @Composable () -> 
 @Composable
 fun NuvioWorkoutNavigation(
     selected: Int,
-    scrollEnergy: Float,
+    scrollEnergy: () -> Float,
     onAdd: () -> Unit,
     modifier: Modifier = Modifier,
     onSelect: (Int) -> Unit,
@@ -163,12 +156,15 @@ fun NuvioWorkoutNavigation(
             Icons.Rounded.Search,
             Icons.Rounded.AccountCircle,
         )
-    val drift by
-        animateFloatAsState(
-            if (motion) scrollEnergy else 0f,
-            tween(if (motion) AppMotion.State else 0, easing = AppMotion.EaseOut),
-            label = "navigation scroll depth",
-        )
+    // Scroll energy changes every scroll frame. Follow it outside composition and read the drift
+    // only in graphicsLayer, so scrolling animates the bar in the draw phase without recomposing.
+    val scrollDrift = remember { Animatable(0f) }
+    val energy by rememberUpdatedState(scrollEnergy)
+    LaunchedEffect(motion) {
+        snapshotFlow { if (motion) energy() else 0f }.collectLatest { target ->
+            scrollDrift.animateTo(target, tween(if (motion) AppMotion.State else 0, easing = AppMotion.EaseOut))
+        }
+    }
     Box(
         modifier.widthIn(max = 480.dp).fillMaxWidth()
             .padding(horizontal = 12.dp).padding(bottom = 14.dp),
@@ -189,6 +185,7 @@ fun NuvioWorkoutNavigation(
             Box(
                 Modifier.fillMaxSize()
                     .graphicsLayer {
+                        val drift = scrollDrift.value
                         translationY = drift * 2.dp.toPx()
                         scaleX = 1f - kotlin.math.abs(drift) * .008f
                         shadowElevation = (6.dp.toPx() + kotlin.math.abs(drift) * 3.dp.toPx())
@@ -203,7 +200,8 @@ fun NuvioWorkoutNavigation(
                     )
             ) {
                 Box(
-                    Modifier.offset(x = offset, y = 4.dp)
+                    // Layout-phase read: the 300ms pill slide does not recompose the bar per frame.
+                    Modifier.offset { IntOffset(offset.roundToPx(), 4.dp.roundToPx()) }
                         .width(slot)
                         .height(58.dp)
                         .clip(RoundedCornerShape(50))
@@ -285,20 +283,28 @@ fun RoundAction(icon: ImageVector, description: String, onClick: () -> Unit) {
     }
 }
 
+private val dmSansFamilies = java.util.concurrent.ConcurrentHashMap<Int, FontFamily>()
+
+/**
+ * One parsed DM Sans instance per weight per process. Building a [Typeface] reads the 240 KB
+ * variable font, and a new family instance also misses Compose's typeface cache.
+ */
+internal fun dmSans(context: android.content.Context, weight: Int): FontFamily = dmSansFamilies.getOrPut(weight) {
+    runCatching {
+            FontFamily(
+                Typeface.Builder(context.applicationContext.assets, "fonts/DM-Sans.ttf")
+                    .setWeight(weight)
+                    .setFontVariationSettings("'wght' $weight")
+                    .build()
+            )
+        }
+        .getOrDefault(FontFamily.SansSerif)
+}
+
 @Composable
 fun workoutDisplayFont(): FontFamily {
     val context = LocalContext.current
-    return remember {
-        runCatching {
-                FontFamily(
-                    Typeface.Builder(context.assets, "fonts/DM-Sans.ttf")
-                        .setWeight(700)
-                        .setFontVariationSettings("'wght' 700")
-                        .build()
-                )
-            }
-            .getOrDefault(FontFamily.SansSerif)
-    }
+    return remember { dmSans(context, 700) }
 }
 
 @Composable
