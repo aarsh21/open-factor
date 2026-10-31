@@ -2,6 +2,7 @@ package org.openfactor.app
 
 import androidx.compose.foundation.*
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -55,6 +56,10 @@ fun WorkoutSession(
     onWorkoutSettings: () -> Unit,
     onGymSettings: () -> Unit,
     onOpenWorkout: ((String) -> Unit)? = null,
+    onSwapSearch: ((String) -> Unit)? = null,
+    swapPick: Pair<String, String>? = null,
+    onSwapPickHandled: () -> Unit = {},
+    onExerciseSwapped: (ExerciseSwapUndo, String) -> Unit = { _, _ -> },
 ) {
     val focus = LocalFocusManager.current
     val context = LocalContext.current
@@ -84,6 +89,9 @@ fun WorkoutSession(
     var workoutNotes by remember { mutableStateOf(false) }
     var restSettings by remember { mutableStateOf(false) }
     var rateExerciseId by rememberSaveable(workout.id) { mutableStateOf<String?>(null) }
+    var swapEntryId by rememberSaveable(workout.id) { mutableStateOf<String?>(null) }
+    var swapRevealId by remember { mutableStateOf<String?>(null) }
+    val motionEnabled = LocalAppMotionEnabled.current
     val selected =
         workout.exercises.find { it.id == workout.selectedExerciseId }
             ?: workout.exercises.firstOrNull()
@@ -245,7 +253,13 @@ fun WorkoutSession(
                 val logicalSets = se.logicalSets()
                 var targets by remember { mutableStateOf(false) }
                 val showTargets = se.sets.any { it.targetRepsMin != null || it.targetRepsMax != null || it.targetRir != null }
-                Surface(color = OF.background) {
+                // A swapped-in exercise fades into the same place; ordinary tab changes stay instant.
+                val swapReveal = remember(se.id) { Animatable(if (motionEnabled && se.id == swapRevealId) 0f else 1f) }
+                LaunchedEffect(swapReveal) {
+                    swapReveal.animateTo(1f, tween(AppMotion.State, easing = AppMotion.EaseOut))
+                    if (swapRevealId == se.id) swapRevealId = null
+                }
+                Surface(color = OF.background, modifier = Modifier.graphicsLayer { alpha = swapReveal.value }) {
                     Column {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -261,6 +275,7 @@ fun WorkoutSession(
                                 IconButton({ exerciseMenu = true }) { Icon(Icons.Rounded.MoreVert, "Exercise options for ${e.title}") }
                                 DropdownMenu(exerciseMenu, { exerciseMenu = false }) {
                                     DropdownMenuItem(text = { Text("Exercise guide") }, onClick = { exerciseMenu = false; focus.clearFocus(); guidanceExerciseId = e.id })
+                                    DropdownMenuItem(text = { Text("Swap exercise…") }, onClick = { exerciseMenu = false; focus.clearFocus(); swapEntryId = se.id })
                                     DropdownMenuItem(text = { Text("Targets & rest") }, onClick = { exerciseMenu = false; targets = true })
                                     if (metrics.any { it.isReps }) DropdownMenuItem(
                                         text = { Text(if (data.preferences.rateEffortAfterExercise) "Turn off effort prompt" else "Ask effort after exercise") },
@@ -444,6 +459,12 @@ fun WorkoutSession(
             onSave = { vm.reviewExerciseEffort(entry.id, set.id, it); rateExerciseId = null },
         )
     }
+    ExerciseSwapHost(
+        data, workout, exercises, vm,
+        sheetEntryId = swapEntryId, onCloseSheet = { swapEntryId = null },
+        searchPick = swapPick, onSearchPickHandled = onSwapPickHandled, onSearchAll = onSwapSearch,
+        onSwapped = { undo, title, newEntryId -> swapRevealId = newEntryId; onExerciseSwapped(undo, title) },
+    )
     guidanceExerciseId?.let { id ->
         exercises.firstOrNull { it.id == id }?.let { exercise ->
             ModalBottomSheet(

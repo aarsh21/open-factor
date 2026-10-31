@@ -89,6 +89,7 @@ data class Workout(
     val programDayId: String? = null,
     val programCycle: Int? = null,
     val gymId: String? = null,
+    val routineId: String? = null,
 )
 
 data class Routine(val id: String = newId(), val name: String, val exerciseIds: List<String>,
@@ -322,6 +323,7 @@ object DataCodec {
             .put("programDayId", programDayId)
             .put("programCycle", programCycle)
             .put("gymId", gymId)
+            .put("routineId", routineId)
             .put("exercises", JSONArray(exercises.map { it.json() }))
             .put("notes", notes)
 
@@ -487,6 +489,7 @@ object DataCodec {
             optString("programDayId").takeIf { it.isNotBlank() && it != "null" },
             if (isNull("programCycle")) null else getInt("programCycle"),
             optString("gymId").takeIf { it.isNotBlank() && it != "null" },
+            routineId = optString("routineId").takeIf { it.isNotBlank() && it != "null" },
         )
 
     fun decode(text: String, historyOverride: List<Workout>? = null): AppData = decode(JSONObject(text), historyOverride)
@@ -1032,6 +1035,14 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun groupSuperset(ids: Set<String>) = editActive { it.withSuperset(ids) }
+
+    fun swapExercise(entryId: String, replacementId: String, scope: SwapScope): ExerciseSwapUndo? {
+        var undo: ExerciseSwapUndo? = null
+        update { d -> d.withExerciseSwap(entryId, replacementId, scope, exercises(d)).also { undo = d.exerciseSwapUndo(it) } }
+        return undo
+    }
+
+    fun undoExerciseSwap(undo: ExerciseSwapUndo) = update { it.withoutExerciseSwap(undo) }
 
     fun leaveSuperset(id: String) = editActive { w ->
         w.copy(exercises = w.exercises.map { if (it.id == id) it.copy(supersetId = null) else it }).normalizeSupersets()

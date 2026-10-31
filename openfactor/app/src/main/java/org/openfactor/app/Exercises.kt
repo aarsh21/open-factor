@@ -44,6 +44,7 @@ fun ExerciseLibrary(
     selectedIds: Set<String> = emptySet(),
     onSelectionChange: ((String) -> Unit)? = null,
     showMuscleShortcuts: Boolean = false,
+    pickTitle: String = "Add exercises",
 ) {
     var gymId by rememberSaveable { mutableStateOf("") }
     var gymMenu by remember { mutableStateOf(false) }
@@ -159,7 +160,7 @@ fun ExerciseLibrary(
         val pickerHeight = maxHeight
         Column(Modifier.fillMaxSize()) {
             PageHeading(
-                if (picking) "Add exercises" else "Exercises",
+                if (picking) pickTitle else "Exercises",
                 onBack,
                 actions = { if (allowCustom) RoundAction(Icons.Rounded.Add, "Create custom exercise", onCustom) },
             )

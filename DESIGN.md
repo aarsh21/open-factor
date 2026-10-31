@@ -229,6 +229,10 @@ Weight/reps exercises use the simple weight-and-reps fields; other exercise metr
 
 The timer row and optional rest strip remain above the scrolling fields. Rest exposes +30s and Skip. Overflow menus retain targets/rest, notes, set kinds, supersets and other advanced choices. Finish confirms the completed-set count, optionally saves a template and opens the saved workout summary/history journey.
 
+### Exercise swap
+
+Swap exercise… opens a 95%-height Material sheet over the session: title, “Replacing …” line, a note when completed sets will stay behind, up to eight suggestion rows (8dp photo, two-line title, muscle · equipment, at most three capsule reason chips, trailing Guide) and a pinned outlined Search all exercises button. Guide cross-fades the same sheet to the shared exercise guide with a pinned Swap for … action, rather than stacking a second sheet. Results fade in once (Quick, EaseOut) without stagger; an empty result uses `EmptyContent` pointing to Search all. Template/program workouts confirm scope in a compact two-button dialog. After a commit the sheet slides away and the replacement block fades in place (State, EaseOut); all motion follows `LocalAppMotionEnabled`. A Long snackbar offers Undo.
+
 ### Exercise guide, video and anatomy
 
 Discovery opens the exercise guide directly; exercise settings are a secondary header action. Guide, Muscles and History tabs keep media, anatomy and previous training accessible. The logger opens the same content in a closeable sheet rather than replacing its current set.
