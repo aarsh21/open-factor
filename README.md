@@ -1,8 +1,10 @@
 # Open Factor
 
-**A free, simple workout tracker for Android.**
+**A free, open-source workout tracker for Android.**
 
 Open Factor helps you log your gym sessions without the clutter. Pick an exercise, watch how it's done, write down your weight and reps, and save your workout. That's it. No account, no subscription, no ads.
+
+> **Open Factor is in beta.** It works well for everyday logging, but expect a few rough edges. Your [feedback and bug reports](https://github.com/aarsh21/open-factor/issues) help make it better.
 
 [**⬇️ Download the latest version**](https://github.com/aarsh21/open-factor/releases/latest/download/open-factor.apk) · [What's new in 0.9.0](docs/open-factor/releases/v0.9.0.md)
 
@@ -43,6 +45,22 @@ Install the new version over the old one the same way, and your workouts are kep
 ## Need help or found a bug?
 
 [Open an issue](https://github.com/aarsh21/open-factor/issues) and tell us what happened. It helps to include your phone model, your Android version and the Open Factor version (shown in Settings). Please don't attach your backup file or progress photos, since issues are public.
+
+## What's next
+
+- **Calorie tracking**, so food and training live in one place.
+- **A smoother app overall:** polishing the everyday experience based on your feedback.
+- **More platforms:** iOS, wearables and other integrations.
+
+## Support Open Factor
+
+Open Factor is free and will stay free, with no ads. If it helps your training and you'd like to support its development, you can donate directly by UPI:
+
+**UPI ID: `padiaaarsh@okicici`**
+
+<img src="docs/media/upi-donate.png" alt="Scan to donate to Open Factor by UPI (padiaaarsh@okicici)" width="200">
+
+Scan the code with any UPI app (Google Pay, PhonePe, Paytm, BHIM) or enter the UPI ID. Every contribution is appreciated, and starring the project on GitHub or sharing it with a gym friend helps too.
 
 ## Thank you
 
