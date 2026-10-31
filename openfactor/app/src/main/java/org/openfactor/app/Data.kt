@@ -97,6 +97,8 @@ data class Workout(
     val gymId: String? = null,
     /** Template this session was started from; null for empty, program and older workouts. */
     val routineId: String? = null,
+    /** Effort questions owed for exercises already left; see [withEffortPromptTransition]. */
+    val effortPrompts: List<EffortPrompt> = emptyList(),
 )
 
 data class Routine(val id: String = newId(), val name: String, val exerciseIds: List<String>,
@@ -132,6 +134,7 @@ data class Preferences(
     val supersetAutoNext: Boolean = true,
     val restBetweenSidesPercent: Int = 100,
     val rateEffortAfterExercise: Boolean = true,
+    val effortPromptTiming: EffortPromptTiming = EffortPromptTiming.NEXT_EXERCISE,
     val workoutKeypad: Boolean = true,
     val weeklyWorkoutGoal: Int? = null,
 )
@@ -334,6 +337,9 @@ object DataCodec {
             .put("programCycle", programCycle)
             .put("gymId", gymId)
             .put("routineId", routineId)
+            .put("effortPrompts", effortPrompts.takeIf { it.isNotEmpty() }?.let { prompts ->
+                JSONArray(prompts.map { JSONObject().put("exerciseId", it.exerciseId).put("afterRest", it.afterRest) })
+            })
             .put("exercises", JSONArray(exercises.map { it.json() }))
             .put("notes", notes)
 
@@ -438,6 +444,7 @@ object DataCodec {
                     .put("supersetAutoNext", d.preferences.supersetAutoNext)
                     .put("restBetweenSidesPercent", d.preferences.restBetweenSidesPercent)
                     .put("rateEffortAfterExercise", d.preferences.rateEffortAfterExercise)
+                    .put("effortPromptTiming", d.preferences.effortPromptTiming.name)
                     .put("workoutKeypad", d.preferences.workoutKeypad)
                     .put("weeklyWorkoutGoal", d.preferences.weeklyWorkoutGoal),
             )
@@ -503,6 +510,9 @@ object DataCodec {
             if (isNull("programCycle")) null else getInt("programCycle"),
             optString("gymId").takeIf { it.isNotBlank() && it != "null" },
             optString("routineId").takeIf { it.isNotBlank() && it != "null" },
+            effortPrompts = array("effortPrompts").objects().map {
+                EffortPrompt(it.getString("exerciseId"), it.optBoolean("afterRest"))
+            },
         )
 
     fun decode(text: String, historyOverride: List<Workout>? = null): AppData = decode(JSONObject(text), historyOverride)
@@ -555,6 +565,9 @@ object DataCodec {
                     it.toInt()
                 },
                 rateEffortAfterExercise = p.optBoolean("rateEffortAfterExercise", true),
+                // Older backups (and unknown future values) get the new on-leave timing.
+                effortPromptTiming = EffortPromptTiming.entries.find { it.name == p.optString("effortPromptTiming") }
+                    ?: EffortPromptTiming.NEXT_EXERCISE,
                 workoutKeypad = p.optBoolean("workoutKeypad", true),
                 weeklyWorkoutGoal = if (p.isNull("weeklyWorkoutGoal")) null else p.optInt("weeklyWorkoutGoal").takeIf { it in 1..7 },
             ),
@@ -815,12 +828,29 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     @Synchronized private fun update(coalesce: (AppData, AppData) -> Boolean = { _, _ -> false }, block: (AppData) -> AppData) {
         val previous = _data.value
-        val next = block(previous)
+        val next = block(previous).withEffortPrompts(previous)
         if (next == previous) return
         // Only typed set values may trail on a worker; every other change is durable before it publishes.
         if (coalesce(previous, next)) saver.saveLater(next) else saver.saveNow(next)
         _data.value = next
         if (previous.active != next.active) WorkoutNotifications.sync(getApplication(), next)
+    }
+
+    // One choke point, so every selection change (tabs, Next, auto-advance, supersets) is covered.
+    private fun AppData.withEffortPrompts(previous: AppData): AppData {
+        val workout = active ?: return this
+        val updated = workout.withEffortPromptTransition(previous.active, preferences) { metricsFor(it, this) }
+        return if (updated === workout) this else copy(active = updated)
+    }
+
+    private fun metricsFor(entry: SessionExercise, d: AppData): List<SetMetric> =
+        (catalog.find { it.id == entry.exerciseId } ?: d.customExercises.find { it.id == entry.exerciseId })
+            ?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS)
+
+    /** True when an owed effort question must be answered or skipped before the finish confirmation. */
+    fun askEffortBeforeFinish(): Boolean {
+        update { d -> d.copy(active = d.active?.withEffortPromptsBeforeFinish(d.preferences) { metricsFor(it, d) }) }
+        return _data.value.let { it.preferences.asksEffortOnLeave && it.active?.effortPrompts?.isNotEmpty() == true }
     }
 
     fun saveScaleWeight(record: ScaleWeightRecord) = update { it.withScaleWeight(record) }
@@ -1145,7 +1175,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         val now = System.currentTimeMillis()
         data.copy(
             active = null,
-            history = listOf(workout.withPause(false, now).copy(finishedAt = now)) + data.history,
+            history = listOf(workout.withPause(false, now).copy(finishedAt = now, effortPrompts = emptyList())) + data.history,
             routines = if (saveTemplate) data.routines + Routine(name = workout.name.trim().ifBlank { "Routine" },
                 exerciseIds = workout.exercises.map { it.exerciseId }) else data.routines,
         )

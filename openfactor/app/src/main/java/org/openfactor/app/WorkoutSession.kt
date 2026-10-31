@@ -97,6 +97,9 @@ fun WorkoutSession(
     var workoutNotes by remember { mutableStateOf(false) }
     var restSettings by remember { mutableStateOf(false) }
     var rateExerciseId by rememberSaveable(workout.id) { mutableStateOf<String?>(null) }
+    // Finish leaves the current exercise too: ask what is owed first, then continue to the confirmation.
+    var finishAfterEffort by rememberSaveable(workout.id) { mutableStateOf(false) }
+    val requestFinish = { if (vm.askEffortBeforeFinish()) finishAfterEffort = true else confirm = "finish" }
     var swapEntryId by rememberSaveable(workout.id) { mutableStateOf<String?>(null) }
     val selected =
         workout.exercises.find { it.id == workout.selectedExerciseId }
@@ -122,7 +125,7 @@ fun WorkoutSession(
             }
             val finishPress = remember { MutableInteractionSource() }
             Button(
-                { focus.clearFocus(); confirm = "finish" },
+                { focus.clearFocus(); requestFinish() },
                 Modifier.pressFeedback(finishPress, enabled = workout.completedSets() > 0),
                 enabled = workout.completedSets() > 0,
                 contentPadding = PaddingValues(horizontal = 16.dp),
@@ -162,7 +165,8 @@ fun WorkoutSession(
                         enabled = workout.completedSets() > 0,
                         onClick = {
                             menu = false
-                            confirm = "finish"
+                            focus.clearFocus()
+                            requestFinish()
                         },
                     )
                     DropdownMenuItem(
@@ -491,13 +495,26 @@ fun WorkoutSession(
     }
     // First match wins, as with the linear find it replaces.
     val catalogById = remember(exercises) { HashMap<String, Exercise>().apply { exercises.forEach { putIfAbsent(it.id, it) } } }
-    val promptedExercise = workout.exercises.firstOrNull { entry ->
-        data.preferences.rateEffortAfterExercise && entry.pendingEffortSet(
-            catalogById[entry.exerciseId]?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS),
-        ) != null
+    fun owesEffort(entry: SessionExercise) = entry.pendingEffortSet(
+        catalogById[entry.exerciseId]?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS),
+    ) != null
+    val promptedExercise = when {
+        !data.preferences.rateEffortAfterExercise -> null
+        data.preferences.effortPromptTiming == EffortPromptTiming.LAST_SET -> workout.exercises.firstOrNull(::owesEffort)
+        // Owed for an exercise already left (recorded by the view model). Never stacked on another
+        // session sheet or dialog; an automatic advance also waits out the running rest timer.
+        guidanceExerciseId != null || swapEntryId != null || restSettings || confirm.isNotEmpty() || rename || workoutNotes -> null
+        else -> workout.effortPrompts.firstNotNullOfOrNull { prompt ->
+            workout.exercises.find { it.id == prompt.exerciseId }
+                ?.takeIf { (!prompt.afterRest || !resting) && it.exerciseId in catalogById && owesEffort(it) }
+        }
     }
+    if (finishAfterEffort && promptedExercise == null) LaunchedEffect(Unit) { finishAfterEffort = false; confirm = "finish" }
     val ratedExercise = rateExerciseId?.let { id -> workout.exercises.find { it.id == id } } ?: promptedExercise
-    ratedExercise?.let { entry ->
+    // The question takes precedence over the keypad: close it first so the two never stack.
+    val keypadOpen = ratedExercise != null && keypad?.open == true
+    if (keypadOpen) LaunchedEffect(ratedExercise?.id) { focus.clearFocus() }
+    ratedExercise?.takeIf { !keypadOpen }?.let { entry ->
         val exercise = catalogById[entry.exerciseId]
         val set = entry.lastEffortSet(exercise?.loggingMetrics() ?: listOf(SetMetric.WEIGHT, SetMetric.REPS))
         if (exercise != null && set != null) ExerciseEffortSheet(

@@ -41,8 +41,9 @@ class WorkoutEffortJourneyTest {
             store.save(AppData(
                 onboarding = OnboardingState(completed = true),
                 // Legacy quick-start explicitly hid inline RIR; the new end-of-exercise prompt
-                // remains available through its separate, default-on setting.
-                preferences = Preferences(showRir = false, autoRest = false),
+                // remains available through its separate, default-on setting. This journey covers the
+                // previous "right after the last set" timing, still one Workout settings choice away.
+                preferences = Preferences(showRir = false, autoRest = false, effortPromptTiming = EffortPromptTiming.LAST_SET),
                 active = Workout(name = "Effort test", exercises = listOf(entry), selectedExerciseId = entry.id),
             ))
             activity = ActivityScenario.launch(MainActivity::class.java)
