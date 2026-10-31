@@ -426,6 +426,16 @@ fun WorkoutSession(
                                 Icon(Icons.Rounded.Edit, null, Modifier.size(16.dp))
                             }
                         }
+                        // Moving on is the most common navigation between sets; it goes through selectExercise.
+                        val done = se.workoutExerciseProgress().done
+                        val doneOnArrival = remember(se.id) { done }
+                        if (done) workout.upNextExercise(se.id)?.let { next ->
+                            NextExerciseAction(
+                                next, exercises.find { it.id == next.exerciseId }, fresh = !doneOnArrival,
+                                onClick = { focus.clearFocus(); vm.selectExercise(next.id) },
+                                modifier = Modifier.padding(top = 12.dp),
+                            )
+                        }
                         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             val warmupPress = remember { MutableInteractionSource() }
                             val addPress = remember { MutableInteractionSource() }

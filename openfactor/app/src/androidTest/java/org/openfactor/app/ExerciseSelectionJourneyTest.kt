@@ -76,12 +76,13 @@ class ExerciseSelectionJourneyTest {
                     onSelect = { current = current.copy(selectedExerciseId = it) }, onAdd = { additions++ })
             }
         }
-        compose.onNodeWithText(incline.title).performClick().assertIsSelected()
+        // The strip identifies exercises by photo and progress ring; its tabs carry the names.
+        compose.onNodeWithContentDescription("Select ${incline.title}, 2 of 2", substring = true).performClick().assertIsSelected()
         compose.runOnIdle {
             assertEquals(second.id, current.selectedExerciseId)
             assertEquals(initial.exercises, current.exercises)
         }
-        compose.onNodeWithText(flat.title).performClick().assertIsSelected()
+        compose.onNodeWithContentDescription("Select ${flat.title}, 1 of 2", substring = true).performClick().assertIsSelected()
         compose.onNodeWithContentDescription("Add exercise").performClick()
         compose.runOnIdle { assertEquals(1, additions); assertEquals(initial, current) }
     }
