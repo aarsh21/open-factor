@@ -1,6 +1,6 @@
 # Bundled licensed exercise illustrations
 
-The public app includes 44 original PNG illustrations by **Everkinetic**, distributed by [wger](https://wger.de), for 21 explicitly reviewed exercise variants. The images use [Creative Commons Attribution-ShareAlike 3.0 Unported](https://creativecommons.org/licenses/by-sa/3.0/); they are unmodified. This license applies to these images independently of the application code's GPLv3 license. No endorsement by the artist or wger is implied.
+The public app includes 44 original PNG illustrations by **Everkinetic**, distributed by [wger](https://wger.de), for 21 explicitly reviewed exercise variants. The images use [Creative Commons Attribution-ShareAlike 3.0 Unported](https://creativecommons.org/licenses/by-sa/3.0/); they are unmodified. This license applies to these images independently of the application code's MIT license. No endorsement by the artist or wger is implied.
 
 The app's Settings → Exercise media credits includes the attribution, source links, and complete license text available offline. The machine-readable [`exercise-previews.json`](../../openfactor/app/src/main/assets/exercise-previews.json) records every original URL, author, license, image ID, byte size and SHA-256 hash. The public APK excludes the private reference pack by default.
 

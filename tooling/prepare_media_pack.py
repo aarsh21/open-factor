@@ -142,7 +142,7 @@ def prepare(source: Path, output: Path, mode: str, max_static_bytes: int = STATI
             video_objects=sorted({path for exercise in catalog for path in exercise.get("videoObjectPaths", [])}),
             source_apk_sha256=provenance.get("source_apk_sha256"),
             source_catalog_sha256=digest(catalog_path),
-            ownership="Imported media retains original ownership and is not relicensed as GPL. Distribution requires appropriate rights.",
+            ownership="Imported media retains original ownership and is not relicensed with the application code. Distribution requires appropriate rights.",
         )
     # Sync only this script's generated directory; mode changes cannot leave old videos behind.
     for path in output.rglob("*"):

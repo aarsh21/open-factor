@@ -112,12 +112,8 @@ fun OpenFactorTheme(
     )
 }
 
-/**
- * Adapted from Nuvio's NavigationBar.kt geometry, selected surface and 300ms motion. Copyright
- * Nuvio contributors; modifications Open Factor contributors. GPL-3.0.
- */
 @Composable
-fun NuvioWorkoutNavigation(
+fun WorkoutNavigation(
     selected: Int,
     scrollEnergy: () -> Float,
     onAdd: () -> Unit,

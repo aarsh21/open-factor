@@ -69,4 +69,4 @@ The unmatched photo retains its original filename and a null exercise associatio
 
 ## Delivery boundary
 
-Recovered content and detailed acquisition evidence remain private. The original handoff inputs remain unchanged. The published alpha.4 APK predates this video import. No new release or media publication is part of this receipt, and the GPL code license does not establish redistribution rights for the source content.
+Recovered content and detailed acquisition evidence remain private. The original handoff inputs remain unchanged. The published alpha.4 APK predates this video import. No new release or media publication is part of this receipt, and the code license does not establish redistribution rights for the source content.

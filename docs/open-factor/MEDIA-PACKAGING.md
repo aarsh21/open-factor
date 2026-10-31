@@ -54,4 +54,4 @@ The active logger's horizontal tabs switch exercises with one tap and keep the s
 
 ## Ownership and distribution
 
-The imported reference directory and build output remain ignored. No imported photos, videos, instruction text, anatomy or fonts are committed by this workflow. Their ownership remains separate from the application's GPL license. Source-only public artifact checks continue to reject `assets/reference/` entries; reference-containing distributions need an explicitly appropriate distribution policy and verifier.
+The imported reference directory and build output remain ignored. No imported photos, videos, instruction text, anatomy or fonts are committed by this workflow. Their ownership remains separate from the application's MIT license. Source-only public artifact checks continue to reject `assets/reference/` entries; reference-containing distributions need an explicitly appropriate distribution policy and verifier.

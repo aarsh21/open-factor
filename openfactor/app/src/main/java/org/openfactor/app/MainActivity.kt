@@ -811,7 +811,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                     fadeOut(tween(AppMotion.Quick)) +
                         slideOutVertically(tween(AppMotion.State, easing = AppMotion.EaseOut)) { it / 3 },
             ) {
-                NuvioWorkoutNavigation(
+                WorkoutNavigation(
                     tab,
                     { scrollEnergy },
                     onAdd = {

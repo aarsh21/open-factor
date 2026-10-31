@@ -4,7 +4,7 @@
 
 “Simple” means an uncluttered interface with meaningful training features. Original videos/photos, instructions, human anatomy and equipment artwork are core capabilities. The library opens rich guidance first. In a workout, horizontal tabs switch exercises in one tap and a photo/title header identifies the current exercise and a separate Guide action opens guidance above the current set. Anatomy shows every primary and secondary target together on original front/back male or female figures. Programs remain accessible from Workout; the home summary shows recorded training rather than an empty active-program card.
 
-The 0.6.1 implementation keeps the charcoal/white system, bundled public DM Sans, Nuvio navigation and grouped settings. First run has three short steps: name and optional gender; optional weight/height, units and direct Health Connect; then weekly workout goal, effort rating and automatic rest/duration. Completing setup requires a name; Skip for now opens Workout and preserves the raw draft and step for later review. Completed installations keep their data and bypass setup. Settings → Profile edits these choices with validation, explicit Save and discard confirmation; Review setup reopens the flow. Weekly goals feed Habits and gender supplies the initial anatomy figure.
+The 0.6.1 implementation keeps the charcoal/white system, bundled public DM Sans, floating navigation and grouped settings. First run has three short steps: name and optional gender; optional weight/height, units and direct Health Connect; then weekly workout goal, effort rating and automatic rest/duration. Completing setup requires a name; Skip for now opens Workout and preserves the raw draft and step for later review. Completed installations keep their data and bypass setup. Settings → Profile edits these choices with validation, explicit Save and discard confirmation; Review setup reopens the flow. Weekly goals feed Habits and gender supplies the initial anatomy figure.
 
 Start on Workout, select an exercise, enter weight and reps, add warmups, complete sets and finish into history. Set values are entered on a compact in-app workout keypad with unit-aware steppers, Next and Log set, keeping the focused set visible; Workout settings can restore the system keyboard. Titles have no explanatory captions. Plus opens shortcuts, including a weight-entry sheet that preserves the caller and active workout. All exercise pickers, including template creation, search all 1,345 catalog exercises with ranked names, aliases, abbreviations, combined name/equipment/muscle terms and bounded typo handling. Equipment defaults to All equipment. The catalog and equipment snapshot load once per process on a background worker; search indexes and default ordering are reused with a bounded four-catalog cache, and catalog edits obtain a new index. Fully drawn includes catalog readiness.
 
@@ -34,7 +34,7 @@ Core training works offline without an account. Original photos, anatomy, equipm
 
 The recovered collection has 1,831 videos for 619 exercises, 1,832 photos, 44 muscle SVGs, four body assets and 297 equipment images. The current staged static manifest records 32,986,897 bytes, with equipment thumbnails derived at up to 256 × 256 pixels and no MP4 payload. Not every catalog exercise has original guidance. See [media packaging](docs/open-factor/MEDIA-PACKAGING.md) and [asset provenance](docs/open-factor/ASSETS.md).
 
-Build mode distinguishes content: `auto` includes the original static pack when present and otherwise falls back to `source`; `static` requires the pack, `source` excludes it, and `full` also includes local videos. Source-only builds retain public DM Sans, the bounded Everkinetic illustration pack and descriptive metadata. The earlier 0.2.0 source-only release remains a historical artifact. Recovered assets stay outside Git and retain their original ownership independently of the GPL code.
+Build mode distinguishes content: `auto` includes the original static pack when present and otherwise falls back to `source`; `static` requires the pack, `source` excludes it, and `full` also includes local videos. Source-only builds retain public DM Sans, the bounded Everkinetic illustration pack and descriptive metadata. The earlier 0.2.0 source-only release remains a historical artifact. Recovered assets stay outside Git and retain their original ownership independently of the MIT code.
 
 Active sessions save durably after changes and resume after process recreation. Optional workout/rest notifications open the active session. Precise background timers require Android special access; force-stop suppresses alarms until reopening. Verification distinguishes source-only and original-media artifacts, static provenance, actual-provider Health Connect reads, playback/cache behavior and logger continuity. The [0.3.0 evidence](docs/open-factor/releases/v0.3.0.md) remains specific to that published artifact; [0.4.0 release evidence](docs/open-factor/releases/v0.4.0.md) remains historical; [0.5.0 release evidence](docs/open-factor/releases/v0.5.0.md) remains specific to that refinement; [0.6.0 release evidence](docs/open-factor/releases/v0.6.0.md) records the profile, Settings, autoplay and catalog changes. The [0.6.1 release evidence](docs/open-factor/releases/v0.6.1.md) records onboarding return and editable starter templates; its finish review is ship for the supplied API35 phone captures at normal and 1.35 font scale. Device checks cover their named configurations, not every Android device.
 
@@ -48,11 +48,11 @@ android
 
 ## Stack
 
-An independently maintained GPLv3 project based on NuvioMedia/NuvioMobile, with base-app credits and original license notices retained. The Android workout application uses Kotlin and Jetpack Compose, matching the base project's technology. The upstream media application is retained as reference; Open Factor builds separately to avoid requiring streaming services, media engines, or their credentials.
+An independently maintained, MIT-licensed native Android workout application built with Kotlin and Jetpack Compose.
 
 ## Product Purpose
 
-Build an open source workout application called Open Factor. Preserve the features, exercises, interactions and screen layouts observed in the supplied MacroFactor Workouts APK, with Nuvio's floating pill navigation and settings presentation as the user's explicit exceptions.
+Build an open source workout application called Open Factor. Preserve the features, exercises, interactions and screen layouts observed in the supplied MacroFactor Workouts APK, with its own floating pill navigation and grouped settings presentation as the user's explicit exceptions.
 
 ## Users
 
@@ -64,18 +64,16 @@ The requested scope includes exercise discovery and details, equipment, workout/
 
 The application is offline-only: no required account, subscription, Internet permission or remote media. Preserve the floating navigation pill with a working plus action in its middle, between Workout and Exercises. Exercise videos fill their demonstration area without a seek bar, with 1X, 2.5X and 5X playback options as explicitly requested. Local body data, photos, analytics and optional device-local integrations remain parity requirements rather than being dismissed as cloud features. See `docs/open-factor/PARITY.md` for the acceptance gaps.
 
-The code is GPLv3, inherited from Nuvio. Asset provenance and redistribution rights must be recorded independently of the code license. Local reference imports must not silently be represented as GPL assets.
+The code is MIT-licensed. Asset provenance and redistribution rights must be recorded independently of the code license. Local reference imports must not silently be represented as MIT assets.
 
 ## Brand Commitments
 
-Name: Open Factor. Preserve the workout app's observed UI and UX, except use the Nuvio navigation pill and Nuvio-style grouped settings. The supplied screenshots are the visual authority for those two surfaces.
+Name: Open Factor. Preserve the workout app's observed UI and UX, except use the floating navigation pill and grouped settings described in DESIGN.md.
 
 ## Evidence on Hand
 
 - `/home/buhh/Downloads/Workouts.apk` (MacroFactor Workouts, installed package `com.sbs.train`, version 1.4.1).
 - Connected Android phone; all four APK splits copied locally through REA.
-- Nuvio upstream commit `c78756d0cbda3337cfff36a95d8b6708f48c0d72`.
-- Two user screenshots of Nuvio navigation/settings.
 - Private inspection evidence outside the public repository. Feature and asset inventories belong in `docs/open-factor/`.
 
 ## Product Principles

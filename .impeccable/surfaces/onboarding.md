@@ -12,7 +12,7 @@ Make a useful personal and training profile in three short steps, with direct op
 
 ## OWN-WORLD
 
-Use large left-aligned DM Sans headings, sparse tonal fields, outlined inputs, native choice chips/switches and anchored white actions. Three thin horizontal progress segments describe the real flow. Titles stand alone. Keep original exercise media and the Nuvio floating navigation/grouped Settings elsewhere in the app; the historical vertical rail is not the current first-run pattern.
+Use large left-aligned DM Sans headings, sparse tonal fields, outlined inputs, native choice chips/switches and anchored white actions. Three thin horizontal progress segments describe the real flow. Titles stand alone. Keep original exercise media and the floating navigation/grouped Settings elsewhere in the app; the historical vertical rail is not the current first-run pattern.
 
 ## STORY
 

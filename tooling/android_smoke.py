@@ -135,7 +135,7 @@ state=persisted()
 assert state.get('active') is None
 assert len(state['history'])>=1
 assert any(s['completed'] for e in state['history'][0]['exercises'] for s in e['sets'])
-# Capture the two explicitly requested Nuvio-style surfaces and exercise library.
+# Capture the navigation and settings surfaces and exercise library.
 adb('shell','am','force-stop','org.openfactor.app');launch();tap('Exercises',last=True);find('Search exercises');capture('phone-exercises')
 if a.media:
  wifi=adb('shell','settings','get','global','wifi_on').strip()
