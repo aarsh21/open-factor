@@ -67,6 +67,7 @@ fun WorkoutSession(
     swapPick: Pair<String, String>? = null,
     onSwapPickHandled: () -> Unit = {},
     onExerciseSwapped: (ExerciseSwapUndo, String) -> Unit = { _, _ -> },
+    onSetRemoved: (SetRemovalUndo, String) -> Unit = { _, _ -> },
 ) {
     val focus = LocalFocusManager.current
     val context = LocalContext.current
@@ -366,6 +367,12 @@ fun WorkoutSession(
                                     val seId = se.id
                                     val workoutId = workout.id
                                     val setId = s.id
+                                    val displayNumber = logicalSets.take(index + 1).count { it.root.warmup == group.root.warmup }
+                                    val removedLabel = when {
+                                        componentIndex > 0 -> "Myo component $componentIndex"
+                                        group.root.warmup -> "Warm-up $displayNumber"
+                                        else -> "Set $displayNumber"
+                                    }
                                     SetRow(
                                         index, s, data.preferences, metrics,
                                         exerciseName = e.title + (s.side?.let { " ${it.label.lowercase()}" } ?: "") +
@@ -383,10 +390,11 @@ fun WorkoutSession(
                                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         },
                                         onRemove = { vm.removeSet(seId, setId) },
+                                        onDelete = { vm.removeSetWithUndo(seId, setId)?.let { onSetRemoved(it, removedLabel) } },
                                         onKind = { kind, isWarmup -> vm.setKind(seId, setId, kind, isWarmup) },
                                         hasExtras = group.components.size > 1,
                                         showTargets = showTargets,
-                                        displayNumber = logicalSets.take(index + 1).count { it.root.warmup == group.root.warmup },
+                                        displayNumber = displayNumber,
                                         keypad = keypad,
                                     )
                                 } } }
@@ -781,6 +789,7 @@ private fun SetRow(
     onChange: (LoggedSet) -> Unit,
     onComplete: () -> Unit,
     onRemove: () -> Unit,
+    onDelete: () -> Unit = {},
     onKind: (SetKind, Boolean) -> Unit,
     hasExtras: Boolean,
     showTargets: Boolean,
@@ -812,9 +821,24 @@ private fun SetRow(
         if (set.completed || !motionEnabled) 1f else .92f,
         tween(completionDuration, easing = AppMotion.EaseOut), label = "set completion check",
     )
+    val canLog = !set.completed && set.canComplete(metrics)
+    // With the keypad on this row, a swipe logs exactly like its Log set key; otherwise like the check button.
+    val logFromRow = {
+        if (keypad != null && keypad.target?.setId == set.id) { if (!keypad.log()) focus.clearFocus() } else onComplete()
+    }
+    // Clearing focus closes the keypad, so the Undo snackbar never covers its keys.
+    val swipe = rememberSetRowSwipe(canLog, logFromRow) { focus.clearFocus(); onDelete() }
+    // Swipe is never the only way: TalkBack offers both actions on every control in the row.
+    val rowActions = listOfNotNull(
+        if (set.completed) CustomAccessibilityAction("Mark set incomplete") { onComplete(); true }
+        else if (canLog) CustomAccessibilityAction("Log set") { logFromRow(); true } else null,
+        CustomAccessibilityAction("Delete set") { swipe.delete(); true },
+    )
     Row(
         Modifier.fillMaxWidth()
+            .setSwipeCollapse(swipe)
             .padding(vertical = 4.dp)
+            .setRowSwipe(swipe)
             .background(
                 rowColor,
                 RoundedCornerShape(8.dp),
@@ -827,6 +851,7 @@ private fun SetRow(
                 { options = true },
                 Modifier.width(40.dp).semantics {
                     contentDescription = "${spokenKind.replaceFirstChar { it.uppercase() }} $displayNumber options for $exerciseName"
+                    customActions = rowActions
                 },
                 contentPadding = PaddingValues(0.dp),
             ) {
@@ -876,6 +901,7 @@ private fun SetRow(
                     },
                     Modifier.weight(if (metric.isLoad) 1.3f else 1f).semantics {
                         contentDescription = "$exerciseName $spokenKind $displayNumber ${metric.catalogName.lowercase()} (${metric.label(prefs.pounds, prefs.distanceImperial)})"
+                        customActions = rowActions
                         if (invalid) error(if (metric.isReps) "Enter a whole number from 1 to 9999" else "Enter a valid ${metric.label(prefs.pounds, prefs.distanceImperial)} value")
                     },
                     isError = invalid,
@@ -895,7 +921,8 @@ private fun SetRow(
             onComplete,
             Modifier.size(48.dp)
                 .pressFeedback(completionSource, enabled = set.completed || set.canComplete(metrics))
-                .background(completionColor, RoundedCornerShape(8.dp)),
+                .background(completionColor, RoundedCornerShape(8.dp))
+                .semantics { customActions = rowActions },
             enabled = set.completed || set.canComplete(metrics),
             interactionSource = completionSource,
         ) {
