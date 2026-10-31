@@ -1,0 +1,10 @@
+# Screen recordings, stills and renders contain exercise demonstration media whose
+# ownership is separate from the code license; keep them out of the public repo.
+assets/footage/
+assets/stills/
+renders/
+.hyperframes/
+node_modules/
+# Sound effects come from HyperFrames' bundled library (Pixabay Content License, which
+# does not allow redistributing the raw files); see README.md for how to restore them.
+assets/sfx/

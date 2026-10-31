@@ -1,0 +1,103 @@
+<template>
+  <style>
+    @font-face {
+      font-family: "DM Sans OF";
+      src: url("assets/fonts/DM-Sans.ttf");
+      font-weight: 100 1000;
+    }
+    #root {
+      position: absolute;
+      inset: 0;
+      background: #131313;
+      font-family: "DM Sans OF", sans-serif;
+      color: #ffffff;
+    }
+    #end-tile {
+      position: absolute;
+      left: 619px;
+      top: 386px;
+      width: 168px;
+      height: 168px;
+      border-radius: 37px;
+      background: #0d0d0d;
+      overflow: hidden;
+    }
+    #end-tile svg {
+      position: absolute;
+      inset: 0;
+      width: 168px;
+      height: 168px;
+    }
+    #end-word {
+      position: absolute;
+      left: 831px;
+      top: 386px;
+      height: 168px;
+      display: flex;
+      align-items: center;
+      font-size: 84px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+    }
+    #end-word .l {
+      display: inline-block;
+    }
+    #end-cta,
+    #end-url,
+    #end-credit {
+      position: absolute;
+      left: 0;
+      width: 1920px;
+      text-align: center;
+    }
+    #end-cta {
+      top: 612px;
+      font-size: 40px;
+      font-weight: 400;
+      color: #b8b8bc;
+    }
+    #end-url {
+      top: 676px;
+      font-size: 40px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    #end-credit {
+      top: 948px;
+      font-size: 28px;
+      font-weight: 400;
+      color: #96999f;
+    }
+  </style>
+  <div data-hf-id="hf-32ii" id="root" data-composition-id="endcard" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-gmzh" id="end-tile">
+      <svg data-hf-id="hf-rppf" id="end-o" viewBox="0 0 108 108" aria-hidden="true">
+        <path data-hf-id="hf-1fcf" fill="#FFFFFF" fill-rule="evenodd" d="M18,30h32v48h-32z M27,39v30h14v-30z" />
+      </svg>
+      <svg data-hf-id="hf-669u" id="end-f" viewBox="0 0 108 108" aria-hidden="true">
+        <path data-hf-id="hf-ua64" fill="#FFFFFF" d="M58,30h32v9h-23v11h20v9h-20v19h-9z" />
+      </svg>
+    </div>
+    <div data-hf-id="hf-vzhw" id="end-word">Open Factor</div>
+    <div data-hf-id="hf-7hzr" id="end-cta">Free and open source for Android</div>
+    <div data-hf-id="hf-wv9m" id="end-url">github.com/aarsh21/open-factor</div>
+    <div data-hf-id="hf-sch6" id="end-credit">Exercise videos: thank you, Jeff Nippard</div>
+  </div>
+  <script>
+    (function () {
+      const word = document.querySelector("#end-word");
+      word.innerHTML = word.textContent.split("").map((c) => `<span class="l">${c === " " ? "&nbsp;" : c}</span>`).join("");
+      const tl = gsap.timeline({ paused: true });
+      // The O rises out of the tile floor; the F is printed left to right.
+      tl.fromTo("#end-o", { scaleY: 0, transformOrigin: "50% 72.2%" }, { scaleY: 1, duration: 0.42, ease: "expo.out" }, 0.12);
+      tl.fromTo("#end-f", { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.34, ease: "power3.out" }, 0.38);
+      // The name, letter by letter.
+      tl.fromTo("#end-word .l", { opacity: 0, filter: "blur(4px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, stagger: 0.045, ease: "power2.out" }, 0.62);
+      tl.fromTo("#end-cta", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power3.out" }, 1.45);
+      tl.fromTo("#end-url", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power3.out" }, 1.75);
+      tl.fromTo("#end-credit", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 2.2);
+      window.__timelines["endcard"] = tl;
+    })();
+  </script>
+</template>
