@@ -177,8 +177,11 @@ class ExerciseNavigatorJourneyTest {
         compose.waitForIdle()
         shot("03-superset")
         // Logging a superset set: the ring segment sweeps in while the indicator follows the auto-advance.
+        // Scroll before freezing the clock: scrolling animates, so a frozen clock never lets it settle.
+        val complete = compose.onNodeWithContentDescription("Complete set 1 for ${title(2)}").performScrollTo()
+        compose.waitForIdle()
         compose.mainClock.autoAdvance = false
-        compose.onNodeWithContentDescription("Complete set 1 for ${title(2)}").performScrollTo().performClick()
+        complete.performClick()
         compose.mainClock.advanceTimeBy(64)
         shot("06-log-set-mid-motion")
         compose.mainClock.advanceTimeBy(400)
