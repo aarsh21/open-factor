@@ -55,6 +55,7 @@ The debug APK is `openfactor/app/build/outputs/apk/debug/app-debug.apk`, package
 - Settings → Import spreadsheet previews the supplied Outlift-style Phase 1/2/3 XLSX layout and appends inactive weekly programs after explicit set-count, exercise-match and omission review. It does not fabricate training history or evaluate formulas. See [supported layout and import limitations](docs/open-factor/SPREADSHEET-IMPORT.md); this is not a lossless/general-purpose spreadsheet importer.
 - Program-day launches with rep/RIR targets and per-exercise rest overrides; weekly recorded training graphs, front/back anatomy and direct/indirect muscle-set counts over week/30-day/90-day windows.
 - Persist active workouts, selected exercise, pause/resume, weight, reps, optional RIR, warmups and notes.
+- A compact in-app workout keypad replaces the system keyboard for set values: digits, unit-aware −/+ steps with hold-to-repeat, Next across fields and unfinished sets, and Log set. It keeps the focused field visible and can be turned off in Workout settings.
 - Optional workout/rest notifications. Precise background timing requires Android special access; force-stop suppresses reminders until reopening.
 - Automatic rest timing, pause-excluding summaries, history and repeat workout; kilograms/pounds with canonical kilogram storage.
 - Local body data and progress photos, plus export/restore backups including programs and drafts.

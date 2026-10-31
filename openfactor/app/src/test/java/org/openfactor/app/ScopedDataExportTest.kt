@@ -120,7 +120,7 @@ class ScopedDataExportTest {
         val payload = ScopedDataExport.document(data, emptyList(), ScopedExportRequest(false, ExportTimeFrame.LAST_MONTH, selected), today, zone).getJSONObject("data")
         assertEquals(setOf("userProfile", "workoutSettings", "workouts", "trainingPrograms", "gymProfiles", "exerciseSettings", "customExercises"), payload.keys().asSequence().toSet())
         assertEquals("Renée", payload.getJSONObject("userProfile").getString("displayName"))
-        assertEquals(setOf("pounds", "restSeconds", "autoRest", "showRir", "exerciseAutoNext", "keepAlive", "showWorkoutTimer", "showBodyweightContribution", "distanceImperial", "restAfterLastWarmupSet", "restBetweenExercises", "supersetAutoNext", "restBetweenSidesPercent", "rateEffortAfterExercise", "weeklyWorkoutGoal"), payload.getJSONObject("workoutSettings").keys().asSequence().toSet())
+        assertEquals(setOf("pounds", "restSeconds", "autoRest", "showRir", "exerciseAutoNext", "keepAlive", "showWorkoutTimer", "showBodyweightContribution", "distanceImperial", "restAfterLastWarmupSet", "restBetweenExercises", "supersetAutoNext", "restBetweenSidesPercent", "rateEffortAfterExercise", "workoutKeypad", "weeklyWorkoutGoal"), payload.getJSONObject("workoutSettings").keys().asSequence().toSet())
         assertEquals(73, payload.getJSONObject("workoutSettings").getInt("restSeconds"))
         assertTrue(payload.getJSONObject("workoutSettings").getBoolean("keepAlive"))
         assertFalse(payload.getJSONObject("workoutSettings").getBoolean("showWorkoutTimer"))

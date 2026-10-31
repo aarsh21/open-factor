@@ -316,6 +316,9 @@ fun WorkoutSettings(p: Preferences, vm: WorkoutViewModel, onDismiss: () -> Unit)
                 PreferenceSwitch("Workout timer", "Show elapsed time during workout sessions", p.showWorkoutTimer) { checked ->
                     vm.settings { it.copy(showWorkoutTimer = checked) }
                 }
+                PreferenceSwitch("Workout keypad", "Enter set values with the in-app keypad instead of the system keyboard", p.workoutKeypad) { checked ->
+                    vm.settings { it.copy(workoutKeypad = checked) }
+                }
             }
         },
         confirmButton = { TextButton(onDismiss) { Text("Done") } },

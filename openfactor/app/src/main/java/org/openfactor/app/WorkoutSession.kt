@@ -101,6 +101,8 @@ fun WorkoutSession(
     var saveTemplate by rememberSaveable { mutableStateOf(false) }
     val resting by remember(clock, restUntil) { derivedStateOf { restUntil > clock.longValue } }
     TraceRecomposition("WorkoutSession")
+    val keypadState = remember { WorkoutKeypad() }
+    val keypad = keypadState.takeIf { data.preferences.workoutKeypad }
     Column(Modifier.fillMaxSize().imePadding()) {
         Row(
             Modifier.fillMaxWidth().background(OF.top).padding(horizontal = 8.dp, vertical = 4.dp),
@@ -223,7 +225,7 @@ fun WorkoutSession(
             }
         }
         LazyColumn(
-            Modifier.weight(1f),
+            Modifier.weight(1f).keypadOutsideTap(keypad) { focus.clearFocus() },
             contentPadding = PaddingValues(18.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
@@ -249,6 +251,7 @@ fun WorkoutSession(
                 var superset by remember { mutableStateOf(false) }
                 var mergeSides by remember { mutableStateOf(false) }
                 val logicalSets = se.logicalSets()
+                SideEffect { keypad?.order(logicalSets, metrics) }
                 var targets by remember { mutableStateOf(false) }
                 val showTargets = se.sets.any { it.targetRepsMin != null || it.targetRepsMax != null || it.targetRir != null }
                 Surface(color = OF.background, modifier = Modifier.animateItem(
@@ -362,6 +365,7 @@ fun WorkoutSession(
                                         hasExtras = group.components.size > 1,
                                         showTargets = showTargets,
                                         displayNumber = logicalSets.take(index + 1).count { it.root.warmup == group.root.warmup },
+                                        keypad = keypad,
                                     )
                                 } } }
                             }
@@ -448,6 +452,7 @@ fun WorkoutSession(
                 }
             }
         }
+        keypad?.let { WorkoutKeypadPanel(it) { focus.clearFocus() } }
     }
     // First match wins, as with the linear find it replaces.
     val catalogById = remember(exercises) { HashMap<String, Exercise>().apply { exercises.forEach { putIfAbsent(it.id, it) } } }
@@ -722,6 +727,7 @@ private fun SetRow(
     hasExtras: Boolean,
     showTargets: Boolean,
     displayNumber: Int,
+    keypad: WorkoutKeypad? = null,
 ) {
     TraceRecomposition("SetRow", set.id)
     val focus = LocalFocusManager.current
@@ -803,7 +809,7 @@ private fun SetRow(
                     mutableStateOf(metric.display(set, prefs.pounds, prefs.distanceImperial))
                 }
                 val invalid = text.isNotBlank() && metric.parse(text, prefs.pounds, prefs.distanceImperial) == null
-                OutlinedTextField(
+                KeypadTextField(
                     text,
                     { entered ->
                         text = entered
@@ -823,6 +829,7 @@ private fun SetRow(
                     keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }),
                     textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center, fontWeight = FontWeight.Medium),
                     shape = RoundedCornerShape(10.dp),
+                    field = keypad?.let { KeypadField(it, set.id, metric, prefs, set.completed, set.canComplete(metrics), onComplete) },
                 )
             }
         }

@@ -108,6 +108,7 @@ object ScopedDataExport {
                     .put("pounds", data.preferences.pounds).put("restSeconds", data.preferences.restSeconds)
                     .put("autoRest", data.preferences.autoRest).put("showRir", data.preferences.showRir)
                     .put("rateEffortAfterExercise", data.preferences.rateEffortAfterExercise)
+                    .put("workoutKeypad", data.preferences.workoutKeypad)
                     .put("weeklyWorkoutGoal", data.preferences.weeklyWorkoutGoal ?: JSONObject.NULL)
                     .put("exerciseAutoNext", data.preferences.exerciseAutoNext)
                     .put("keepAlive", data.preferences.keepAlive).put("showWorkoutTimer", data.preferences.showWorkoutTimer)
