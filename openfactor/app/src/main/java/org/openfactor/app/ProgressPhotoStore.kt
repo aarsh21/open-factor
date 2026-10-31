@@ -71,17 +71,16 @@ class ProgressPhotoStore(private val context: Context) {
         val bytes = output.toByteArray()
         validateImage(bytes)
         val reference = digest(bytes)
-        if (!file(reference).exists()) {
-            val temporary = File.createTempFile("import-", ".tmp", directory)
-            try {
-                temporary.outputStream().use {
-                    it.write(bytes)
-                    it.fd.sync()
-                }
-                check(temporary.renameTo(file(reference))) { "Could not store photo" }
-            } finally {
-                temporary.delete()
+        // Replace even an existing hash: reattaching the original must repair damaged stored bytes.
+        val temporary = File.createTempFile("import-", ".tmp", directory)
+        try {
+            temporary.outputStream().use {
+                it.write(bytes)
+                it.fd.sync()
             }
+            check(temporary.renameTo(file(reference))) { "Could not store photo" }
+        } finally {
+            temporary.delete()
         }
         return reference
     }
@@ -120,8 +119,16 @@ class ProgressPhotoStore(private val context: Context) {
                     override fun write(bytes: ByteArray, offset: Int, length: Int) = out.write(bytes, offset, length)
                     override fun close() = flush()
                 }
+                val original = file(reference)
+                require(original.length() in 1..MAX_PHOTO_BYTES.toLong()) { "Stored photo is too large or empty; reattach the original" }
+                val checksum = MessageDigest.getInstance("SHA-256")
                 Base64.getEncoder().wrap(nonClosing).use { encoded ->
-                    file(reference).inputStream().use { it.copyTo(encoded) }
+                    java.security.DigestInputStream(original.inputStream(), checksum).use {
+                        require(it.copyTo(encoded) <= MAX_PHOTO_BYTES) { "Stored photo is too large" }
+                    }
+                }
+                require(checksum.digest().joinToString("") { "%02x".format(it) } == reference) {
+                    "Stored photo is damaged; reattach the original before exporting"
                 }
                 bounded.write('"'.code)
             }
@@ -137,7 +144,7 @@ class ProgressPhotoStore(private val context: Context) {
         try {
             val metadata = JSONObject()
             val assets = mutableSetOf<String>()
-            val bounded = BoundedJsonText(InputStreamReader(input, Charsets.UTF_8))
+            val bounded = BoundedJsonText(InputStreamReader(input, Charsets.UTF_8.newDecoder()))
             JsonReader(bounded).use { reader ->
                 val values = BackupMetadataReader(reader)
                 reader.beginObject()

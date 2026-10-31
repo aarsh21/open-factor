@@ -165,7 +165,7 @@ fun SettingsScreen(
                 "Export Backup",
                 if (backupBusy) "Preparing backup…" else "Includes original photos; keep the file private",
             ) {
-                if (!backupBusy) export.launch("open-factor-${LocalDate.now()}.json")
+                if (!backupBusy) dialog = "export"
             }
             SettingsRow(
                 Icons.Rounded.FileDownload,
@@ -206,6 +206,13 @@ fun SettingsScreen(
         )
     }
     when (dialog) {
+        "export" -> ConfirmDialog(
+            "Export complete backup?",
+            "This file includes your training, body data, preferences and original progress photos with image metadata. It is not encrypted. Choose a private location and keep the file private.",
+            "Choose file",
+            { dialog = "" },
+            { dialog = ""; export.launch("open-factor-${LocalDate.now()}.json") },
+        )
         "rest" -> {
             var seconds by rememberSaveable { mutableStateOf(p.restSeconds.toString()) }
             var automatic by rememberSaveable { mutableStateOf(p.autoRest) }

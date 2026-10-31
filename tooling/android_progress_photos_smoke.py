@@ -225,7 +225,7 @@ try:
     assert final_record['photos']['back'] == hashlib.sha256(fixtures['replacement']).hexdigest()
     assert saved['photos']['back'] not in private_names()
     capture('photos-edited-history')
-    settings(); tap('Export Backup')
+    settings(); tap('Export Backup'); tap('Choose file')
     filename = f'ofphoto-backup-{time.time_ns()}.json'
     edit = [n for n in nodes() if n.get('class') == 'android.widget.EditText'][0]
     enter(edit.get('resource-id'), filename, 'resource-id', last=True)

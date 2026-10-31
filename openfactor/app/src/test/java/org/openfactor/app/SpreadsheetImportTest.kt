@@ -124,6 +124,13 @@ class SpreadsheetImportTest {
         rejects("formula-based weeks") { read(workbook(sampleRows().replace(number("D3", "1.0"), formula("D3", "1")))) }
     }
 
+    @Test fun restLabelsMustBeLiteralRatherThanUnwarnedCachedFormulaResults() {
+        rejects("rest targets must be literal") {
+            read(workbook(sampleRows().replace(cell("B4", "2-MIN REST"), formula("B4", "2-MIN REST"))))
+        }
+        assertEquals(120, read().phases.single().days.single().exercises.first().restSeconds)
+    }
+
     @Test fun missingDuplicateAndInvalidTargetsAreRejected() {
         rejects("missing weeks") { read(workbook(sampleRows().replace(number("D4", "2.0"), number("D4", "3")))) }
         rejects("duplicate exercise week") { read(workbook(sampleRows().replace(number("D4", "2.0"), number("D4", "1")))) }

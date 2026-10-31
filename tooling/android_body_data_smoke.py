@@ -270,6 +270,7 @@ try:
     settings()
     # Use the actual Android Storage Access Framework, not a private test-only export route.
     tap('Export Backup')
+    tap('Choose file')
     edit_fields = [n for n in nodes() if n.get('class') == 'android.widget.EditText']
     assert edit_fields, 'Android document creation did not open'
     filename = f'open-factor-body-smoke-{time.time_ns()}.json'

@@ -54,6 +54,39 @@ class StorageRecoveryTest {
         assertEquals(listOf(damaged), originals(WorkoutStore(context, name)))
     }
 
+    @Test fun missingPrimaryRecoversSurvivingCheckpointInsteadOfInitializingAnEmptyStore() = withStore { context, name, store ->
+        assertEquals(AppData(), store.load())
+        assertNull(store.recovery())
+        val known = AppData(active = Workout(name = "Resume after primary loss"),
+            history = listOf(Workout(name = "Keep archived history")))
+        store.save(known)
+        assertEquals(known, store.load())
+        val checkpoint = context.getSharedPreferences("${name}_recovery", Context.MODE_PRIVATE)
+            .getString("data_last_good", null)!!
+        assertTrue(context.getSharedPreferences(name, Context.MODE_PRIVATE).edit().remove("data").commit())
+        val recovered = WorkoutStore(context, name)
+        assertEquals(known, recovered.load())
+        assertEquals(StorageRecovery(restoredPreviousData = true, originalCount = 1), recovered.recovery())
+        assertTrue(checkpoint in originals(recovered))
+        val next = known.copy(preferences = known.preferences.copy(pounds = true))
+        recovered.save(next)
+        assertEquals(next, WorkoutStore(context, name).load())
+        assertTrue(checkpoint in originals(WorkoutStore(context, name)))
+    }
+
+    @Test fun malformedHistoryContainerRecoversCheckpointAndPreservesExactOriginal() = withStore { context, name, store ->
+        val known = AppData(history = listOf(Workout(name = "Keep recorded history")))
+        store.save(known)
+        assertEquals(known, store.load())
+        val malformed = org.json.JSONObject(DataCodec.encode(known))
+            .put("history", org.json.JSONObject().put("damaged", true)).toString()
+        assertTrue(context.getSharedPreferences(name, Context.MODE_PRIVATE).edit().putString("data", malformed).commit())
+        val recovered = WorkoutStore(context, name)
+        assertEquals(known, recovered.load())
+        assertEquals(StorageRecovery(restoredPreviousData = true, originalCount = 1), recovered.recovery())
+        assertTrue(malformed in originals(recovered))
+    }
+
     @Test fun noCheckpointPreservesOriginalBeforeFreshGymInitialization() = withStore { context, name, _ ->
         val damaged = "{\"schemaVersion\":999999,\"training\":\"newer app data\"}"
         val prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)

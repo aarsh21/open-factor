@@ -164,7 +164,7 @@ private fun ScopedExportScreen(vm: WorkoutViewModel, snackbar: SnackbarHostState
             Text(dates?.let { "${it.start} – ${it.endInclusive} · inclusive dates" } ?: "All saved dates", color = OF.muted)
             Text("What's Included?", style = MaterialTheme.typography.titleMedium)
             Text(if (quick) "Muscle-group set records, the active training program, and completed workout history including notes."
-                else "${selected.size} categories. Dated records use the time frame; libraries and settings export their current state. Workouts means saved routines. User Profile contains your display name.")
+                else "${selected.size} categories. Dated records use the time frame; libraries and settings export their current state. Workouts means saved routines. User Profile contains your display name, gender, height and weekly workout goal.")
             Text("Local JSON for analysis, not a restorable backup. No original photos, exercise media, active sessions or unsaved drafts. Hidden measurements still export. Use Export Backup for a complete restore file, including photos. Keep exports private.", color = OF.muted)
             Text("Exercise and muscle-group data contains raw saved sets and catalog muscle labels, not estimated strength, trend or volume calculations.", color = OF.muted)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }

@@ -4,6 +4,99 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ProgramDataTest {
+    private fun validationProgram(count: Int = 1) = TrainingProgram(
+        id = "plan", name = "Validation", cycleCount = count,
+        days = listOf(ProgramDay(id = "day", name = "Upper", exercises = listOf(
+            PlannedExercise(id = "entry", exerciseId = "press", cycles = List(count) {
+                CycleTarget(listOf(SetTarget(id = "set-$it", repsMin = 1, repsMax = 9, rir = 1)), restSeconds = 1)
+            }),
+        ))),
+    )
+
+    private fun firstTarget(json: org.json.JSONObject) = json.getJSONArray("days").getJSONObject(0)
+        .getJSONArray("exercises").getJSONObject(0).getJSONArray("cycles").getJSONObject(0)
+
+    @Test
+    fun normalProgramNumbersRejectCoercionAndOverflow() {
+        val plan = validationProgram()
+        for (key in listOf("repsMin", "repsMax", "rir", "restSeconds")) {
+            for (value in listOf(1.5, "1", true, 4_294_967_297L, -4_294_967_295L)) {
+                val json = ProgramCodec.encode(plan)
+                val target = firstTarget(json)
+                val fields = if (key == "restSeconds") target else target.getJSONArray("sets").getJSONObject(0)
+                fields.put(key, value)
+                assertThrows("$key must reject $value", IllegalArgumentException::class.java) { ProgramCodec.decode(json) }
+            }
+        }
+        for (value in listOf(1.5, "1", true, 4_294_967_297L, org.json.JSONObject.NULL)) {
+            val json = ProgramCodec.encode(plan).put("cycleCount", value)
+            assertThrows(IllegalArgumentException::class.java) { ProgramCodec.decode(json) }
+        }
+        assertEquals(plan, ProgramCodec.decode(ProgramCodec.encode(plan)))
+    }
+
+    @Test
+    fun programSkipRequiresABooleanInsteadOfChangingThePrescriptionSilently() {
+        for (value in listOf("true", "false", 0, 1, org.json.JSONObject.NULL)) {
+            val json = ProgramCodec.encode(validationProgram())
+            firstTarget(json).put("skip", value)
+            assertThrows(IllegalArgumentException::class.java) { ProgramCodec.decode(json) }
+        }
+        for (skip in listOf(false, true)) {
+            val json = ProgramCodec.encode(validationProgram())
+            firstTarget(json).put("skip", skip)
+            assertEquals(skip, ProgramCodec.decode(json).days.single().exercises.single().cycles.single().skip)
+        }
+    }
+
+    @Test
+    fun strictProgramNumbersKeepLegacyDefaultsOptionalTargetsAndIntegralJsonNumbers() {
+        val legacy = ProgramCodec.encode(validationProgram(7)).apply { remove("cycleCount") }
+        val target = firstTarget(legacy).apply { remove("skip"); put("restSeconds", 0.0) }
+        target.getJSONArray("sets").getJSONObject(0).apply {
+            put("repsMin", org.json.JSONObject.NULL)
+            put("repsMax", 9999.0)
+            put("rir", 10.0)
+        }
+        val decoded = ProgramCodec.decode(legacy)
+        assertEquals(7, decoded.cycleCount)
+        val restored = decoded.days.single().exercises.single().cycles.first()
+        assertFalse(restored.skip)
+        assertEquals(0, restored.restSeconds)
+        assertNull(restored.sets.single().repsMin)
+        assertEquals(9999, restored.sets.single().repsMax)
+        assertEquals(10, restored.sets.single().rir)
+        assertEquals(decoded, ProgramCodec.decode(ProgramCodec.encode(decoded)))
+    }
+
+    @Test
+    fun failurePrescriptionsInitializeZeroEffortForNormalAndExplicitDeloadSessions() {
+        val target = CycleTarget(listOf(SetTarget(id = "failure", repsMin = 6, repsMax = 10, rir = 2, kind = SetKind.FAILURE)))
+        val entry = PlannedExercise(exerciseId = "press", cycles = listOf(target), deloadTargets = mapOf(ProgramDeload.FIRST to target))
+        val plan = TrainingProgram(name = "Failure", cycleCount = 1, deloadPlacement = ProgramDeload.FIRST,
+            days = listOf(ProgramDay(id = "day", exercises = listOf(entry))))
+        for (cycle in listOf(0, ProgramDeload.FIRST.sourceCycle)) {
+            val workout = plan.toWorkout("day", cycle, 1000)!!
+            val log = workout.exercises.single().sets.single()
+            assertNotEquals("failure", log.id)
+            assertEquals(SetKind.FAILURE, log.kind)
+            assertEquals(0, log.rir)
+            assertEquals(2, log.targetRir)
+            assertNull(log.reps)
+            assertNull(log.weightKg)
+            assertFalse(log.completed)
+            val completed = workout.exercises.single().copy(sets = listOf(log.copy(weightKg = 40.0, reps = 8, completed = true)))
+            assertNull(completed.pendingEffortSet(listOf(SetMetric.WEIGHT, SetMetric.REPS)))
+            assertEquals(workout, DataCodec.decode(DataCodec.encode(AppData(active = workout))).active)
+        }
+        assertEquals(target, plan.days.single().exercises.single().cycles.single())
+        assertEquals(plan, ProgramCodec.decode(ProgramCodec.encode(plan)))
+        val standard = plan.copy(days = listOf(ProgramDay(id = "day", exercises = listOf(entry.copy(
+            cycles = listOf(target.copy(sets = listOf(target.sets.single().copy(kind = SetKind.STANDARD)))),
+        )))))
+        assertNull(standard.toWorkout("day", 0, 1000)!!.exercises.single().sets.single().rir)
+    }
+
     @Test
     fun manualDraftStartsWithRestAndConvertsOnlyTheEditedDay() {
         val first = ProgramDay(id = "rest")

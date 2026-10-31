@@ -142,6 +142,10 @@ fun ProgramDay.addExercise(exerciseId: String, cycleCount: Int, workoutName: Str
                 ),
     )
 
+/** Derived deload targets can add three RIR to the normal 0–10 range, even after a plan is deleted. */
+internal val Workout.targetRirLimit: Int
+    get() = if (programId != null && ProgramDeload.entries.any { it.sourceCycle == programCycle }) 13 else 10
+
 fun TrainingProgram.toWorkout(
     dayId: String,
     cycle: Int,
@@ -169,6 +173,7 @@ fun TrainingProgram.toWorkout(
                             targetRepsMax = it.repsMax,
                             targetRir = it.rir,
                             kind = it.kind,
+                            rir = if (it.kind == SetKind.FAILURE) 0 else null,
                         )
                     },
                 restSeconds = targets.restSeconds,
@@ -203,18 +208,22 @@ object ProgramCodec {
                     .put("kind", s.kind.name)
             }))
 
+    private fun optionalInt(j: JSONObject, key: String, deload: Boolean = false): Int? {
+        if (j.isNull(key)) return null
+        val value = j.get(key)
+        if (deload) require(value is Int) { "Invalid deload $key" }
+        require(value is Number && value.toDouble().isFinite() && value.toDouble() % 1.0 == 0.0 &&
+            value.toDouble() in Int.MIN_VALUE.toDouble()..Int.MAX_VALUE.toDouble()) { "Invalid program $key" }
+        return value.toInt()
+    }
+
     private fun decodeTarget(c: JSONObject, deload: Boolean = false): CycleTarget {
-        fun optionalInt(j: JSONObject, key: String): Int? {
-            if (j.isNull(key)) return null
-            if (deload) require(j.get(key) is Int) { "Invalid deload $key" }
-            return j.getInt(key)
-        }
-        val rest = optionalInt(c, "restSeconds")
+        val rest = optionalInt(c, "restSeconds", deload)
         require(rest == null || rest in 0..1800) { "Invalid program rest timer" }
         val sets = c.getJSONArray("sets").objects().map { s ->
-            val min = optionalInt(s, "repsMin")
-            val max = optionalInt(s, "repsMax")
-            val rir = optionalInt(s, "rir")
+            val min = optionalInt(s, "repsMin", deload)
+            val max = optionalInt(s, "repsMax", deload)
+            val rir = optionalInt(s, "rir", deload)
             require(min == null || min in 1..9999) { "Invalid minimum reps" }
             require(max == null || max in 1..9999) { "Invalid maximum reps" }
             require(min == null || max == null || min <= max) { "Minimum reps exceeds maximum" }
@@ -223,7 +232,7 @@ object ProgramCodec {
             SetTarget(s.getString("id"), min, max, rir, kind)
         }
         require(sets.map { it.id }.distinct().size == sets.size) { "Duplicate program set" }
-        if (deload && c.has("skip")) require(c.get("skip") is Boolean) { "Invalid deload skip" }
+        if (c.has("skip")) require(c.get("skip") is Boolean) { "Invalid program skip" }
         return CycleTarget(sets, c.optBoolean("skip"), rest)
     }
 
@@ -273,7 +282,7 @@ object ProgramCodec {
             )
 
     fun decode(j: JSONObject): TrainingProgram {
-        val count = j.optInt("cycleCount", 7)
+        val count = if (j.has("cycleCount")) requireNotNull(optionalInt(j, "cycleCount")) { "Invalid program cycle count" } else 7
         require(count in 1..52) { "Program cycles must be between 1 and 52" }
         val days =
             j.getJSONArray("days").objects().map { day ->

@@ -42,6 +42,8 @@ def safe_relative(value: str) -> Path:
 
 
 def prepare(source: Path, output: Path, mode: str, max_static_bytes: int = STATIC_LIMIT) -> dict:
+    if output.is_symlink():
+        raise ValueError("Generated output must not be a symlink")
     source, output = source.resolve(), output.resolve()
     if source == output or source in output.parents or output in source.parents:
         raise ValueError("Generated output must be separate from the imported source directory")
@@ -50,10 +52,12 @@ def prepare(source: Path, output: Path, mode: str, max_static_bytes: int = STATI
     if mode not in {"source", "static", "full"}:
         raise ValueError(f"Unknown media mode: {mode}")
     marker = output / "media-pack.json"
+    if output.exists() and any(path.is_symlink() for path in output.rglob("*")):
+        raise ValueError("Generated output must not contain symlinks")
     if output.exists() and any(output.iterdir()) and not marker.is_file():
         raise ValueError(f"Refusing to change an unmanaged output directory: {output}")
     previous = json.loads(marker.read_text()) if marker.is_file() else {}
-    if previous and previous.get("schema") != SCHEMA:
+    if marker.is_file() and (not isinstance(previous, dict) or previous.get("schema") != SCHEMA):
         raise ValueError("Unsupported generated pack schema; choose a new output directory")
     output.mkdir(parents=True, exist_ok=True)
     if not marker.is_file():
