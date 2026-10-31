@@ -521,8 +521,15 @@ object DataCodec {
 
     fun decode(text: String, historyOverride: List<Workout>? = null): AppData = decode(JSONObject(text), historyOverride)
 
+    internal fun requireSupportedVersion(json: JSONObject) {
+        val version = json.opt("schemaVersion")
+        // JSON readers use either Int or Long. Never truncate fractions, wrap large values,
+        // or accept strings/booleans as a supported version.
+        require(version == 1 || version == 1L) { "Unsupported backup version" }
+    }
+
     internal fun decode(j: JSONObject, historyOverride: List<Workout>? = null): AppData {
-        require(j.optInt("schemaVersion") == 1) { "Unsupported backup version" }
+        requireSupportedVersion(j)
         require(!j.has("storageHistory") || historyOverride != null) { "Internal storage snapshot is not a restore backup" }
         val p = j.optionalObject("preferences") ?: JSONObject()
         val programs = j.array("programs").objects().map { ProgramCodec.decode(it) }
@@ -743,6 +750,22 @@ class WorkoutStore(context: Context, preferencesName: String = "open_factor") {
 
     fun hasRecoveryPayloads(): Boolean = locked { recoveryPayloads().isNotEmpty() }
 
+    /** Null means cleanup is unsafe: unreadable recovery data may reference any original. */
+    internal fun recoveryPhotoReferences(): Set<String>? = locked {
+        if (unreadablePrimary != null || hasRecoveryPayloads()) return@locked null
+        try {
+            val checkpoint = recoveryPrefs.getString("data_last_good", null)
+                ?: return@locked emptySet()
+            val document = JSONObject(checkpoint)
+            DataCodec.requireSupportedVersion(document)
+            // Only decode photo metadata, not a potentially multi-year workout history.
+            ProgressPhotoCodec.decode(document).flatMap { it.photos.values }.toSet()
+        } catch (_: Exception) {
+            // Preserve originals rather than guessing what a damaged/newer checkpoint needs.
+            null
+        }
+    }
+
     private companion object {
         // A reader must finish before another store can prune the archive it just referenced.
         val storageLocks = java.util.concurrent.ConcurrentHashMap<String, Any>()
@@ -890,8 +913,10 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         cleanPhotos()
     }
 
-    @Synchronized fun cleanPhotos(draft: Collection<String> = emptyList()) =
-        photoStore.clean(_data.value.photoReferences() + draft)
+    @Synchronized fun cleanPhotos(draft: Collection<String> = emptyList()) {
+        val recoveryReferences = store.recoveryPhotoReferences() ?: return
+        photoStore.clean(_data.value.photoReferences() + recoveryReferences + draft)
+    }
 
     fun editOnboarding(block: (OnboardingState) -> OnboardingState) = update {
         it.copy(onboarding = block(it.onboarding))

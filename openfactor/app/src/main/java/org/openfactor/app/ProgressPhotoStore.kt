@@ -98,7 +98,9 @@ class ProgressPhotoStore(private val context: Context) {
     /** Stream one workout and one photo at a time; never duplicate the whole history as JSON trees. */
     fun export(data: AppData, output: OutputStream) {
         requireFiles(data)
-        val bounded = BoundedBackupOutput(output)
+        // Document providers may perform an expensive write for every call. Keep punctuation
+        // and the platform Base64 encoder's small writes off the destination until buffered.
+        val bounded = BoundedBackupOutput(BufferedOutputStream(output))
         val writer = JsonWriter(OutputStreamWriter(bounded, Charsets.UTF_8))
         val values = BackupMetadataWriter(writer)
         writer.beginObject()
@@ -116,6 +118,8 @@ class ProgressPhotoStore(private val context: Context) {
                 if (index > 0) bounded.write(','.code)
                 bounded.write("\"$reference\":\"".toByteArray())
                 val nonClosing = object : FilterOutputStream(bounded) {
+                    // API 26's FilterOutputStream.write(byte[]) otherwise loops byte-by-byte.
+                    override fun write(bytes: ByteArray) = out.write(bytes, 0, bytes.size)
                     override fun write(bytes: ByteArray, offset: Int, length: Int) = out.write(bytes, offset, length)
                     override fun close() = flush()
                 }
@@ -245,6 +249,7 @@ internal constructor(val data: AppData, private val staging: File, private val d
 
 private class BoundedBackupOutput(output: OutputStream) : FilterOutputStream(output) {
     private var written = 0L
+    override fun write(bytes: ByteArray) = write(bytes, 0, bytes.size)
     override fun write(value: Int) {
         require(written + 1 <= ProgressPhotoStore.MAX_BACKUP_BYTES) { "Backup exceeds the 1 GiB safety limit" }
         out.write(value)

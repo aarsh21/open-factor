@@ -179,12 +179,21 @@ class ProgressPhotoStorageTest {
             rejected {
                 it.getJSONArray("progressPhotos").getJSONObject(0).put("date", "2026-02-30")
             }
+            fun refreshCheckpointAndClean() {
+                assertEquals(reopened.data.value, WorkoutStore(context).load())
+                reopened.cleanPhotos()
+            }
             reopened.deleteProgressPhotos(record.id)
+            // The startup checkpoint must remain photo-complete until a later load advances it.
+            assertTrue(references.all { reopened.photoStore.file(it).exists() })
+            refreshCheckpointAndClean()
             assertTrue(reopened.photoStore.file(references.first()).exists())
             assertFalse(reopened.photoStore.file(references[1]).exists())
             assertFalse(reopened.photoStore.file(references[2]).exists())
             reopened.deleteProgressPhotos(shared.id)
             assertEquals(training, reopened.data.value)
+            assertTrue(reopened.photoStore.file(references.first()).exists())
+            refreshCheckpointAndClean()
             assertFalse(reopened.photoStore.file(references.first()).exists())
             // Restore onto an empty store, not onto retained records or attachment files.
             reopened.restore(DataCodec.encode(AppData()))
@@ -204,11 +213,14 @@ class ProgressPhotoStorageTest {
                 )
             reopened.saveProgressPhotos(edited)
             assertEquals(listOf(edited, shared), reopened.data.value.progressPhotos)
+            assertTrue(reopened.photoStore.file(references[1]).exists())
+            refreshCheckpointAndClean()
             assertFalse(reopened.photoStore.file(references[1]).exists())
             val legacy =
                 JSONObject(DataCodec.encode(training)).apply { remove("progressPhotos") }.toString()
             reopened.restore(legacy)
             assertEquals(training, reopened.data.value)
+            refreshCheckpointAndClean()
             assertTrue(references.none { reopened.photoStore.file(it).exists() })
             assertThrows(IllegalArgumentException::class.java) {
                 reopened.photoStore.attach(ByteArrayInputStream("not a photo".toByteArray()))
