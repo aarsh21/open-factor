@@ -105,6 +105,24 @@ class ScopedDataExportTest {
     }
 
     @Test
+    fun profileExportHasExplicitSavedFieldsAndDoesNotIncludePrivateSetupDrafts() {
+        val data = AppData(
+            preferences = Preferences(displayName = "Renée", weeklyWorkoutGoal = 4),
+            onboarding = OnboardingState(gender = ProfileGender.NON_BINARY, heightCm = "172.25",
+                weightKg = "PRIVATE baseline", profileDraft = ProfileSetupDraft(name = "PRIVATE draft")),
+        )
+        val document = ScopedDataExport.document(data, emptyList(), ScopedExportRequest(false,
+            ExportTimeFrame.ALL_TIME, setOf(ExportCategory.USER_PROFILE)), today, zone)
+        val profile = document.getJSONObject("data").getJSONObject("userProfile")
+        assertEquals(setOf("displayName", "gender", "heightCm", "weeklyWorkoutGoal"), profile.keys().asSequence().toSet())
+        assertEquals("Renée", profile.getString("displayName"))
+        assertEquals("NON_BINARY", profile.getString("gender"))
+        assertEquals(172.25, profile.getDouble("heightCm"), 0.0)
+        assertEquals(4, profile.getInt("weeklyWorkoutGoal"))
+        assertFalse(document.toString().contains("PRIVATE"))
+    }
+
+    @Test
     fun categorySnapshotsAreExplicitAndUnavailableCategoriesCannotPretendToExport() {
         val data = AppData(
             preferences = Preferences(pounds = true, restSeconds = 73, autoRest = false, displayName = "Renée", dismissedTutorials = setOf("bodyCharts"),

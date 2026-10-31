@@ -265,7 +265,7 @@ try:
     final_record = next(r for r in final['progressPhotos'] if r['id'] == record['id'])
     assert final_record['photos']['back'] == replacement and record['photos']['back'] not in private_names()
     capture('photo-history-edited')
-    settings(); tap('Export Backup')
+    settings(); tap('Export Backup'); tap('Choose file')
     filename = tag+'-backup.json'; downloads.append(filename)
     edit = next(n for n in nodes() if n.get('class') == 'android.widget.EditText')
     enter(edit.get('resource-id'), filename, 'resource-id', last=True); tap('Save', last=True); target('Export Backup')

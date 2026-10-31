@@ -279,7 +279,7 @@ try:
     tap('Back', 'content-desc'); tap('Body Data'); tap('View Charts'); target('About body charts'); tap('Got it')
     final = state()
     assert final == dismissed
-    settings(); tap('Export Backup'); target('Save')
+    settings(); tap('Export Backup'); tap('Choose file'); target('Save')
     name = tag+'-complete.json'; downloads.append(name); save_as(name); target('Export Backup')
     complete = json.loads(adb('shell', 'cat', '/sdcard/Download/'+name))
     assert complete['preferences'] == final['preferences']

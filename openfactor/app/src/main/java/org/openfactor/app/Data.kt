@@ -168,11 +168,11 @@ data class WorkingSetTarget(
     val repsMax: Int? = null,
     val rir: Int? = null,
 ) {
-    fun isValid(): Boolean =
+    fun isValid(maxRir: Int = 10): Boolean =
         (repsMin == null || repsMin > 0) &&
             (repsMax == null || repsMax > 0) &&
             (repsMin == null || repsMax == null || repsMin <= repsMax) &&
-            (rir == null || rir in 0..10)
+            (rir == null || rir in 0..maxRir)
 }
 
 /** Updates only current working rows, keyed by stable set ID, in one session change. */
@@ -182,7 +182,7 @@ fun Workout.withExerciseTargets(
     restSeconds: Int?,
 ): Workout {
     require(restSeconds == null || restSeconds in 0..1800) { "Rest must be 0–1800 seconds" }
-    require(targets.values.all { it.isValid() }) { "Invalid working set targets" }
+    require(targets.values.all { it.isValid(targetRirLimit) }) { "Invalid working set targets" }
     return copy(exercises = exercises.map { exercise ->
         if (exercise.id != exerciseId) exercise
         else exercise.copy(
@@ -453,7 +453,11 @@ object DataCodec {
 
     private fun JSONArray.strings() = (0 until length()).map { getString(it) }
 
-    private fun JSONObject.array(k: String) = optJSONArray(k) ?: JSONArray()
+    // Missing legacy fields have defaults; malformed present fields must not erase saved records.
+    private fun JSONObject.array(k: String) = if (has(k)) getJSONArray(k) else JSONArray()
+
+    private fun JSONObject.optionalObject(k: String): JSONObject? =
+        if (isNull(k)) null else getJSONObject(k)
 
     private fun JSONObject.actual(key: String, maximum: Double = Double.MAX_VALUE): Double? =
         if (isNull(key)) null else getDouble(key).also {
@@ -520,13 +524,13 @@ object DataCodec {
     internal fun decode(j: JSONObject, historyOverride: List<Workout>? = null): AppData {
         require(j.optInt("schemaVersion") == 1) { "Unsupported backup version" }
         require(!j.has("storageHistory") || historyOverride != null) { "Internal storage snapshot is not a restore backup" }
-        val p = j.optJSONObject("preferences") ?: JSONObject()
+        val p = j.optionalObject("preferences") ?: JSONObject()
         val programs = j.array("programs").objects().map { ProgramCodec.decode(it) }
         require(programs.map { it.id }.distinct().size == programs.size) { "Duplicate program" }
         val routines = j.array("routines").objects().map { TemplateCodec.decodeRoutine(it) }
         require(routines.map { it.id }.distinct().size == routines.size) { "Duplicate template" }
         return AppData(
-            j.optJSONObject("active")?.workout(),
+            j.optionalObject("active")?.workout(),
             historyOverride ?: j.array("history").objects().map { it.workout() },
             routines,
             j.array("favorites").strings().toSet(),
@@ -555,8 +559,8 @@ object DataCodec {
                 theme = AppTheme.valueOf(p.optString("theme", AppTheme.DARK.name)),
                 // Cosmetic: a missing or unknown palette (older or newer backup) falls back to Charcoal.
                 palette = AppPalette.entries.firstOrNull { it.name == p.optString("palette") } ?: AppPalette.CHARCOAL,
-                shortcuts = ShortcutPreferences.decode(p.optJSONObject("shortcuts")),
-                dashboard = DashboardPreferences.decode(p.optJSONObject("dashboard")),
+                shortcuts = ShortcutPreferences.decode(p.optionalObject("shortcuts")),
+                dashboard = DashboardPreferences.decode(p.optionalObject("dashboard")),
                 restAfterLastWarmupSet = p.optBoolean("restAfterLastWarmupSet", true),
                 restBetweenExercises = p.optBoolean("restBetweenExercises", true),
                 supersetAutoNext = p.optBoolean("supersetAutoNext", true),
@@ -574,11 +578,11 @@ object DataCodec {
             j.optString("activeProgramId").takeIf { it.isNotBlank() && it != "null" },
             j.array("gyms").objects().map { GymCodec.decode(it) },
             programs,
-            j.optJSONObject("programDraft")?.let { ProgramCodec.decode(it) },
-            OnboardingState.decode(j.optJSONObject("onboarding")),
+            j.optionalObject("programDraft")?.let { ProgramCodec.decode(it) },
+            OnboardingState.decode(j.optionalObject("onboarding")),
             BodyDataCodec.readWeights(j),
             BodyDataCodec.readMeasurements(j),
-            workoutDraft = j.optJSONObject("workoutDraft")?.let {
+            workoutDraft = j.optionalObject("workoutDraft")?.let {
                 WorkoutDraft(
                     name = it.getString("name"),
                     exercises = it.array("exercises").objects().map { entry -> entry.sessionExercise() },
@@ -587,17 +591,17 @@ object DataCodec {
                 )
             },
             progressPhotos = ProgressPhotoCodec.decode(j),
-            exerciseDefaults = ExerciseDefaultsCodec.decode(j.optJSONObject("exerciseDefaults")),
-            healthConnect = HealthConnectSyncCodec.decode(j.optJSONObject("healthConnect")),
-            pastWorkoutEdit = j.optJSONObject("pastWorkoutEdit")?.let {
+            exerciseDefaults = ExerciseDefaultsCodec.decode(j.optionalObject("exerciseDefaults")),
+            healthConnect = HealthConnectSyncCodec.decode(j.optionalObject("healthConnect")),
+            pastWorkoutEdit = j.optionalObject("pastWorkoutEdit")?.let {
                 PastWorkoutEdit(it.getJSONObject("original").workout(), it.getJSONObject("edited").workout())
             },
-            templateSplits = TemplateCodec.decodeSplits(j.optJSONArray("templateSplits"), routines),
+            templateSplits = TemplateCodec.decodeSplits(j.array("templateSplits"), routines),
         )
     }
 
     private fun JSONObject.exercise(custom: Boolean = optBoolean("custom")): Exercise {
-        val properties = optJSONObject("properties")
+        val properties = optionalObject("properties")
         val muscles = array("muscles").strings()
         fun requirements(key: String): List<Set<String>> = array(key).let { groups ->
             (0 until groups.length()).map { groups.getJSONArray(it).strings().toSet() }
@@ -662,19 +666,22 @@ class WorkoutStore(context: Context, preferencesName: String = "open_factor") {
     }
 
     fun load(): AppData = locked {
-        val raw = prefs.getString("data", null) ?: return AppData()
+        val raw = prefs.getString("data", null)
+        val checkpoint = recoveryPrefs.getString("data_last_good", null)
+        if (raw == null && checkpoint == null) return AppData()
         val decoded = decode(raw)
         if (decoded != null) {
             unreadablePrimary = null
             // A startup checkpoint avoids duplicating the full history on each typed digit.
-            if (recoveryPrefs.getString("data_last_good", null) != raw)
+            if (checkpoint != raw)
                 recoveryPrefs.edit().putString("data_last_good", raw).commit()
             return decoded
         }
-        unreadablePrimary = raw
-        val previous = decode(recoveryPrefs.getString("data_last_good", null))
+        // Missing primary preferences are not a fresh install when a checkpoint still exists.
+        unreadablePrimary = raw ?: checkpoint
+        val previous = decode(checkpoint)
         restoredPreviousData = previous != null
-        // Keep the original before allowing initialization or a later edit to replace primary data.
+        // Keep the original (or surviving checkpoint) before initialization can replace primary data.
         // If this commit fails, save() includes preservation in the same atomic commit as new data.
         if (preserveUnreadable(recoveryPrefs.edit()).commit()) unreadablePrimary = null
         return previous ?: AppData()
@@ -871,10 +878,10 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun saveProgressPhotos(record: ProgressPhotoRecord) {
         record.validate()
-        val next = _data.value.copy(progressPhotos = listOf(record) +
-            _data.value.progressPhotos.filterNot { it.id == record.id })
-        photoStore.requireFiles(next)
-        update { next }
+        update { data ->
+            data.copy(progressPhotos = listOf(record) +
+                data.progressPhotos.filterNot { it.id == record.id }).also(photoStore::requireFiles)
+        }
         cleanPhotos()
     }
 
@@ -883,7 +890,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         cleanPhotos()
     }
 
-    fun cleanPhotos(draft: Collection<String> = emptyList()) =
+    @Synchronized fun cleanPhotos(draft: Collection<String> = emptyList()) =
         photoStore.clean(_data.value.photoReferences() + draft)
 
     fun editOnboarding(block: (OnboardingState) -> OnboardingState) = update {
@@ -1291,7 +1298,7 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
         photoStore.prepare(ByteArrayInputStream(text.toByteArray())).use { restore(it) }
     }
 
-    fun restore(backup: PreparedPhotoBackup) {
+    @Synchronized fun restore(backup: PreparedPhotoBackup) {
         val decoded = backup.data
         val d =
             if (decoded.gyms.isEmpty())

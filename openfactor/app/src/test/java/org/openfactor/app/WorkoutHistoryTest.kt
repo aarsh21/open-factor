@@ -20,6 +20,23 @@ class WorkoutHistoryTest {
         assertTrue(workoutHistoryDays(listOf(older), LocalDate.parse("2026-10-28")).isEmpty())
     }
 
+    @Test fun homeRecentWorkoutsUseRecordedDatesRatherThanImportOrEditOrder() {
+        val workouts = (1..7).map { day ->
+            Workout(id = "day-$day", name = "Day $day", startedAt = day * 86_400_000L)
+        }
+        val unordered = listOf(workouts[0], workouts[3], workouts[6], workouts[1], workouts[5], workouts[2], workouts[4])
+        assertEquals(listOf("day-7", "day-6", "day-5", "day-4", "day-3"), recentWorkouts(unordered).map { it.id })
+        assertEquals(5, recentWorkouts(unordered + workouts[6]).size)
+        assertEquals(5, recentWorkouts(unordered + workouts[6]).map { it.id }.distinct().size)
+
+        // Changing a saved date must affect Home immediately, without reordering storage.
+        val edited = unordered.map { if (it.id == "day-1") it.copy(startedAt = 8 * 86_400_000L) else it }
+        assertEquals(listOf("day-1", "day-7", "day-6", "day-5", "day-4"), recentWorkouts(edited).map { it.id })
+        assertEquals(listOf(workouts.first()), recentWorkouts(workouts.take(1)))
+        assertTrue(recentWorkouts(emptyList()).isEmpty())
+        assertEquals("day-1", unordered.first().id)
+    }
+
     @Test fun durationKeepsSecondsAndHours() {
         assertEquals("0:00", historyDuration(0))
         assertEquals("21:19", historyDuration(1279))

@@ -14,6 +14,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.time.format.DateTimeFormatter
 
+/** Imports and saved-date edits need not leave the backing list in chronological order. */
+internal fun recentWorkouts(history: List<Workout>): List<Workout> =
+    history.distinctBy { it.id }.sortedByDescending { it.startedAt }.take(5)
+
 /** Logging is the default destination. Planning and analytics remain one action away. */
 @Composable
 fun WorkoutHome(
@@ -34,6 +38,7 @@ fun WorkoutHome(
     val today = rememberToday()
     val week = remember(data.active, data.history, exercises, today) { data.trainingWeek(exercises, today = today) }
     val catalog = remember(exercises) { exercises.associateBy { it.id } }
+    val recent = remember(data.history) { recentWorkouts(data.history) }
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 112.dp),
@@ -101,7 +106,7 @@ fun WorkoutHome(
         }
         if (data.history.isNotEmpty()) {
             item { Box(Modifier.padding(horizontal = 18.dp)) { SectionTitle("Recent workouts", "All", onHistory) } }
-            items(data.history.take(5), key = { "history-${it.id}" }) { workout ->
+            items(recent, key = { "history-${it.id}" }) { workout ->
                 Row(
                     Modifier.itemMotion(this).fillMaxWidth().clickable(onClick = onHistory).padding(horizontal = 18.dp, vertical = 18.dp),
                     verticalAlignment = Alignment.CenterVertically,

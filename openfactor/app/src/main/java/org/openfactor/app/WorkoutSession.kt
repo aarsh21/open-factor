@@ -344,7 +344,7 @@ fun WorkoutSession(
                             onDismissLast = { vm.dismissLastNote(se.id) },
                         )
                         if (targets)
-                            WorkoutTargetsDialog(se, { targets = false }) { values, rest ->
+                            WorkoutTargetsDialog(se, workout.targetRirLimit, { targets = false }) { values, rest ->
                                 vm.saveExerciseTargets(se.id, values, rest)
                                 targets = false
                             }
@@ -734,6 +734,7 @@ private fun SessionNotesDialog(title: String, initial: String, onDismiss: () -> 
 @Composable
 private fun WorkoutTargetsDialog(
     exercise: SessionExercise,
+    maxRir: Int,
     onDismiss: () -> Unit,
     onSave: (Map<String, WorkingSetTarget>, Int?) -> Unit,
 ) {
@@ -751,7 +752,7 @@ private fun WorkoutTargetsDialog(
     }
     val valid = values.values.all { fields ->
         fields.all { it.isBlank() || it.toIntOrNull() != null }
-    } && parsed.values.all { it.isValid() } &&
+    } && parsed.values.all { it.isValid(maxRir) } &&
         (rest.isBlank() || rest.toIntOrNull()?.let { it in 0..1800 } == true)
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -785,7 +786,7 @@ private fun WorkoutTargetsDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                 )
-                if (!valid) Text("Use positive ordered rep bounds, RIR 0–10 and rest 0–1800.", color = MaterialTheme.colorScheme.error)
+                if (!valid) Text("Use positive ordered rep bounds, RIR 0–$maxRir and rest 0–1800.", color = MaterialTheme.colorScheme.error)
             }
         },
         confirmButton = {

@@ -225,6 +225,7 @@ def contract(device, ui):
     assert ui.state() == expected
     ui.settings()
     ui.tap('Export Backup')
+    ui.tap('Choose file')
     ui.target('Save')
     ui.capture('native-save')
     name = tag + '-complete.json'

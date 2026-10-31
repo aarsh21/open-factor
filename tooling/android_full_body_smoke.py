@@ -225,7 +225,7 @@ try:
         assert state() == saved, 'Dismissing chart help changed unrelated saved data'
     tap('Neck'); tap('Visual Body Fat'); tap('All'); target('26.13 %'); target('0 %')
     capture('visual-fat-chart'); assert state() == saved
-    settings(); tap('Export Backup')
+    settings(); tap('Export Backup'); tap('Choose file')
     filename = f'offullbody-{time.time_ns()}.json'
     edit = next(n for n in nodes() if n.get('class') == 'android.widget.EditText')
     enter(edit.get('resource-id'), filename, 'resource-id', last=True)

@@ -328,6 +328,41 @@ class WorkoutDataTest {
     }
 
     @Test
+    fun changingActiveDeloadRestPreservesRecoveredRirTargetsAndRecordedActuals() {
+        val catalog = listOf(Exercise("press", "Press", "Chest", "Barbell", properties = mapOf("Metrics" to "Weight, Reps")))
+        val plan = TrainingProgram(id = "plan", name = "Deload", cycleCount = 1,
+            days = listOf(ProgramDay(id = "day", exercises = listOf(PlannedExercise(
+                exerciseId = "press", cycles = listOf(CycleTarget(listOf(SetTarget(repsMin = 7, repsMax = 9, rir = 10)))),
+            )))))
+        for (placement in ProgramDeload.entries) {
+            val started = plan.copy(deloadPlacement = placement).toWorkout("day", placement.sourceCycle, 1000, catalog = catalog)!!
+            val recorded = started.copy(exercises = started.exercises.map { entry ->
+                entry.copy(sets = entry.sets.map { it.copy(weightKg = 40.0, reps = 8, rir = 3, completed = true) })
+            })
+            val entry = recorded.exercises.single()
+            val targets = entry.sets.associate { it.id to WorkingSetTarget(it.targetRepsMin, it.targetRepsMax, it.targetRir) }
+            assertEquals(13, entry.sets.single().targetRir)
+            assertEquals(13, recorded.targetRirLimit)
+            val changed = recorded.withExerciseTargets(entry.id, targets, 75)
+            assertEquals(recorded.copy(exercises = listOf(entry.copy(restSeconds = 75))), changed)
+            // Target editing must still work after the source program has been deleted.
+            val data = AppData(active = changed, history = listOf(recorded.copy(id = "saved", finishedAt = 2000)))
+            assertTrue(data.programs.isEmpty())
+            assertEquals(data, DataCodec.decode(DataCodec.encode(data)))
+            assertThrows(IllegalArgumentException::class.java) {
+                recorded.withExerciseTargets(entry.id, mapOf(entry.sets.single().id to WorkingSetTarget(rir = 14)), 75)
+            }
+        }
+        val normal = plan.toWorkout("day", 0, 1000, catalog = catalog)!!
+        assertEquals(10, normal.targetRirLimit)
+        assertThrows(IllegalArgumentException::class.java) {
+            normal.withExerciseTargets(normal.exercises.single().id,
+                mapOf(normal.exercises.single().sets.single().id to WorkingSetTarget(rir = 11)), 75)
+        }
+        assertEquals(10, normal.copy(programId = null, programCycle = -1).targetRirLimit)
+    }
+
+    @Test
     fun invalidTargetsAndRestAreRejectedAndOptionalBoundsAreAccepted() {
         val exercise = SessionExercise(exerciseId = "dip")
         val workout = Workout(name = "Training", exercises = listOf(exercise))

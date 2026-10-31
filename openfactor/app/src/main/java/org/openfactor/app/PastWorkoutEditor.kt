@@ -85,11 +85,17 @@ fun PastWorkoutEditor(
                                 val number = session.logicalSets().take(index + 1).count { it.root.warmup == group.root.warmup }
                                 val label = listOfNotNull(if (log.warmup) "Warm-up $number" else "Set $number", log.side?.label,
                                     if (component > 0) "Myo $component" else if (log.kind != SetKind.STANDARD) log.kind.label else null).joinToString(" · ")
-                                PastSetEditor(title, label, log, metrics, prefs,
+                                PastSetEditor(title, label, log, metrics, prefs, hasExtras = group.components.size > 1,
                                     onInvalid = { key, invalid -> invalidInputs = invalidInputs + (key to invalid) },
                                     onChange = { next -> entry(session.id) { it.copy(sets = it.sets.map { s -> if (s.id == log.id) next else s }) } },
                                     onRemove = { entry(session.id) { it.withoutSet(log.id) } },
-                                    onWarmup = { entry(session.id) { it.withSetKind(log.id, log.kind, !log.warmup) } })
+                                    onWarmup = {
+                                        if (!log.warmup) {
+                                            // Effort inputs disappear for the whole logical warmup, including both sides.
+                                            invalidInputs = invalidInputs - group.logs.map { "${it.id}:RIR" }.toSet()
+                                        }
+                                        entry(session.id) { it.withSetKind(log.id, log.kind, !log.warmup) }
+                                    })
                             } }
                         }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -129,11 +135,12 @@ fun PastWorkoutEditor(
 
 @Composable
 private fun PastSetEditor(
-    exercise: String, label: String, set: LoggedSet, metrics: List<SetMetric>, prefs: Preferences,
+    exercise: String, label: String, set: LoggedSet, metrics: List<SetMetric>, prefs: Preferences, hasExtras: Boolean,
     onInvalid: (String, Boolean) -> Unit,
     onChange: (LoggedSet) -> Unit, onRemove: () -> Unit, onWarmup: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
+    var confirmWarmup by remember(set.id) { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(label, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = OF.muted)
@@ -142,7 +149,10 @@ private fun PastSetEditor(
             Box {
                 IconButton({ menu = true }) { Icon(Icons.Rounded.MoreVert, "Options for $exercise $label") }
                 DropdownMenu(menu, { menu = false }) {
-                    DropdownMenuItem(text = { Text(if (set.warmup) "Mark as working set" else "Mark as warmup") }, onClick = { menu = false; onWarmup() })
+                    DropdownMenuItem(text = { Text(if (set.warmup) "Mark as working set" else "Mark as warmup") }, onClick = {
+                        menu = false
+                        if (hasExtras) confirmWarmup = true else onWarmup()
+                    })
                     DropdownMenuItem(text = { Text(if (set.segmentOf != null) "Remove Myo component" else "Remove set group") }, onClick = { menu = false; onRemove() })
                 }
             }
@@ -177,4 +187,8 @@ private fun PastSetEditor(
         }
         HorizontalDivider(Modifier.padding(top = 8.dp), color = OF.line)
     }
+    if (confirmWarmup) ConfirmDialog(
+        "Remove Myo components?", "Marking this set as a warmup removes its additional component values on both sides. The main set is kept. Saved history changes only after Save.",
+        "Change set type", { confirmWarmup = false }, { confirmWarmup = false; onWarmup() },
+    )
 }

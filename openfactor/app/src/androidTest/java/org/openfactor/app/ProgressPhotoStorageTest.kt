@@ -15,6 +15,48 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ProgressPhotoStorageTest {
+    private fun withPhotoStore(test: (ProgressPhotoStore) -> Unit) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val directory = java.io.File(context.cacheDir, "photo-storage-test-${newId()}").apply { check(mkdirs()) }
+        val isolated = object : android.content.ContextWrapper(context) {
+            override fun getNoBackupFilesDir() = directory
+        }
+        try { test(ProgressPhotoStore(isolated)) }
+        finally { directory.deleteRecursively() }
+    }
+
+    @Test fun exportRejectsDamagedOriginalsAndReattachingRepairsTheSameReference() = withPhotoStore { store ->
+        val bitmap = Bitmap.createBitmap(29, 43, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.CYAN)
+        val bytes = ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+        bitmap.recycle()
+        val reference = store.attach(bytes.inputStream())
+        val data = AppData(progressPhotos = listOf(ProgressPhotoRecord(photos = mapOf(PhotoPosition.FRONT to reference))))
+        val damaged = bytes + byteArrayOf(1)
+        store.file(reference).writeBytes(damaged)
+        assertThrows(IllegalArgumentException::class.java) { store.export(data, ByteArrayOutputStream()) }
+        assertArrayEquals(damaged, store.file(reference).readBytes())
+        assertEquals(reference, store.attach(bytes.inputStream()))
+        assertArrayEquals(bytes, store.file(reference).readBytes())
+        val backup = ByteArrayOutputStream().also { store.export(data, it) }.toByteArray()
+        store.prepare(backup.inputStream()).use { prepared ->
+            assertEquals(data, prepared.data)
+            prepared.install()
+            assertArrayEquals(bytes, store.file(reference).readBytes())
+        }
+        store.file(reference).writeBytes(byteArrayOf())
+        assertThrows(IllegalArgumentException::class.java) { store.export(data, ByteArrayOutputStream()) }
+    }
+
+    @Test fun malformedUtf8BackupIsRejectedInsteadOfChangingSavedText() = withPhotoStore { store ->
+        val prefix = "{\"schemaVersion\":1,\"preferences\":{\"displayName\":\"".toByteArray()
+        val suffix = "\"}}".toByteArray()
+        val malformed = prefix + byteArrayOf(0xc3.toByte(), 0x28) + suffix
+        assertThrows(java.nio.charset.CharacterCodingException::class.java) { store.prepare(malformed.inputStream()) }
+        val valid = DataCodec.encode(AppData(preferences = Preferences(displayName = "Renée · 日本語"))).toByteArray()
+        store.prepare(valid.inputStream()).use { assertEquals("Renée · 日本語", it.data.preferences.displayName) }
+    }
+
     @Test
     fun cameraCapturesUsePrivateFullResolutionUrisAndCleanCancelledOrInvalidOutput() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -129,6 +171,9 @@ class ProgressPhotoStorageTest {
                     assertArrayEquals(bytes, reopened.photoStore.file(reference).readBytes())
                 }
             }
+            rejected { it.put("history", JSONObject()) }
+            rejected { it.put("active", "damaged session") }
+            rejected { it.getJSONObject("preferences").put("dashboard", "damaged settings") }
             rejected { it.getJSONObject("photoAssets").remove(references.first()) }
             rejected { it.getJSONObject("photoAssets").put(references.first(), "bm90IGEgcGhvdG8=") }
             rejected {

@@ -204,6 +204,7 @@ internal object SpreadsheetImport {
             val exercise = currentExercise ?: throw IllegalArgumentException("$location: week has no exercise name.")
             require(exercise.weeks.none { it.week == week }) { "$location: duplicate exercise week." }
             if (restMatch != null) {
+                require(!label.formula) { "$location: rest targets must be literal, not stored formula results." }
                 val amount = restMatch.groupValues[1].toIntOrNull() ?: -1
                 val seconds = amount.toLong() * if (restMatch.groupValues[2].equals("MIN", true)) 60 else 1
                 require(seconds in 0..1800) { "$location: rest must be 0–1800 seconds." }

@@ -73,7 +73,7 @@ object ScopedDataExport {
         val exercises = (catalog + data.customExercises).associateBy { it.id }
         val payload = JSONObject()
         // Only selected categories reach the codec; unselected private state is not serialized.
-        val encoded = JSONObject(DataCodec.encode(AppData(
+        val encoded = DataCodec.document(AppData(
             history = if (ExportCategory.WORKOUT_LOG in chosen || ExportCategory.EXERCISES in chosen) workouts.map { workout ->
                 if (request.quick) workout else workout.copy(notes = "", exercises = workout.exercises.map { it.copy(notes = "") })
             } else emptyList(),
@@ -86,7 +86,7 @@ object ScopedDataExport {
             customExercises = if (ExportCategory.CUSTOM_EXERCISES in chosen) data.customExercises else emptyList(),
             gyms = if (ExportCategory.GYM_PROFILES in chosen) data.gyms else emptyList(),
             exerciseDefaults = if (ExportCategory.EXERCISE_SETTINGS in chosen) data.exerciseDefaults else emptyMap(),
-        )))
+        ))
         chosen.forEach { category ->
             when (category) {
                 ExportCategory.SCALE_WEIGHT -> payload.put(category.key, encoded.getJSONArray("scaleWeights"))

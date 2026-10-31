@@ -75,7 +75,8 @@ class MainActivity : ComponentActivity() {
                 windowRevealed = true
             }
         }
-        if (intent.action == WorkoutNotifications.OPEN_WORKOUT) workoutOpenRequest++
+        // A recreated activity restores its current route. The retained launch intent is not a new tap.
+        if (savedInstanceState == null && intent.action == WorkoutNotifications.OPEN_WORKOUT) workoutOpenRequest++
         enableEdgeToEdge(
             statusBarStyle =
                 androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),

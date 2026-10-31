@@ -67,7 +67,7 @@ Local category mappings are:
 | Exercises | Saved exercise set actuals and targets, not calculated estimates |
 | Training Programs | Saved programs; only the active program in Quick Export |
 | Workouts | Saved routines |
-| User Profile | Display name only |
+| User Profile | Display name, gender, height, and weekly workout goal; no setup drafts |
 | Exercise Settings | Saved per-exercise defaults |
 | Gym Profiles | Saved equipment and weight selections |
 | Workout Settings | Weight and distance units, rest duration, automatic rest, RIR, auto-next, keep-alive, timer, and bodyweight contribution display |
