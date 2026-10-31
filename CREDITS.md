@@ -1,18 +1,20 @@
 # Credits
 
-The public workout app bundles DM Sans by the DM Sans project authors under the SIL Open Font License (full license in `openfactor/app/src/main/assets/fonts/OFL.txt`). It also bundles 44 unmodified exercise illustrations by Everkinetic, distributed through wger under Creative Commons BY-SA 3.0 Unported. [The media manifest and attribution guide](docs/open-factor/LICENSED-MEDIA.md) record the 21 reviewed exercise mappings, source URLs, original authors, licenses, and hashes. These image licenses are independent of the GPLv3 application code. No endorsement is implied.
+The public workout app bundles DM Sans by the DM Sans project authors under the SIL Open Font License (full license in `openfactor/app/src/main/assets/fonts/OFL.txt`). It also bundles 44 unmodified exercise illustrations by Everkinetic, distributed through wger under Creative Commons BY-SA 3.0 Unported. [The media manifest and attribution guide](docs/open-factor/LICENSED-MEDIA.md) record the 21 reviewed exercise mappings, source URLs, original authors, licenses, and hashes. These image licenses are independent of the MIT-licensed application code. No endorsement is implied.
 
-Open Factor is independently maintained by [aarsh21](https://github.com/aarsh21) and Open Factor contributors.
+Open Factor is independently maintained by [aarsh21](https://github.com/aarsh21).
 
-## Base application
+## Exercise videos
 
-**[NuvioMobile](https://github.com/NuvioMedia/NuvioMobile)** by NuvioMedia and its contributors provided the application base. Open Factor adapts its floating navigation capsule, design tokens and grouped Settings presentation. The original base implementation and its history retain their contributor attribution. The original project documentation is preserved in [docs/upstream/NUVIO-README.md](docs/upstream/NUVIO-README.md).
+A special thank you to **[Jeff Nippard](https://www.youtube.com/@JeffNippard)** for the exercise demonstration videos. The videos remain his and their original owners' property and are not relicensed by Open Factor.
 
-Application code remains under the [GNU General Public License v3.0](LICENSE). Existing copyright and license notices are retained. Independent repository maintenance does not change the authorship or licensing of inherited code.
+## Application code
+
+Application code is released under the [MIT License](LICENSE).
 
 ## Libraries and icons
 
-Open Factor uses Kotlin, Jetpack Compose, AndroidX, Coil and Material icons under their respective licenses. Existing dependency and source notices remain applicable.
+Open Factor uses Kotlin, Jetpack Compose, AndroidX, Coil and Material icons under their respective licenses.
 
 ## Reference content
 

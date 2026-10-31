@@ -2,6 +2,7 @@ package org.openfactor.app
 
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
@@ -117,6 +118,11 @@ class PaletteShotsTest {
         settle()
     }
 
+    /** Scrolled only to the viewport edge, a low row sits under the floating navigation, whose plus takes a tap. */
+    private fun openAppearanceRow() {
+        compose.onNodeWithText("Appearance").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+    }
+
     @Test fun everyPaletteInDarkAndLight() {
         val history = history()
         AppPalette.entries.forEach { palette ->
@@ -131,7 +137,7 @@ class PaletteShotsTest {
                 shot("$prefix-3-dashboard")
                 tab("Settings")
                 shot("$prefix-4-settings")
-                compose.onNodeWithText("Appearance").performScrollTo().performClick()
+                openAppearanceRow()
                 settle()
                 shot("$prefix-5-appearance")
             }
@@ -141,7 +147,7 @@ class PaletteShotsTest {
     private fun openAppearance(palette: AppPalette) {
         launch(AppData(onboarding = OnboardingState(completed = true), preferences = preferences(palette, true)), "Start workout")
         tab("Settings")
-        compose.onNodeWithText("Appearance").performScrollTo().performClick()
+        openAppearanceRow()
         settle()
     }
 

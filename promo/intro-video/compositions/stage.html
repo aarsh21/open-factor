@@ -1,0 +1,178 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    #stage-ground {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background: #f5f5f5;
+    }
+    #stage-cam {
+      position: absolute;
+      z-index: 1;
+      left: 0;
+      top: 0;
+      width: 1920px;
+      height: 1080px;
+    }
+    #stage-phone-wrap {
+      position: absolute;
+      left: 1102px;
+      top: 48px;
+      width: 456px;
+      height: 984px;
+    }
+    #stage-phone {
+      position: absolute;
+      inset: 0;
+      border-radius: 60px;
+      background: #0a0a0a;
+      box-shadow: inset 0 0 0 1.5px #2a2a2a;
+      clip-path: inset(0px 0px 0px 0px round 60px);
+    }
+    #stage-shadow {
+      position: absolute;
+      inset: 0;
+      border-radius: 60px;
+      box-shadow:
+        0 40px 80px rgba(0, 0, 0, 0.22),
+        0 8px 18px rgba(0, 0, 0, 0.16);
+    }
+    #stage-screen {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      width: 432px;
+      height: 960px;
+      border-radius: 48px;
+      overflow: hidden;
+      background: #131313;
+    }
+    #stage-screen video,
+    #stage-screen img {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 432px;
+      height: 960px;
+      object-fit: cover;
+    }
+    #stage-dim {
+      position: absolute;
+      inset: 0;
+      background: #000;
+      opacity: 0;
+    }
+    #stage-tile {
+      position: absolute;
+      inset: 0;
+      background: #0d0d0d;
+      opacity: 0;
+    }
+  </style>
+  <div data-hf-id="hf-e7aa" id="root" data-composition-id="stage" data-width="1920" data-height="1080" data-layout-allow-overflow>
+    <div data-hf-id="hf-eein" id="stage-ground"></div>
+    <div data-hf-id="hf-bzcb" id="stage-cam">
+      <div data-hf-id="hf-cxin" id="stage-phone-wrap">
+        <div data-hf-id="hf-1s9a" id="stage-shadow"></div>
+        <div data-hf-id="hf-k87y" id="stage-phone">
+          <div data-hf-id="hf-t6rm" id="stage-screen">
+            <!-- Hook: keypad entry and swipe-to-log (take 1) -->
+            <video data-hf-id="hf-ztum" id="stage-v-log" class="clip" src="assets/footage/take1-log.mp4" muted playsinline
+              data-start="0" data-duration="4.25" data-media-start="2.4" data-playback-rate="1.2" data-track-index="1"></video>
+            <!-- Bench with all three sets logged, then the Guide (take 2) -->
+            <video data-hf-id="hf-d6rg" id="stage-v-bench" class="clip" src="assets/footage/take2-guide.mp4" muted playsinline
+              data-start="4.25" data-duration="4.35" data-media-start="0" data-playback-rate="0.345" data-track-index="1"></video>
+            <video data-hf-id="hf-v0yd" id="stage-v-guide" class="clip" src="assets/footage/take2-guide.mp4" muted playsinline
+              data-start="8.6" data-duration="0.85" data-media-start="1.5" data-playback-rate="1" data-track-index="1"></video>
+            <!-- The stream's loading spinner (source 2.35-3.35 s) is cut out. -->
+            <video id="stage-v-demo" class="clip" src="assets/footage/take2-guide.mp4" muted playsinline
+              data-start="9.45" data-duration="4.55" data-media-start="3.5" data-playback-rate="1" data-track-index="1"></video>
+            <video data-hf-id="hf-qog7" id="stage-v-muscles" class="clip" src="assets/footage/take2-guide.mp4" muted playsinline
+              data-start="14" data-duration="1.9" data-media-start="11.45" data-playback-rate="1" data-track-index="1"></video>
+            <!-- Swap exercise (take 3) -->
+            <video data-hf-id="hf-cdrl" id="stage-v-swap" class="clip" src="assets/footage/take3-swap.mp4" muted playsinline
+              data-start="15.9" data-duration="4.9" data-media-start="1.0" data-playback-rate="1.3" data-track-index="1"></video>
+            <!-- Finish and summary (take 4) -->
+            <video data-hf-id="hf-mdwt" id="stage-v-finish" class="clip" src="assets/footage/take4-finish.mp4" muted playsinline
+              data-start="20.8" data-duration="3.6" data-media-start="6.3" data-playback-rate="1.1" data-track-index="1"></video>
+            <!-- Dashboard payoff (take 5) -->
+            <video data-hf-id="hf-1hto" id="stage-v-dash" class="clip" src="assets/footage/take5-dashboard.mp4" muted playsinline
+              data-start="24.4" data-duration="6.4" data-media-start="1.4" data-playback-rate="1.2" data-track-index="1"></video>
+            <!-- Exercise library (take 7) -->
+            <video data-hf-id="hf-rsdc" id="stage-v-library" class="clip" src="assets/footage/take7-library.mp4" muted playsinline
+              data-start="30.8" data-duration="3.6" data-media-start="1.5" data-playback-rate="1.25" data-track-index="1"></video>
+            <!-- Color palettes (take 6) -->
+            <video data-hf-id="hf-cooc" id="stage-v-palettes" class="clip" src="assets/footage/take6-palettes.mp4" muted playsinline
+              data-start="34.4" data-duration="4.6" data-media-start="1.3" data-playback-rate="1.9" data-track-index="1"></video>
+            <!-- Claim: the week's dashboard, held -->
+            <img data-hf-id="hf-gpd6" id="stage-still-dash" class="clip" src="assets/stills/dashboard.png" alt="Open Factor dashboard"
+              data-start="39" data-duration="4.6" data-track-index="1" />
+            <div data-hf-id="hf-r7ac" id="stage-dim"></div>
+            <div data-hf-id="hf-h4hm" id="stage-tile"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      // Screen geometry: source recordings are 1080 x 2400, shown at 0.4 on the phone at home.
+      const K = 0.4, SX = 1102 + 12, SY = 48 + 12;
+      // Camera framing: put source point (sx, sy) at canvas point (tx, ty) at scale s.
+      const cam = (s, sx, sy, tx = 1330, ty = 540) => ({
+        scale: s,
+        x: tx - s * (SX + sx * K),
+        y: ty - s * (SY + sy * K),
+      });
+      const HOME = { scale: 1, x: 0, y: 0 };
+      const tl = gsap.timeline({ paused: true });
+      tl.set("#stage-cam", { transformOrigin: "0 0", ...cam(1.78, 540, 1640) }, 0);
+
+      // Hook -> whip pull-back to the whole phone (the screen cut at 4.25 hides inside the move).
+      tl.to("#stage-cam", { ...HOME, duration: 0.6, ease: "power3.inOut" }, 4.0);
+
+      // Push toward the Guide button, then reframe on the demonstration video as the sheet rises.
+      tl.to("#stage-cam", { ...cam(1.45, 802, 683, 1330, 360), duration: 0.6, ease: "power2.inOut" }, 8.15);
+      tl.to("#stage-cam", { ...cam(1.32, 540, 1260), duration: 0.8, ease: "power2.inOut" }, 9.25);
+
+      // Hard punch-in cut on the Muscles tab.
+      tl.set("#stage-cam", cam(1.5, 540, 1150), 14.0);
+
+      // Whip to the next exercise: leave fast, arrive fast.
+      tl.to("#stage-cam", { x: "-=420", duration: 0.15, ease: "power3.in" }, 15.75);
+      tl.set("#stage-cam", { scale: 1, x: 420, y: 0 }, 15.9);
+      tl.to("#stage-cam", { x: 0, duration: 0.3, ease: "power3.out" }, 15.9);
+      // Into the swap sheet as it rises.
+      tl.to("#stage-cam", { ...cam(1.22, 540, 1150), duration: 0.7, ease: "power2.inOut" }, 17.25);
+
+      // Dip cut to the Finish dialog, then the summary.
+      tl.to("#stage-dim", { opacity: 0.4, duration: 0.1, ease: "none" }, 20.7);
+      tl.set("#stage-dim", { opacity: 0 }, 20.8);
+      tl.to("#stage-cam", { ...cam(1.48, 540, 820), duration: 0.8, ease: "power2.inOut" }, 22.0);
+
+      // Payoff: back out to the tab bar, then into the week's rings, then pull back as it scrolls.
+      tl.to("#stage-cam", { ...HOME, duration: 0.45, ease: "power3.inOut" }, 24.15);
+      tl.to("#stage-cam", { ...cam(1.8, 540, 1000, 1420, 540), duration: 0.75, ease: "power3.inOut" }, 25.15);
+      tl.to("#stage-cam", { ...cam(1.18, 540, 1250), duration: 0.9, ease: "power2.inOut" }, 27.55);
+      tl.to("#stage-cam", { ...HOME, duration: 0.5, ease: "power3.inOut" }, 30.55);
+
+      // Palettes: each tap floods the ground with that palette's own action colour.
+      const floods = [[34.62, "#9DB8FF"], [35.58, "#F5A54A"], [36.53, "#CFE6C4"], [37.49, "#FFFFFF"], [38.44, "#F5F5F5"]];
+      floods.forEach(([t, c]) => tl.to("#stage-ground", { backgroundColor: c, duration: 0.3, ease: "power2.inOut" }, t));
+
+      // Morph: the phone crops to a square and shrinks into the app-icon tile; the ground goes charcoal.
+      tl.to("#stage-shadow", { opacity: 0, duration: 0.3, ease: "power2.in" }, 42.6);
+      tl.to("#stage-tile", { opacity: 1, duration: 0.45, ease: "power2.inOut" }, 42.6);
+      tl.to("#stage-phone", { clipPath: "inset(264px 0px 264px 0px round 100px)", duration: 0.55, ease: "power3.inOut" }, 42.65);
+      tl.to("#stage-phone-wrap", { x: -627, y: -70, scale: 168 / 456, duration: 0.75, ease: "power3.inOut" }, 42.75);
+      tl.to("#stage-ground", { backgroundColor: "#131313", duration: 0.5, ease: "power2.inOut" }, 42.85);
+
+      window.__timelines["stage"] = tl;
+    })();
+  </script>
+</template>

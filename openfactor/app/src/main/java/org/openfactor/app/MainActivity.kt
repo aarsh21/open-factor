@@ -82,6 +82,17 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle =
                 androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.P) {
+            // Android 8 focuses a window's first focusable view even in touch mode, and refocuses it whenever
+            // focus is cleared. Compose hands that to the first set field, so the workout keypad opened by itself
+            // and Back or an outside tap could never close it. Android 9 dropped both; on 8 the frame absorbs it.
+            findViewById<android.view.ViewGroup>(android.R.id.content).apply {
+                isFocusableInTouchMode = true
+                descendantFocusability = android.view.ViewGroup.FOCUS_BEFORE_DESCENDANTS
+                // Focusable would make it one screen-sized accessibility node; its children stay accessible.
+                importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+        }
         setContent {
             val vm: WorkoutViewModel = viewModel()
             val data by vm.data.collectAsState()
@@ -124,7 +135,9 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     val onboardingPending by remember(vm) { derivedStateOf { !data.onboarding.completed && !data.onboarding.deferred } }
     TraceRecomposition("OpenFactorApp")
     var tab by rememberSaveable { mutableIntStateOf(1) }
-    var route by rememberSaveable { mutableStateOf(when { data.pastWorkoutEdit != null -> "history-edit"; data.active != null -> "session"; else -> "" }) }
+    // Initial values come from vm.data.value, not data: reading data inside a remember calculation subscribes
+    // the whole shell to it, and then every keystroke recomposes the shell.
+    var route by rememberSaveable { vm.data.value.let { d -> mutableStateOf(when { d.pastWorkoutEdit != null -> "history-edit"; d.active != null -> "session"; else -> "" }) } }
     var detailId by rememberSaveable { mutableStateOf("") }
     var previousRoute by rememberSaveable { mutableStateOf("") }
     var exerciseInfo by rememberSaveable { mutableStateOf(false) }
@@ -151,7 +164,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     var swapPickId by rememberSaveable { mutableStateOf("") }
     val contentRoute =
         if (route == "measurement-entry" || route == "photo-entry") bodyEntryReturn else route
-    val exercises = remember(vm, customExercises, libraryReady) { vm.exercises(data) }
+    val exercises = remember(vm, customExercises, libraryReady) { vm.exercises() }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val routeState = rememberSaveableStateHolder()
@@ -798,7 +811,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                     fadeOut(tween(AppMotion.Quick)) +
                         slideOutVertically(tween(AppMotion.State, easing = AppMotion.EaseOut)) { it / 3 },
             ) {
-                NuvioWorkoutNavigation(
+                WorkoutNavigation(
                     tab,
                     { scrollEnergy },
                     onAdd = {

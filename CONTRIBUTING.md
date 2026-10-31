@@ -1,6 +1,6 @@
 # Contributing to Open Factor
 
-Open Factor is a native Android workout app. Its application and Gradle project live in `openfactor/`; the optional exercise-media service lives in `backend/media/`. The former upstream Nuvio media-player targets are not part of this repository's supported build.
+Open Factor is a native Android workout app. Its application and Gradle project live in `openfactor/`; the optional exercise-media service lives in `backend/media/`.
 
 ## Before changing code
 
@@ -8,7 +8,7 @@ Open Factor is a native Android workout app. Its application and Gradle project 
 - Keep changes focused. Explain the problem, behavior changes, and known limitations.
 - Preserve users' saved training and backup compatibility. Never replace real data with synthetic records without explicit consent.
 - Keep imported reference media, signing credentials, private captures, and generated build output out of Git.
-- Preserve GPLv3 notices and the attribution in [CREDITS.md](CREDITS.md). Media licenses are separate.
+- Preserve the license and the attribution in [CREDITS.md](CREDITS.md). Code is MIT; media licenses are separate.
 
 ## Build and test
 

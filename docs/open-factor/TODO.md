@@ -9,7 +9,7 @@ The private Mac return contains all **1,831 expected original videos and 1,831 m
 - Preserve unresolved scope: 712 other exercises exposed no demo selectors during recorded visits, and 14 catalog entries were not located. Neither observation proves absent server media.
 - Preserve instruction gaps: 1,212 exercises have nonempty current Markdown, one has only older database text, and 132 have neither. Older text is retained separately, not silently substituted in the app.
 - Keep the unmatched photo unmapped. Do not infer a missing exercise ID or guess extra video suffixes.
-- Keep source media private until its redistribution terms are established separately from the GPL code. No recordings, synthetic media or account tokens belong in the imported pack.
+- Keep source media private until its redistribution terms are established separately from the MIT code. No recordings, synthetic media or account tokens belong in the imported pack.
 - Check original HEVC compatibility on physical Android hardware before claiming broad playback support. The byte-preserving full video payload is 2.73 GB; distribution size remains a separate decision.
 
 Expected-path recovery is complete. Full catalog media coverage and full app parity remain incomplete. The published alpha.4 APK predates this video import.

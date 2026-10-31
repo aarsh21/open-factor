@@ -1,6 +1,6 @@
 ---
 name: Open Factor
-description: Simple native workout logging in charcoal and white by default, five curated palettes, Nuvio navigation and grouped settings.
+description: Simple native workout logging in charcoal and white by default, five curated palettes, floating navigation and grouped settings.
 colors:
   primary: "#FFFFFF"
   on-primary: "#000000"
@@ -129,7 +129,7 @@ components:
 
 Open Factor makes meaningful training features easy to use. The current direction pairs a quiet charcoal logger with original exercise photos, videos, instructions and anatomy. Guidance is directly reachable from discovery and the active set; it is a core capability rather than decoration. Start on Workout, choose an exercise, view its guide when needed, enter weight and reps, add warmups and finish into history. Page and section titles stand alone without explanatory captions.
 
-The floating Nuvio navigation and grouped Settings remain part of the existing system. Programs, body data, analytics and advanced logging remain available; the active program is visible on Workout and the default journey stays short. The current direction at the top of [PRODUCT.md](PRODUCT.md) and the [workouts contract](.impeccable/surfaces/workouts.md) supersedes the older MacroFactor parity brief. Historical parity differences are not release blockers for this direction.
+The floating navigation and grouped Settings remain part of the existing system. Programs, body data, analytics and advanced logging remain available; the active program is visible on Workout and the default journey stays short. The current direction at the top of [PRODUCT.md](PRODUCT.md) and the [workouts contract](.impeccable/surfaces/workouts.md) supersedes the older MacroFactor parity brief. Historical parity differences are not release blockers for this direction.
 
 **Key characteristics:**
 
@@ -204,7 +204,7 @@ The session is a full-height IME-aware column: compact header, fixed-height time
 
 ## Elevation & Depth
 
-Ordinary surfaces use tonal fills and restrained outlines, with transparent theme surface tint. The Nuvio shell alone adds native `graphicsLayer.shadowElevation`: 6dp at rest plus up to 3dp from scroll energy. Its 1dp vertical-gradient rim gives the shell an edge. These native elevation values are not CSS shadow measurements. Menus, dialogs, sheets, ripple and focus behavior remain Material defaults.
+Ordinary surfaces use tonal fills and restrained outlines, with transparent theme surface tint. The navigation shell alone adds native `graphicsLayer.shadowElevation`: 6dp at rest plus up to 3dp from scroll energy. Its 1dp vertical-gradient rim gives the shell an edge. These native elevation values are not CSS shadow measurements. Menus, dialogs, sheets, ripple and focus behavior remain Material defaults.
 
 Navigation selection moves over 280ms with `FastOutSlowInEasing`; the shell responds over 180ms with the same easing. Selected icons scale to 1.04 over 180ms. Scroll energy affects shell translation by at most 2dp and width by at most 0.8%; the tab targets remain fixed. The root scroll-energy reset is 140ms. Android animation settings govern the native animation paths.
 
@@ -274,7 +274,7 @@ The Muscles tab displays all targets in a noninteractive Primary/Secondary legen
 
 ### Navigation and grouped Settings
 
-The Nuvio capsule has Dashboard, Workout, central plus, Exercises and Settings in five fixed slots. Workout is the initial destination. The plus starts and opens the picker, or resumes an active session. The shell is 66dp high; its selected surface is 58dp with 4dp inset. Slot width is `(available width - 8dp) / 5`. The central button is 48dp. Shell width caps at 480dp with 12dp side padding and a 14dp bottom gap. Icons measure 26dp; destination controls use native tab selection semantics. Only the shell material responds to scroll; touch targets keep their anchor.
+The navigation capsule has Dashboard, Workout, central plus, Exercises and Settings in five fixed slots. Workout is the initial destination. The plus starts and opens the picker, or resumes an active session. The shell is 66dp high; its selected surface is 58dp with 4dp inset. Slot width is `(available width - 8dp) / 5`. The central button is 48dp. Shell width caps at 480dp with 12dp side padding and a 14dp bottom gap. Icons measure 26dp; destination controls use native tab selection semantics. Only the shell material responds to scroll; touch targets keep their anchor.
 
 Settings retains the large title, grouped rows, monochrome icon wells and inset separators. Rows use 16dp horizontal/15dp vertical padding with a 15dp gap, 40dp wells and 25dp icons. The divider begins at 71dp. Row titles stand alone; the retained subtitle parameter is not rendered. The five groups are You, Training, App, Data and About. Profile is the editable personal/training destination; Body data and Health Connect remain directly reachable. Workout logging retains effort rating, exercise advance, keep-screen-on and workout timer; Rest timer, equipment, library, history, units, shortcuts, appearance, backup and attribution remain useful destinations. Unavailable language/energy controls, the ineffective bodyweight-contribution toggle and the old setup ceremony are removed. Light mode substitutes theme surfaces. Existing Dashboard analytics, body-data editors, programs, history and other advanced routes retain their existing components; this refresh does not certify their visual parity or recast them as the default logging flow.
 

@@ -61,7 +61,7 @@ These screenshots remain private because they include a signed-in personal accou
 
 | Surface or behavior | Status |
 | --- | --- |
-| Nuvio-derived capsule navigation and settings grouping | Implemented; scoped native reviews retain open parity findings |
+| Capsule navigation and settings grouping | Implemented; scoped native reviews retain open parity findings |
 | 1,345-entry reference catalog and available local images/instructions | Implemented through ignored local import |
 | Basic exercise search, aliases, muscles/equipment, favorites | Implemented; source filter set is broader |
 | Exercise properties, target muscles and available media | Partial; videos and exact source media layout pending |
@@ -151,4 +151,4 @@ The existing importer now fills all expected clip slots in the ignored local ref
 
 Native playback exposed a stale lifecycle observer after camera selection changed. Backgrounding paused the initial camera, but not a later selection. The observer now rebinds to the current exercise and camera rather than retaining the initial playback state. The optional `--media` smoke pass covers offline camera playback and this background/resume scenario.
 
-Expected-path acquisition is complete, not full catalog media coverage. The export reports 712 other exercises without exposed demo controls and 14 catalog entries not located. Current Markdown has nonempty instructions for 1,212 exercises. One empty current file has older database prose, preserved separately, and 132 exercises lack their own text in both bundled versions. Neither missing UI controls nor missing bundled text proves server absence. Original ownership remains separate from the GPL code license, and no new release is published by this checkpoint.
+Expected-path acquisition is complete, not full catalog media coverage. The export reports 712 other exercises without exposed demo controls and 14 catalog entries not located. Current Markdown has nonempty instructions for 1,212 exercises. One empty current file has older database prose, preserved separately, and 132 exercises lack their own text in both bundled versions. Neither missing UI controls nor missing bundled text proves server absence. Original ownership remains separate from the code license, and no new release is published by this checkpoint.

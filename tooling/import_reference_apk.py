@@ -156,7 +156,7 @@ def build(apk: Path, dest: Path, video_directory: Path | None = None, public_dat
         'with_instructions':sum(bool(e['instructions']) for e in projected),'videos':video_count,
         'static_video_paths':sum(len(e['videoObjectPaths']) for e in projected),
         'media_selection':'Exact filename ID joins. Static source ordering: preferred thumbnail first, then alphabetical suffix. Object paths do not establish remote access or playback.',
-        'license':'Original ownership retained; not relicensed as GPL by this importer.', 'files':provenance}
+        'license':'Original ownership retained; not relicensed by this importer.', 'files':provenance}
     (dest/'provenance.json').write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps({k:v for k,v in report.items() if k!='files'},indent=2))
 

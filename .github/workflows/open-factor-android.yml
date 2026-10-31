@@ -1,6 +1,8 @@
 name: Open Factor Android
 on:
+  # Branch work is checked through its pull request; pushes only run on main, where they gate releases.
   push:
+    branches: [main]
     paths: ['openfactor/**', 'tooling/**', '.github/workflows/open-factor-android.yml']
   pull_request:
     paths: ['openfactor/**', 'tooling/**', '.github/workflows/open-factor-android.yml']
@@ -9,10 +11,12 @@ permissions:
   contents: read
 concurrency:
   group: open-factor-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer commit replaces a pull request's run; runs on main always finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: openfactor
@@ -48,7 +52,7 @@ jobs:
   device-tests:
     name: Android API ${{ matrix.api }} device tests
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -79,7 +83,8 @@ jobs:
           arch: x86_64
           disable-animations: true
           working-directory: openfactor
-          script: ./gradlew :app:connectedDebugAndroidTest -PopenfactorMediaMode=source
+          # A hung test fails on its own with the stuck stack trace instead of silently using up the job.
+          script: ./gradlew :app:connectedDebugAndroidTest -PopenfactorMediaMode=source -Pandroid.testInstrumentationRunnerArguments.timeout_msec=300000
       - uses: actions/upload-artifact@v4
         if: always()
         with:

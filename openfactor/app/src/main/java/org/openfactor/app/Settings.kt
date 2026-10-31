@@ -193,7 +193,7 @@ fun SettingsScreen(
             SettingsRow(
                 Icons.Rounded.Description,
                 "Licenses & Attribution",
-                "GPLv3 · Nuvio contributors",
+                "MIT License",
             ) {
                 dialog = "licenses"
             }
@@ -253,14 +253,14 @@ fun SettingsScreen(
         "about" ->
             InfoDialog(
                 "Open Factor",
-                "Open Factor ${BuildConfig.VERSION_NAME}\n\nWorkouts, progress photos and preferences stay on this device. Exercise demonstrations can stream over HTTPS and use a local cache. Health Connect is optional.\n\nBuilt on NuvioMobile. Back up your data before uninstalling or clearing app storage.",
+                "Open Factor ${BuildConfig.VERSION_NAME}\n\nWorkouts, progress photos and preferences stay on this device. Exercise demonstrations can stream over HTTPS and use a local cache. Health Connect is optional.\n\nBack up your data before uninstalling or clearing app storage.",
             ) {
                 dialog = ""
             }
         "licenses" ->
             InfoDialog(
                 "Licenses & Attribution",
-                "Application code: GNU General Public License v3.0, inherited from NuvioMedia/NuvioMobile.\n\nNavigation geometry and design tokens are adapted from Nuvio contributors. AndroidX, Kotlin and Material icons are used under their respective open source licenses.\n\nLocally imported reference content retains its original ownership and is not relicensed by this application. See the repository's asset provenance records.",
+                "Application code: MIT License.\n\nExercise demonstration videos: thank you to Jeff Nippard. AndroidX, Kotlin and Material icons are used under their respective open source licenses.\n\nLocally imported reference content retains its original ownership and is not relicensed by this application. See the repository's asset provenance records.",
             ) {
                 dialog = ""
             }

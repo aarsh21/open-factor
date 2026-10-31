@@ -8,7 +8,7 @@ Reproduce the captured manual program workflow: name/color, an initial Rest day,
 
 ## OWN-WORLD
 
-Preserve the inherited charcoal, white actions, DM Sans and geometric heading rules in DESIGN.md. Program colors identify user-selected plans. Primary navigation and Settings retain the user's Nuvio exceptions.
+Preserve the inherited charcoal, white actions, DM Sans and geometric heading rules in DESIGN.md. Program colors identify user-selected plans. Primary navigation and Settings retain the floating navigation and grouped Settings exceptions.
 
 ## STORY
 

@@ -1,6 +1,8 @@
 name: Open Factor Media
 on:
+  # Branch work is checked through its pull request; pushes only run on main.
   push:
+    branches: [main]
     paths: ['backend/media/**', 'tooling/upload_exercise_media.py', '.github/workflows/open-factor-media.yml']
   pull_request:
     paths: ['backend/media/**', 'tooling/upload_exercise_media.py', '.github/workflows/open-factor-media.yml']
@@ -9,7 +11,8 @@ permissions:
   contents: read
 concurrency:
   group: open-factor-media-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer commit replaces a pull request's run; runs on main always finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   contracts:
     runs-on: ubuntu-latest

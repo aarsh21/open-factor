@@ -183,9 +183,12 @@ class NavigationMotionTest {
             active = Workout(name = "Motion test", exercises = listOf(entry), selectedExerciseId = entry.id),
         ))
         val first = "Set 1 options for Barbell Bench Press"
+        // Scroll while the clock runs: scrolling animates, so with the clock frozen performScrollTo never settles.
+        compose.onNodeWithText("Add set").performScrollTo()
+        compose.waitForIdle()
         val firstTop = top(first)
         compose.mainClock.autoAdvance = false
-        compose.onNodeWithText("Add set").performScrollTo().performClick()
+        compose.onNodeWithText("Add set").performClick()
         compose.mainClock.advanceTimeBy(48)
         frame("11-set-arriving")
         val arriving = top("Set 2 options for Barbell Bench Press")
