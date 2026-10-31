@@ -123,6 +123,7 @@ data class Preferences(
     val supersetAutoNext: Boolean = true,
     val restBetweenSidesPercent: Int = 100,
     val rateEffortAfterExercise: Boolean = true,
+    val workoutKeypad: Boolean = true,
     val weeklyWorkoutGoal: Int? = null,
 )
 
@@ -425,6 +426,7 @@ object DataCodec {
                     .put("supersetAutoNext", d.preferences.supersetAutoNext)
                     .put("restBetweenSidesPercent", d.preferences.restBetweenSidesPercent)
                     .put("rateEffortAfterExercise", d.preferences.rateEffortAfterExercise)
+                    .put("workoutKeypad", d.preferences.workoutKeypad)
                     .put("weeklyWorkoutGoal", d.preferences.weeklyWorkoutGoal),
             )
 
@@ -537,6 +539,7 @@ object DataCodec {
                     it.toInt()
                 },
                 rateEffortAfterExercise = p.optBoolean("rateEffortAfterExercise", true),
+                workoutKeypad = p.optBoolean("workoutKeypad", true),
                 weeklyWorkoutGoal = if (p.isNull("weeklyWorkoutGoal")) null else p.optInt("weeklyWorkoutGoal").takeIf { it in 1..7 },
             ),
             j.optString("activeProgramId").takeIf { it.isNotBlank() && it != "null" },

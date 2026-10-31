@@ -56,6 +56,7 @@ The debug APK is `openfactor/app/build/outputs/apk/debug/app-debug.apk`, package
 - Settings → Import Fitbod CSV resolves clear compatible exercise names automatically and preserves uncertain names as custom exercises, without blocking on manual mappings. A compact preview and pinned confirmation append completed history; reading is cancellable and time-bounded. Recorded kilograms, reps, warm-ups and timestamps are retained; repeated workout IDs are skipped. AMRAP/rest metadata stays in notes, and missing duration is not guessed. See [supported Fitbod format and limitations](docs/open-factor/FITBOD-IMPORT.md).
 - Program-day launches with rep/RIR targets and per-exercise rest overrides; weekly recorded training graphs, front/back anatomy and direct/indirect muscle-set counts over week/30-day/90-day windows.
 - Persist active workouts, selected exercise, pause/resume, weight, reps, optional RIR, warmups and notes.
+- A compact in-app workout keypad replaces the system keyboard for set values: digits, unit-aware −/+ steps with hold-to-repeat, Next across fields and unfinished sets, and Log set. It keeps the focused field visible and can be turned off in Workout settings.
 - Optional workout/rest notifications. Precise background timing requires Android special access; force-stop suppresses reminders until reopening.
 - Automatic rest timing, pause-excluding summaries, history and repeat workout; kilograms/pounds with canonical kilogram storage.
 - Local body data and progress photos, plus export/restore backups including programs and drafts.
