@@ -122,4 +122,50 @@ class ExerciseSwapJourneyTest {
             store.save(before)
         }
     }
+
+    @Test fun reopeningSwapWhileTheSheetSlidesAwayKeepsTheNewSheetOpen() {
+        val store = WorkoutStore(context)
+        val before = store.load()
+        var activity: ActivityScenario<MainActivity>? = null
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(
+                    "pm grant ${context.packageName} android.permission.POST_NOTIFICATIONS"
+                ).use { descriptor -> java.io.FileInputStream(descriptor.fileDescriptor).use { it.readBytes() } }
+            }
+            val routine = Routine(id = "swap-race", name = "Upper", exerciseIds = listOf(bench, row), prescriptions = listOf(
+                TemplateExercise(bench, 3, 5, 8, 180), TemplateExercise(row, 3, 8, 12, 120),
+            ))
+            val workout = routine.toWorkout(System.currentTimeMillis()).copy(routineId = routine.id)
+            store.save(AppData(onboarding = OnboardingState(completed = true), routines = listOf(routine), active = workout,
+                preferences = Preferences(pounds = false, autoRest = false)))
+            activity = ActivityScenario.launch(MainActivity::class.java)
+            compose.waitUntil(15_000) {
+                runCatching { compose.onAllNodesWithContentDescription("Exercise options for Barbell Bench Press").fetchSemanticsNodes().isNotEmpty() }.getOrDefault(false)
+            }
+            compose.onNodeWithContentDescription("Exercise options for Barbell Bench Press").performClick()
+            compose.onNodeWithText("Swap exercise…").performClick()
+            awaitTag("swap-suggestion")
+            compose.onAllNodesWithTag("swap-suggestion").onFirst().performClick()
+            awaitText("Just today")
+            // Commit, then Undo and reopen Swap while the first sheet is still sliding away.
+            compose.mainClock.autoAdvance = false
+            compose.onNodeWithText("Just today").performClick()
+            compose.mainClock.advanceTimeBy(48)
+            compose.onNodeWithText("Undo").performClick()
+            compose.mainClock.advanceTimeBy(32)
+            compose.onNodeWithContentDescription("Exercise options for Barbell Bench Press").performClick()
+            compose.mainClock.advanceTimeBy(32)
+            compose.onNodeWithText("Swap exercise…").performClick()
+            compose.mainClock.advanceTimeBy(1_500)
+            compose.mainClock.autoAdvance = true
+            // The old slide must not dismiss the sheet that was just opened.
+            awaitTag("swap-suggestion")
+            compose.onNodeWithText("Replacing Barbell Bench Press").assertIsDisplayed()
+            compose.runOnIdle { assertEquals(workout, store.load().active) }
+        } finally {
+            activity?.close()
+            store.save(before)
+        }
+    }
 }

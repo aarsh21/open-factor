@@ -50,14 +50,19 @@ internal fun ExerciseSwapHost(
 ) {
     var choiceEntry by rememberSaveable { mutableStateOf<String?>(null) }
     var choiceReplacement by rememberSaveable { mutableStateOf<String?>(null) }
-    var closing by remember(sheetEntryId) { mutableStateOf(false) }
+    // After a commit the session's sheet is already closed; this keeps it composed while it slides
+    // away. Reopening during that slide brings the same sheet back instead of losing the tap.
+    var lingering by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(sheetEntryId) { if (sheetEntryId != null) lingering = null }
+    val shownId = sheetEntryId ?: lingering
+    val closing = sheetEntryId == null && lingering != null
     fun title(id: String) = exercises.find { it.id == id }?.title ?: "Exercise"
     fun commit(entryId: String, replacementId: String, scope: SwapScope) {
         choiceEntry = null
         choiceReplacement = null
         val undo = vm.swapExercise(entryId, replacementId, scope)
         // The sheet slides away over the new block instead of vanishing.
-        if (sheetEntryId != null) closing = true
+        if (sheetEntryId != null) { lingering = sheetEntryId; onCloseSheet() }
         if (undo != null) onSwapped(undo, title(replacementId))
     }
     fun request(entryId: String, replacementId: String) {
@@ -69,15 +74,17 @@ internal fun ExerciseSwapHost(
         onSearchPickHandled()
         if (workout.exercises.any { it.id == entryId }) request(entryId, replacementId)
     }
-    sheetEntryId?.let { id ->
-        // The workout as it was when opened: a committed swap must not reshuffle the closing list.
-        val opened = remember(id) { workout }
+    shownId?.let { id ->
+        // The workout as it was when opened: a committed swap must not reshuffle the closing list,
+        // but a reopen during the slide starts from the current workout.
+        var opened by remember(id) { mutableStateOf(workout) }
+        LaunchedEffect(id, sheetEntryId) { if (sheetEntryId != null) opened = workout }
         val entry = opened.exercises.find { it.id == id }
         val original = entry?.let { e -> exercises.find { it.id == e.exerciseId } }
         if (entry == null || original == null) LaunchedEffect(id) { onCloseSheet() }
         else ExerciseSwapSheet(
             data, opened, entry, original, exercises, vm, closing,
-            onDismiss = onCloseSheet,
+            onDismiss = { if (sheetEntryId == null) lingering = null else onCloseSheet() },
             onChoose = { if (!closing) request(entry.id, it) },
             onSearchAll = onSearchAll?.let { search -> { onCloseSheet(); search(entry.id) } },
         )
@@ -147,7 +154,7 @@ private fun ExerciseSwapSheet(
         if (closing) {
             sheetState.hide()
             onDismiss()
-        }
+        } else if (!sheetState.isVisible) sheetState.show()
     }
     var guideId by rememberSaveable(entry.id) { mutableStateOf<String?>(null) }
     val gym = data.gyms.find { it.id == workout.gymId } ?: data.gyms.firstOrNull()

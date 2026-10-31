@@ -99,6 +99,10 @@ fun OpenFactorTheme(theme: AppTheme = AppTheme.DARK, content: @Composable () -> 
                 surfaceContainerHigh = Color(0xFF202020),
                 surfaceContainerHighest = Color(0xFF353535),
                 error = Color(0xFFFF9696),
+                // Snackbars (e.g. "Swapped for … · Undo") stay in the charcoal palette, not Material lavender.
+                inverseSurface = Color(0xFF353535),
+                inverseOnSurface = Color.White,
+                inversePrimary = Color.White,
             ) else lightColorScheme(
                 primary = Color(0xFF202020), onPrimary = Color.White,
                 background = Color(0xFFF5F5F5), onBackground = Color(0xFF202020),
@@ -111,6 +115,7 @@ fun OpenFactorTheme(theme: AppTheme = AppTheme.DARK, content: @Composable () -> 
                 surfaceContainer = Color.White, surfaceContainerHigh = Color.White,
                 surfaceContainerHighest = Color(0xFFE5E5E7), surfaceTint = Color.Transparent,
                 error = Color(0xFFB3261E),
+                inverseSurface = Color(0xFF202020), inverseOnSurface = Color.White, inversePrimary = Color.White,
             ),
         typography =
             Typography().let { t ->
