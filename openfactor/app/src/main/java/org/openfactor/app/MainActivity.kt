@@ -632,6 +632,19 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                     if (result == SnackbarResult.ActionPerformed) vm.undoExerciseSwap(undo)
                                 }
                             },
+                            onSetRemoved = { undo, label ->
+                                scope.launch {
+                                    snackbar.currentSnackbarData?.dismiss()
+                                    // Withdrawn by the first later edit, so Undo never clobbers new work.
+                                    val offer = launch {
+                                        vm.data.first { !it.canUndoSetRemoval(undo) }
+                                        snackbar.currentSnackbarData?.dismiss()
+                                    }
+                                    val result = snackbar.showSnackbar("$label removed", "Undo", duration = SnackbarDuration.Long)
+                                    offer.cancel()
+                                    if (result == SnackbarResult.ActionPerformed) vm.undoSetRemoval(undo)
+                                }
+                            },
                         )
                     "history" ->
                         HistoryScreen(

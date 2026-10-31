@@ -1088,6 +1088,15 @@ class WorkoutViewModel(application: Application) : AndroidViewModel(application)
 
     fun removeSet(exerciseId: String, setId: String) = editSessionExercise(exerciseId) { it.withoutSet(setId) }
 
+    /** The swipe and accessibility removal: no confirmation, an Undo offer instead. */
+    fun removeSetWithUndo(exerciseId: String, setId: String): SetRemovalUndo? {
+        var undo: SetRemovalUndo? = null
+        update { d -> d.withRemovedSet(exerciseId, setId).also { undo = d.setRemovalUndo(it) } }
+        return undo
+    }
+
+    fun undoSetRemoval(undo: SetRemovalUndo) = update { it.withoutSetRemoval(undo) }
+
     fun editSet(exerciseId: String, setId: String, block: (LoggedSet) -> LoggedSet) =
         editActive({ previous, next -> previous.onlyTypedSetValuesChanged(next, exerciseId, setId) }) { w ->
             w.copy(

@@ -57,6 +57,7 @@ The debug APK is `openfactor/app/build/outputs/apk/debug/app-debug.apk`, package
 - Program-day launches with rep/RIR targets and per-exercise rest overrides; weekly recorded training graphs, front/back anatomy and direct/indirect muscle-set counts over week/30-day/90-day windows.
 - Persist active workouts, selected exercise, pause/resume, weight, reps, optional RIR, warmups and notes.
 - A compact in-app workout keypad replaces the system keyboard for set values: digits, unit-aware −/+ steps with hold-to-repeat, Next across fields and unfinished sets, and Log set. It keeps the focused field visible and can be turned off in Workout settings.
+- Swipe a set row toward the reading end to log it, or toward the start to delete it with Undo. Invalid or already logged sets refuse the log swipe; TalkBack offers the same actions, and the check button and set menu still work.
 - Exercise notes at three levels: a pinned note shows every time, a template note shows only in workouts started from that template (edit it with the template targets or from the workout's exercise menu), and a muted, dated "Last time" note previews your latest saved note until you write today's. It is never copied; swipe or tap close to hide it for that workout.
 - Optional workout/rest notifications. Precise background timing requires Android special access; force-stop suppresses reminders until reopening.
 - Automatic rest timing, pause-excluding summaries, history and repeat workout; kilograms/pounds with canonical kilogram storage.
