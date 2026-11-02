@@ -86,9 +86,12 @@ class SetRowSwipeJourneyTest {
         .getUnclippedBoundsInRoot().right - options(3).getUnclippedBoundsInRoot().left).value * pxPerMs
     private val pxPerMs get() = compose.density.density
 
-    /** Starts on the weight field, so swiping also proves fields do not swallow horizontal drags. */
+    /** Start on a metric field with room in the swipe direction, never outside the window. */
     private fun drag(n: Int, dx: Float, speedDpPerMs: Float, release: Boolean = true) {
-        weight(n).performScrollTo().assertIsDisplayed().performTouchInput {
+        // Android 8 cancels a pointer that leaves its compact window. Starting long leftward
+        // swipes on reps still tests a real text field without crossing the system edge.
+        val target = if (dx < 0f) reps(n) else weight(n)
+        target.performScrollTo().assertIsDisplayed().performTouchInput {
             val step = 8L
             val perStep = speedDpPerMs * pxPerMs * step * kotlin.math.sign(dx)
             down(center)
