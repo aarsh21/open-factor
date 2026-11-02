@@ -43,21 +43,6 @@ fun healthConnectScaleWeights(
         }
 }
 
-/** Manual dates win; a repeated import updates only the imported reading and retains its ID. */
-fun AppData.withHealthConnectWeights(incoming: List<ScaleWeightRecord>): AppData {
-    require(incoming.all { it.healthConnectOrigin != null })
-    incoming.forEach { it.validate() }
-    var records = scaleWeights
-    for (record in incoming) {
-        val day = records.filter { it.date == record.date }
-        if (day.any { it.healthConnectOrigin == null }) continue
-        val existing = day.firstOrNull()
-        val replacement = record.copy(id = existing?.id ?: record.id)
-        records = records.filterNot { it.date == record.date } + replacement
-    }
-    return copy(scaleWeights = records)
-}
-
 /** Local IDs use the platform's client-ID upsert contract, without deleting a health-store range. */
 fun healthConnectScaleExport(
     records: List<ScaleWeightRecord>,
@@ -76,7 +61,7 @@ fun healthConnectScaleExport(
         ))
         if (includeBodyFat && record.bodyFatPercent != null) add(BodyFatRecord(
             time = at.toInstant(), zoneOffset = at.offset,
-            percentage = Percentage(record.bodyFatPercent),
+            percentage = Percentage(requireNotNull(record.bodyFatPercent)),
             metadata = Metadata.manualEntry("open-factor:fat:${record.id}", version),
         ))
     }

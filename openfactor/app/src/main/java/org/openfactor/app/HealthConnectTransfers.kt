@@ -17,8 +17,6 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.CancellationException
 
-enum class HealthConnectAvailability { AVAILABLE, UNAVAILABLE, UPDATE_REQUIRED }
-
 enum class HealthConnectAction(val label: String, val permissions: Set<String>) {
     IMPORT_SCALE("Import weight and scale body fat", setOf(
         HealthPermission.getReadPermission(WeightRecord::class),
@@ -33,16 +31,6 @@ enum class HealthConnectAction(val label: String, val permissions: Set<String>) 
         HealthPermission.getWritePermission(ExerciseSessionRecord::class),
     )),
 }
-
-sealed interface HealthConnectResult<out T> {
-    data class Success<T>(val value: T) : HealthConnectResult<T>
-    data class ProviderUnavailable(val availability: HealthConnectAvailability) : HealthConnectResult<Nothing>
-    data class PermissionRequired(val missing: Set<String>) : HealthConnectResult<Nothing>
-    data object PermissionRevoked : HealthConnectResult<Nothing>
-    data object Failed : HealthConnectResult<Nothing>
-}
-
-data class HealthConnectStepDay(val date: LocalDate, val count: Long)
 
 val healthConnectReadPermissions: Set<String> = setOf(
     HealthPermission.getReadPermission(WeightRecord::class),

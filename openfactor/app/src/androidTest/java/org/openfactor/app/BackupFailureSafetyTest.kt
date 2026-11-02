@@ -236,7 +236,7 @@ class BackupFailureSafetyTest {
     @Test fun checkpointPicturesSurviveDeletionAndAreCleanedAfterCheckpointAdvances() = withFixture { f ->
         val prior = f.seed()
         val originals = prior.photoReferences().associateWith { f.store.file(it).readBytes() }
-        prior.progressPhotos.forEach { f.vm.deleteProgressPhotos(it.id) }
+        prior.progressPhotos.forEach { f.vm.commands.deleteProgressPhotos(it.id) }
         assertTrue(f.vm.data.value.progressPhotos.isEmpty())
         originals.forEach { (reference, bytes) -> assertArrayEquals(bytes, f.store.file(reference).readBytes()) }
         // Once a new startup checkpoint no longer references these pictures, they may be pruned.
@@ -404,8 +404,10 @@ class BackupFailureSafetyTest {
         val replacement = prior.copy(history = emptyList(), preferences = prior.preferences.copy(displayName = "Must not publish"))
         val bytes = f.backup(replacement)
         f.failPrimaryCommit = true
-        try { f.rejected(bytes.inputStream(), IOException::class.java) }
-        finally { f.failPrimaryCommit = false }
+        try {
+            val failure = f.rejected(bytes.inputStream(), PersistenceWriteException::class.java)
+            assertTrue("The normalized write error retains the injected I/O cause", failure.cause is IOException)
+        } finally { f.failPrimaryCommit = false }
     }
 
     @Test fun missingAndEmptyOriginalsAbortExportWithoutMutatingRemainingFiles() = withFixture { f ->

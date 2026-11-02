@@ -103,8 +103,10 @@ fun SettingsScreen(
     }
     if (dialog == "shortcuts") {
         ShortcutEditor(p.shortcuts, { dialog = "" }) { changed ->
-            vm.settings { it.copy(shortcuts = changed) }
-            dialog = ""
+            runPersistenceAction {
+                vm.commands.settings { it.copy(shortcuts = changed) }
+                dialog = ""
+            }
         }
         return
     }
@@ -239,13 +241,15 @@ fun SettingsScreen(
                 confirmButton = {
                     TextButton(
                         {
-                            vm.settings {
-                                it.copy(
-                                    restSeconds = seconds.toInt().coerceIn(0, 1800),
-                                    autoRest = automatic,
-                                )
+                            runPersistenceAction {
+                                vm.commands.settings {
+                                    it.copy(
+                                        restSeconds = seconds.toInt().coerceIn(0, 1800),
+                                        autoRest = automatic,
+                                    )
+                                }
+                                dialog = ""
                             }
-                            dialog = ""
                         },
                         enabled = validSeconds,
                     ) {
@@ -300,24 +304,24 @@ fun WorkoutSettings(p: Preferences, vm: WorkoutViewModel, onDismiss: () -> Unit)
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 PreferenceSwitch("Rate effort after exercise", "Ask for reps left after all sets are logged", p.rateEffortAfterExercise) { checked ->
-                    vm.settings { it.copy(rateEffortAfterExercise = checked) }
+                    runPersistenceAction { vm.commands.settings { it.copy(rateEffortAfterExercise = checked) } }
                 }
                 if (p.rateEffortAfterExercise) Column(Modifier.selectableGroup()) {
                     EffortPromptTiming.entries.forEach { timing ->
-                        PreferenceChoice(timing.label, p.effortPromptTiming == timing) { vm.settings { it.copy(effortPromptTiming = timing) } }
+                        PreferenceChoice(timing.label, p.effortPromptTiming == timing) { runPersistenceAction { vm.commands.settings { it.copy(effortPromptTiming = timing) } } }
                     }
                 }
                 PreferenceSwitch("Advance after exercise", "Move to unfinished exercises after the last set", p.exerciseAutoNext) { checked ->
-                    vm.settings { it.copy(exerciseAutoNext = checked) }
+                    runPersistenceAction { vm.commands.settings { it.copy(exerciseAutoNext = checked) } }
                 }
                 PreferenceSwitch("Keep screen on", "Keep the screen on while the workout logger is visible", p.keepAlive) { checked ->
-                    vm.settings { it.copy(keepAlive = checked) }
+                    runPersistenceAction { vm.commands.settings { it.copy(keepAlive = checked) } }
                 }
                 PreferenceSwitch("Workout timer", "Show elapsed time during workout sessions", p.showWorkoutTimer) { checked ->
-                    vm.settings { it.copy(showWorkoutTimer = checked) }
+                    runPersistenceAction { vm.commands.settings { it.copy(showWorkoutTimer = checked) } }
                 }
                 PreferenceSwitch("Workout keypad", "Enter set values with the in-app keypad instead of the system keyboard", p.workoutKeypad) { checked ->
-                    vm.settings { it.copy(workoutKeypad = checked) }
+                    runPersistenceAction { vm.commands.settings { it.copy(workoutKeypad = checked) } }
                 }
             }
         },
@@ -413,29 +417,29 @@ private fun UnitsSettings(p: Preferences, vm: WorkoutViewModel, onClose: () -> U
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 112.dp)) {
             SettingsSection("WEIGHT UNITS") {
                 Column(Modifier.selectableGroup()) {
-                    PreferenceChoice("Kilograms (kg)", !p.pounds) { vm.settings { it.copy(pounds = false) } }
-                    PreferenceChoice("Pounds (lb)", p.pounds) { vm.settings { it.copy(pounds = true) } }
+                    PreferenceChoice("Kilograms (kg)", !p.pounds) { runPersistenceAction { vm.commands.settings { it.copy(pounds = false) } } }
+                    PreferenceChoice("Pounds (lb)", p.pounds) { runPersistenceAction { vm.commands.settings { it.copy(pounds = true) } } }
                 }
             }
             SettingsSection("HEIGHT UNITS") {
                 Column(Modifier.selectableGroup()) {
-                    PreferenceChoice("Centimeters", !p.heightInFeet) { vm.settings { it.copy(heightInFeet = false) } }
-                    PreferenceChoice("Feet and Inches", p.heightInFeet) { vm.settings { it.copy(heightInFeet = true) } }
+                    PreferenceChoice("Centimeters", !p.heightInFeet) { runPersistenceAction { vm.commands.settings { it.copy(heightInFeet = false) } } }
+                    PreferenceChoice("Feet and Inches", p.heightInFeet) { runPersistenceAction { vm.commands.settings { it.copy(heightInFeet = true) } } }
                 }
                 Text("Applies to profile height. Body circumferences remain in centimeters.",
                     Modifier.padding(16.dp), color = OF.muted)
             }
             SettingsSection("CLOCK UNITS") {
                 Column(Modifier.selectableGroup()) {
-                    PreferenceChoice("12 Hour", !p.clock24Hour) { vm.settings { it.copy(clock24Hour = false) } }
-                    PreferenceChoice("24 Hour", p.clock24Hour) { vm.settings { it.copy(clock24Hour = true) } }
+                    PreferenceChoice("12 Hour", !p.clock24Hour) { runPersistenceAction { vm.commands.settings { it.copy(clock24Hour = false) } } }
+                    PreferenceChoice("24 Hour", p.clock24Hour) { runPersistenceAction { vm.commands.settings { it.copy(clock24Hour = true) } } }
                 }
                 Text("Workout start times use this format.", Modifier.padding(16.dp), color = OF.muted)
             }
             SettingsSection("DISTANCE") {
                 Column(Modifier.selectableGroup()) {
-                    PreferenceChoice("Kilometers and Meters", !p.distanceImperial) { vm.settings { it.copy(distanceImperial = false) } }
-                    PreferenceChoice("Miles and Yards", p.distanceImperial) { vm.settings { it.copy(distanceImperial = true) } }
+                    PreferenceChoice("Kilometers and Meters", !p.distanceImperial) { runPersistenceAction { vm.commands.settings { it.copy(distanceImperial = false) } } }
+                    PreferenceChoice("Miles and Yards", p.distanceImperial) { runPersistenceAction { vm.commands.settings { it.copy(distanceImperial = true) } } }
                 }
             }
         }

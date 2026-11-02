@@ -15,10 +15,13 @@ Open Factor is a native Android workout app. Its application and Gradle project 
 Use JDK 17 and Android SDK Platform 36. From the repository root:
 
 ```sh
-./openfactor/gradlew -p openfactor :app:assembleDebug :app:testDebugUnitTest :app:lintDebug -PopenfactorMediaMode=source
+python3 -I tooling/verify_android_architecture.py
+./openfactor/gradlew -p openfactor :core:test :coreConsumer:test :app:assembleDebug :app:testDebugUnitTest :app:lintDebug -PopenfactorMediaMode=source
 ./openfactor/gradlew -p openfactor :app:connectedDebugAndroidTest -PopenfactorMediaMode=source
 python3 -m unittest discover -s tooling -p 'test_*.py'
 ```
+
+Keep reusable product behavior in the JVM `:core` module, without Android/Compose dependencies. New app source needs a feature or navigation owner; the remaining flat presentation files are a frozen migration baseline. See [native architecture and acceptance contracts](docs/open-factor/ARCHITECTURE.md).
 
 Source mode is reproducible without private media. Static-media packaging has separate checks described in [media packaging](docs/open-factor/MEDIA-PACKAGING.md). Backend commands are documented in [backend/media/README.md](backend/media/README.md).
 

@@ -303,7 +303,12 @@ internal fun NoteDialog(
             // The dialog composes in its own window: request focus from there, once the field is attached.
             LaunchedEffect(Unit) { focus.requestFocus() }
         },
-        confirmButton = { TextButton({ error = onSave(notes) }, enabled = !tooLong) { Text("Save") } },
+        confirmButton = {
+            TextButton({
+                if (!runPersistenceAction { error = onSave(notes) })
+                    error = "Couldn't save the note. Free up storage and try again."
+            }, enabled = !tooLong) { Text("Save") }
+        },
         dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
     )
 }

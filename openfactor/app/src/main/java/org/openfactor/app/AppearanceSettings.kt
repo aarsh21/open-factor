@@ -41,7 +41,7 @@ internal fun AppearanceSettings(p: Preferences, vm: WorkoutViewModel, onClose: (
             SettingsSection("MODE") {
                 Column(Modifier.selectableGroup()) {
                     AppTheme.entries.forEach { theme ->
-                        PreferenceChoice(theme.label, p.theme == theme) { vm.settings { it.copy(theme = theme) } }
+                        PreferenceChoice(theme.label, p.theme == theme) { runPersistenceAction { vm.commands.settings { it.copy(theme = theme) } } }
                     }
                 }
             }
@@ -52,7 +52,7 @@ internal fun AppearanceSettings(p: Preferences, vm: WorkoutViewModel, onClose: (
                 ) {
                     AppPalette.entries.forEach { palette ->
                         PaletteSwatch(palette, dark, p.palette == palette, Modifier.weight(1f)) {
-                            vm.settings { it.copy(palette = palette) }
+                            runPersistenceAction { vm.commands.settings { it.copy(palette = palette) } }
                         }
                     }
                 }

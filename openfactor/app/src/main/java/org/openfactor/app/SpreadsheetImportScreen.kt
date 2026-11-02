@@ -156,7 +156,7 @@ internal fun SpreadsheetImportScreen(vm: WorkoutViewModel, snackbar: SnackbarHos
                     try {
                         withContext(Dispatchers.IO) {
                             val programs = parsed.materializePrograms(selected, excluded, setCount, vm.exercises())
-                            vm.appendSpreadsheetPrograms(programs)
+                            vm.commands.appendSpreadsheetPrograms(programs)
                         }
                         preview = null
                         matcher = null

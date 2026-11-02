@@ -22,63 +22,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.json.JSONObject
 
-/** Local continuation of the observed three-stage setup; source-only integrations stay optional. */
-data class OnboardingState(
-    val step: Int = 0,
-    val completed: Boolean = false,
-    val deferred: Boolean = false,
-    val name: String = "",
-    val pounds: Boolean = false,
-    val heightCm: String = "",
-    val weightKg: String = "",
-    val preset: String = "current",
-    val gymName: String = "Everything Gym",
-    val gymId: String? = null,
-    val gender: ProfileGender = ProfileGender.UNSPECIFIED,
-    val profileDraft: ProfileSetupDraft? = null,
-) {
-    fun validBasics() =
-        name.isNotBlank() &&
-            (heightCm.isBlank() || (heightCm.toDoubleOrNull() ?: 0.0) in 30.0..300.0) &&
-            (weightKg.isBlank() || (weightKg.toDoubleOrNull() ?: 0.0) in 1.0..1000.0)
-
-    fun json() =
-        JSONObject()
-            .put("step", step)
-            .put("completed", completed)
-            .put("deferred", deferred)
-            .put("name", name)
-            .put("pounds", pounds)
-            .put("heightCm", heightCm)
-            .put("weightKg", weightKg)
-            .put("preset", preset)
-            .put("gymName", gymName)
-            .put("gymId", gymId)
-            .put("gender", gender.name)
-            .put("profileDraft", profileDraft?.json())
-
-    companion object {
-        // Old backups/installations are already usable; setup is available through Settings.
-        fun decode(j: JSONObject?) =
-            if (j == null) OnboardingState(completed = true)
-            else
-                OnboardingState(
-                    j.optInt("step").coerceIn(0, 7),
-                    j.optBoolean("completed"),
-                    j.optBoolean("deferred"),
-                    j.optString("name"),
-                    j.optBoolean("pounds"),
-                    j.optString("heightCm"),
-                    j.optString("weightKg"),
-                    j.optString("preset", "current"),
-                    j.optString("gymName"),
-                    j.optString("gymId").takeIf { it.isNotBlank() && it != "null" },
-                    gender = ProfileGender.entries.find { it.name == j.optString("gender") } ?: ProfileGender.UNSPECIFIED,
-                    profileDraft = j.optJSONObject("profileDraft")?.let(ProfileSetupDraft::fromJson),
-                )
-    }
-}
-
 @Composable
 fun OnboardingScreen(
     data: AppData,
@@ -87,7 +30,7 @@ fun OnboardingScreen(
     onHealthConnect: () -> Unit = {},
 ) {
     val s = data.onboarding
-    fun edit(block: (OnboardingState) -> OnboardingState) = vm.editOnboarding(block)
+    fun edit(block: (OnboardingState) -> OnboardingState) = runPersistenceAction { vm.commands.editOnboarding(block) }
     fun next() = edit { it.copy(step = (it.step + 1).coerceAtMost(7)) }
     var exit by remember { mutableStateOf(false) }
     BackHandler { if (s.step > 0) edit { it.copy(step = it.step - 1) } else exit = true }
@@ -373,8 +316,10 @@ fun OnboardingScreen(
                         )
                         OutlinedCard(
                             onClick = {
-                                vm.finishOnboarding()
-                                onManualProgram()
+                                runPersistenceAction {
+                                    vm.commands.finishOnboarding()
+                                    onManualProgram()
+                                }
                             },
                             colors = CardDefaults.outlinedCardColors(containerColor = OF.top),
                         ) {
@@ -412,17 +357,19 @@ fun OnboardingScreen(
                     else -> "Next"
                 },
                 {
-                    when (s.step) {
-                        3 -> {
-                            vm.applyOnboardingBasics()
-                            next()
+                    runPersistenceAction {
+                        when (s.step) {
+                            3 -> {
+                                vm.commands.applyOnboardingBasics()
+                                next()
+                            }
+                            5 -> {
+                                vm.commands.applyOnboardingGym()
+                                next()
+                            }
+                            7 -> vm.commands.finishOnboarding()
+                            else -> next()
                         }
-                        5 -> {
-                            vm.applyOnboardingGym()
-                            next()
-                        }
-                        7 -> vm.finishOnboarding()
-                        else -> next()
                     }
                 },
                 Modifier.fillMaxWidth().padding(18.dp),
@@ -444,8 +391,7 @@ fun OnboardingScreen(
             },
             confirmButton = {
                 TextButton({
-                    edit { it.copy(deferred = true) }
-                    exit = false
+                    if (edit { it.copy(deferred = true) }) exit = false
                 }) {
                     Text("Set up later")
                 }

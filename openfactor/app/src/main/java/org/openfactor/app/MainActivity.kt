@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         // Typed set values are saved off the main thread; make them durable before the app can be killed.
-        androidx.lifecycle.ViewModelProvider(this)[WorkoutViewModel::class.java].flushPendingSaves()
+        androidx.lifecycle.ViewModelProvider(this)[WorkoutViewModel::class.java].commands.flushPendingSaves()
         super.onPause()
     }
 
@@ -135,48 +135,41 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     val activeId by remember(vm) { derivedStateOf { data.active?.id } }
     val onboardingPending by remember(vm) { derivedStateOf { !data.onboarding.completed && !data.onboarding.deferred } }
     TraceRecomposition("OpenFactorApp")
-    var tab by rememberSaveable { mutableIntStateOf(1) }
-    // Initial values come from vm.data.value, not data: reading data inside a remember calculation subscribes
-    // the whole shell to it, and then every keystroke recomposes the shell.
-    var route by rememberSaveable { vm.data.value.let { d -> mutableStateOf(when { d.pastWorkoutEdit != null -> "history-edit"; d.active != null -> "session"; else -> "" }) } }
-    var detailId by rememberSaveable { mutableStateOf("") }
-    var previousRoute by rememberSaveable { mutableStateOf("") }
+    // Initial values come from vm.data.value: subscribing the shell to all data here would
+    // recompose it for every typed digit. The Saver restores the entire typed return chain.
+    val navigator = rememberSaveable(saver = AppNavigatorSaver) {
+        vm.data.value.let { d -> AppNavigator(
+            d.pastWorkoutEdit?.let { AppScreen.HistoryEdit(AppScreen.HistoryDetail(it.original.id)) }
+                ?: if (d.active != null) AppScreen.Session() else AppScreen.Root(),
+        ) }
+    }
+    val navigationWorkouts = remember(vm) { ViewModelNavigationWorkouts(vm) }
+    WorkoutFinishNavigation(vm.finishWorkout, vm.commands, navigator)
+    val currentDestination = navigator.destination
+    val contentScreen = navigator.contentScreen
+    val tab = navigator.rootTab
     var exerciseInfo by rememberSaveable { mutableStateOf(false) }
-    var exerciseSettingsReturnRoute by rememberSaveable { mutableStateOf("") }
-    var customReturnRoute by rememberSaveable { mutableStateOf("") }
-    var duplicateId by rememberSaveable { mutableStateOf("") }
-    var programDayId by rememberSaveable { mutableStateOf("") }
-    var programExit by remember { mutableStateOf(false) }
     var shortcuts by rememberSaveable { mutableStateOf(false) }
     var quickWeight by rememberSaveable { mutableStateOf(false) }
     var configureShortcuts by rememberSaveable { mutableStateOf(false) }
     var workoutSettings by rememberSaveable { mutableStateOf(false) }
     var healthConnect by rememberSaveable { mutableStateOf(false) }
     var autoConnectHealth by rememberSaveable { mutableStateOf(false) }
-    var routineEditId by rememberSaveable { mutableStateOf("") }
-    var routineDraftKey by rememberSaveable { mutableStateOf("") }
-    var routineReturn by rememberSaveable { mutableStateOf("") }
-    var gymsReturn by rememberSaveable { mutableStateOf("") }
     var bodyDataTab by rememberSaveable { mutableIntStateOf(0) }
     var bodyChartMetric by rememberSaveable { mutableStateOf("weight") }
     var bodyChartRange by rememberSaveable { mutableStateOf(BodyChartRange.WEEK) }
-    var bodyEntryReturn by rememberSaveable { mutableStateOf("body-data") }
-    var swapEntryId by rememberSaveable { mutableStateOf("") }
-    var swapPickId by rememberSaveable { mutableStateOf("") }
-    val contentRoute =
-        if (route == "measurement-entry" || route == "photo-entry") bodyEntryReturn else route
     val exercises = remember(vm, customExercises, libraryReady) { vm.exercises() }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val routeState = rememberSaveableStateHolder()
     val context = LocalContext.current
-    HealthConnectForegroundSync(healthConnectState, vm::importHealthConnectSync, enabled = !healthConnect)
+    HealthConnectForegroundSync(healthConnectState, vm.commands, enabled = !healthConnect)
     val view = LocalView.current
     val lifecycleOwner = LocalLifecycleOwner.current
     StorageRecoveryAlert(vm)
     val notificationPermission = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-    ) { WorkoutNotifications.sync(context, vm.data.value, forceRefresh = true) }
+    ) { vm.refreshNotifications() }
     LaunchedEffect(activeId) {
         if (data.active != null && android.os.Build.VERSION.SDK_INT >= 33) {
             val prefs = context.getSharedPreferences("notification-permission", android.content.Context.MODE_PRIVATE)
@@ -187,16 +180,16 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         }
     }
     LaunchedEffect(workoutOpenRequest) {
-        if (workoutOpenRequest > 0 && data.active != null) route = "session"
+        if (workoutOpenRequest > 0 && data.active != null) navigator.navigate(AppScreen.Session())
     }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) WorkoutNotifications.sync(context, vm.data.value, forceRefresh = true)
+            if (event == Lifecycle.Event.ON_RESUME) vm.refreshNotifications()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    val keepAlive by remember(vm) { derivedStateOf { data.preferences.keepAlive && route == "session" && data.active != null &&
+    val keepAlive by remember(vm) { derivedStateOf { data.preferences.keepAlive && navigator.destination is AppScreen.Session && data.active != null &&
         (data.onboarding.completed || data.onboarding.deferred) } }
     DisposableEffect(view, lifecycleOwner, keepAlive) {
         if (!keepAlive) return@DisposableEffect onDispose { }
@@ -210,72 +203,19 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
             view.keepScreenOn = original
         }
     }
-    fun editTemplate(routine: Routine? = null, returnRoute: String = "") {
-        routineEditId = routine?.id.orEmpty()
-        routineDraftKey = newId()
-        routineReturn = returnRoute
-        route = "routine"
-    }
-    fun openExercise(id: String) {
-        previousRoute = route
-        detailId = id
-        route = "exercise"
-    }
-    fun openCustom() {
-        duplicateId = ""
-        customReturnRoute = route
-        route = "custom"
-    }
-    fun pickExercise(id: String, origin: String) {
-        // The first Add navigates away synchronously. Ignore any queued second tap from
-        // that departed picker/detail instead of adding the same exercise twice.
-        if (route != origin && !(route == "exercise" && previousRoute == origin)) return
-        when (origin) {
-            "program-picker" -> {
-                vm.editProgramDraft { plan ->
-                    plan.copy(days = plan.days.map { day ->
-                        if (day.id == programDayId) day.addExercise(
-                            id,
-                            plan.cycleCount,
-                            "Workout ${('A'.code + plan.days.count { it.exercises.isNotEmpty() }).toChar()}",
-                        ) else day
-                    })
-                }
-                route = "program-editor"
-            }
-            "workout-draft", "draft-picker" -> {
-                vm.addDraftExercise(id)
-                route = "workout-draft"
-            }
-            "swap-picker" -> {
-                swapPickId = id
-                route = "session"
-            }
-            else -> {
-                if (data.active != null) {
-                    vm.addExercise(id)
-                    route = "session"
-                } else {
-                    vm.prepareWorkout()
-                    vm.addDraftExercise(id)
-                    route = "workout-draft"
-                }
-            }
-        }
-    }
     if (healthConnect) HealthConnectPanel(
-        data, vm::importHealthConnectWeights, onClose = { healthConnect = false; autoConnectHealth = false },
-        onSync = vm::importHealthConnectSync,
+        data, vm.commands::importHealthConnectWeights, onClose = { healthConnect = false; autoConnectHealth = false },
+        onSync = vm.commands::importHealthConnectSync,
         autoConnectOnOpen = autoConnectHealth,
         onSuccessfulSync = if (autoConnectHealth) { { healthConnect = false; autoConnectHealth = false } } else null,
     )
     if (quickWeight) QuickWeightSheet(
         data.preferences.pounds,
         onClose = { quickWeight = false },
-        onSave = { vm.saveScaleWeight(it); quickWeight = false },
+        onSave = { vm.commands.saveScaleWeight(it); quickWeight = false },
     )
     if (onboardingPending) {
-        QuickStartScreen(data, vm, onConnect = { autoConnectHealth = true; healthConnect = true }) { tab = 1 }
+        QuickStartScreen(data, vm.commands, onConnect = { autoConnectHealth = true; healthConnect = true }) { navigator.selectTab(AppTab.WORKOUT) }
         return
     }
     if (!libraryReady) {
@@ -297,7 +237,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
     }
     var scrollEnergy by remember { mutableFloatStateOf(0f) }
     val rootScroll =
-        remember(route) {
+        remember(currentDestination) {
             object : NestedScrollConnection {
                 override fun onPostScroll(
                     consumed: Offset,
@@ -305,7 +245,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                     source: NestedScrollSource,
                 ): Offset {
                     if (
-                        route.isBlank() &&
+                        currentDestination is AppScreen.Root &&
                             source == NestedScrollSource.UserInput &&
                             android.animation.ValueAnimator.areAnimatorsEnabled()
                     ) {
@@ -323,24 +263,8 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
             scrollEnergy = 0f
         }
     }
-    /** Null means back asks first instead of leaving. */
-    fun backRoute(): String? = when (route) {
-        "exercise" -> previousRoute
-        "exercise-settings" -> exerciseSettingsReturnRoute
-        "custom" -> customReturnRoute
-        "picker", "swap-picker" -> "session"
-        "draft-picker" -> "workout-draft"
-        "gym" -> "gyms"
-        "gyms" -> gymsReturn
-        "measurement-entry", "photo-entry" -> bodyEntryReturn
-        "weight-entry" -> "body-data"
-        "body-charts" -> "body-data"
-        "program-picker" -> "program-editor"
-        "program-editor", "program-setup" -> null
-        else -> ""
-    }
     val motion = LocalAppMotionEnabled.current
-    val destination = AppDestination.of(contentRoute, detailId, tab)
+    val destination = contentScreen
     val navigation = remember { SeekableTransitionState(destination) }
     // True only while a back gesture drives the transition; taps and 3-button back never set it.
     var keypadInset by remember { mutableStateOf(0.dp) }
@@ -348,16 +272,25 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
      * One Undo snackbar at a time: a newer offer replaces the old one, and the first later edit
      * (canUndo turns false) withdraws it, so Undo can never erase new work.
      */
-    fun offerUndo(message: String, canUndo: (AppData) -> Boolean, undo: () -> Unit) {
+    fun offerUndo(message: String, canUndo: (AppData) -> Boolean, undo: () -> Boolean) {
         scope.launch {
             snackbar.currentSnackbarData?.dismiss()
-            val offer = launch {
-                vm.data.first { !canUndo(it) }
-                snackbar.currentSnackbarData?.dismiss()
+            var retrying = false
+            while (canUndo(vm.data.value)) {
+                val offer = launch {
+                    vm.data.first { !canUndo(it) }
+                    snackbar.currentSnackbarData?.dismiss()
+                }
+                val result = snackbar.showSnackbar(
+                    if (retrying) "$message. Undo wasn't saved; free up storage and retry." else message,
+                    if (retrying) "Retry Undo" else "Undo",
+                    withDismissAction = retrying,
+                    duration = if (retrying) SnackbarDuration.Indefinite else SnackbarDuration.Long,
+                )
+                offer.cancel()
+                if (result != SnackbarResult.ActionPerformed || !canUndo(vm.data.value) || undo()) break
+                retrying = true
             }
-            val result = snackbar.showSnackbar(message, "Undo", duration = SnackbarDuration.Long)
-            offer.cancel()
-            if (result == SnackbarResult.ActionPerformed) undo()
         }
     }
     var scrubbing by remember { mutableStateOf(false) }
@@ -366,11 +299,10 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         scrubbing = false
     }
     val screenTransition = rememberTransition(navigation, label = "screen")
-    PredictiveBackHandler(route.isNotBlank()) { gesture ->
-        val target = backRoute()
-        val revealed = target?.let {
-            AppDestination.of(it, detailId, tab)
-        }
+    PredictiveBackHandler(currentDestination !is AppScreen.Root) { gesture ->
+        val from = currentDestination
+        val target = navigator.backDestination(from)
+        val revealed = target?.contentScreen
         try {
             gesture.collect { event ->
                 // The gesture scrubs the same pop transition a tap would play, so lifting the
@@ -380,7 +312,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                     navigation.seekTo(event.progress, revealed)
                 }
             }
-            if (target == null) programExit = true else route = target
+            navigator.back(from)
         } catch (cancelled: CancellationException) {
             scope.launch {
                 navigation.animateTo(navigation.currentState)
@@ -393,62 +325,65 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         modifier = Modifier.fillMaxSize(),
         containerColor = OF.background,
         contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
+        topBar = { PersistenceStatusNotice(vm.persistence, vm::retryPersistence, vm::dismissPersistenceFailure) },
         snackbarHost = {
-            SnackbarHost(snackbar, Modifier.padding(bottom = if (route.isBlank()) 94.dp else if (route == "session") keypadInset else 0.dp))
+            SnackbarHost(snackbar, Modifier.padding(bottom = if (currentDestination is AppScreen.Root) 94.dp else if (currentDestination is AppScreen.Session) keypadInset else 0.dp))
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().background(OF.background)) {
             screenTransition.AnimatedContent(
                 Modifier.fillMaxSize().nestedScroll(rootScroll).padding(top = padding.calculateTopPadding()),
                 transitionSpec = { appTransition(motion, scrubbing) },
-                contentKey = { it },
+                contentKey = { it.transitionKey },
             ) { screen ->
-            val shownId = screen.key
-            val shownTab = screen.key.removePrefix("tab:").toIntOrNull() ?: tab
-            // A departing screen keeps rendering its own record; only the current one redirects.
-            fun leave(to: String) { if (route == screen.route) route = to }
+            fun go(to: AppDestination) = navigator.navigateFrom(screen, to)
+            fun back() = navigator.back(screen)
+            fun openExercise(id: String) = navigator.openExercise(id, screen)
+            fun openCustom() = navigator.openCustom(screen)
+            fun editTemplate(routine: Routine? = null) = navigator.editTemplate(routine?.id, newId(), screen)
+            fun pickExercise(id: String) = navigator.pickExercise(id, screen, navigationWorkouts)
             // Without motion there is nothing to watch leave: never stack two opaque screens.
             if (motion || screen == screenTransition.targetState)
-            Column(Modifier.fillMaxSize().padding(bottom = if (screen.route.isBlank()) 0.dp else padding.calculateBottomPadding())) {
-                when (screen.route) {
-                    "profile" -> ProfileEditor(data, vm) { route = "" }
-                    "body-data" -> {
+            Column(Modifier.fillMaxSize().padding(bottom = if (screen is AppScreen.Root) 0.dp else padding.calculateBottomPadding())) {
+                when (screen) {
+                    AppScreen.Profile -> ProfileEditor(data, vm) { go(navigator.root) }
+                    AppScreen.BodyData -> {
                         BodyDataScreen(
-                            data, bodyDataTab, { bodyDataTab = it }, { route = "" },
-                            { detailId = it; route = "weight-entry" },
-                            { detailId = it; bodyEntryReturn = "body-data"; route = "measurement-entry" },
-                            { detailId = it; bodyEntryReturn = "body-data"; route = "photo-entry" }, vm.photoStore,
+                            data, bodyDataTab, { bodyDataTab = it }, { go(navigator.root) },
+                            { go(AppScreen.WeightEntry(it)) },
+                            { go(MeasurementEntry(it, screen)) },
+                            { go(PhotoEntry(it, screen)) }, vm.photoStore,
                             {
                                 bodyChartMetric = if (bodyDataTab == 1) BodyMeasurement.NECK.key else "weight"
-                                route = "body-charts"
+                                go(AppScreen.BodyCharts)
                             },
                         )
                     }
-                    "body-charts" -> BodyChartScreen(
+                    AppScreen.BodyCharts -> BodyChartScreen(
                         data, bodyChartMetric, bodyChartRange,
-                        { bodyChartMetric = it }, { bodyChartRange = it }, { route = "body-data" },
+                        { bodyChartMetric = it }, { bodyChartRange = it }, { go(AppScreen.BodyData) },
                         onDismissTutorial = {
-                            vm.settings { it.copy(dismissedTutorials = it.dismissedTutorials + "bodyCharts") }
+                            runPersistenceAction { vm.commands.settings { it.copy(dismissedTutorials = it.dismissedTutorials + "bodyCharts") } }
                         },
                         onLogWeight = { quickWeight = true },
                     )
-                    "weight-entry" -> key(shownId) {
+                    is AppScreen.WeightEntry -> key(screen.entryId) {
                         ScaleWeightEditor(
-                            data.scaleWeights.find { it.id == shownId }, data.preferences.pounds,
-                            { route = "body-data" },
-                            { vm.saveScaleWeight(it); bodyDataTab = 0; route = "body-data" },
-                            { vm.deleteScaleWeight(shownId); bodyDataTab = 0; route = "body-data" },
+                            data.scaleWeights.find { it.id == screen.entryId }, data.preferences.pounds,
+                            { go(AppScreen.BodyData) },
+                            { vm.commands.saveScaleWeight(it); bodyDataTab = 0; go(AppScreen.BodyData) },
+                            { vm.commands.deleteScaleWeight(screen.entryId); bodyDataTab = 0; go(AppScreen.BodyData) },
                         )
                     }
-                    "programs" ->
+                    AppScreen.Programs ->
                         ProgramLibrary(
                             data,
                             vm,
-                            { route = "" },
+                            { go(navigator.root) },
                             {
-                                if (data.programDraft != null) route = "program-editor"
-                                else {
-                                    vm.beginProgram(
+                                if (data.programDraft != null) go(AppScreen.ProgramEditor())
+                                else { runPersistenceAction {
+                                    vm.commands.beginProgram(
                                         TrainingProgram(
                                             name =
                                                 java.time.LocalDate.now()
@@ -458,74 +393,74 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                                     )
                                         )
                                     )
-                                    route = "program-setup"
+                                    go(AppScreen.ProgramSetup)
+                                } }
+                            },
+                            { go(AppScreen.ProgramEditor()) },
+                            { program, day, cycle ->
+                                runPersistenceAction {
+                                    if (vm.commands.startProgramDay(program, day, cycle)) go(AppScreen.Session())
+                                    else shortcuts = true
                                 }
                             },
-                            { route = "program-editor" },
-                            { program, day, cycle ->
-                                if (vm.startProgramDay(program, day, cycle)) route = "session"
-                                else shortcuts = true
-                            },
                         )
-                    "program-setup" ->
+                    AppScreen.ProgramSetup ->
                         data.programDraft?.let {
                             ProgramSetup(
                                 it,
                                 vm,
-                                { programExit = true },
-                                { route = "program-editor" },
+                                ::back,
+                                { go(AppScreen.ProgramEditor()) },
                             )
                         }
-                    "program-editor" ->
+                    is AppScreen.ProgramEditor ->
                         ProgramEditor(
                             data,
-                            programDayId,
-                            { programDayId = it },
+                            screen.selectedDayId,
+                            { go(screen.copy(selectedDayId = it)) },
                             exercises,
                             vm,
-                            { programExit = true },
+                            ::back,
                             { day ->
-                                programDayId = day
-                                route = "program-picker"
+                                go(AppScreen.ProgramPicker(day, screen.copy(selectedDayId = day)))
                             },
-                            { route = "programs" },
+                            { go(AppScreen.Programs) },
                         )
-                    "program-picker" -> routeState.SaveableStateProvider("program-picker") {
+                    is AppScreen.ProgramPicker -> routeState.SaveableStateProvider("program-picker:${screen.dayId}") {
                         ExerciseLibrary(
                             exercises,
                             data.favorites,
-                            vm::favorite,
+                            vm.commands::favorite,
                             ::openExercise,
-                            { id -> pickExercise(id, "program-picker") },
-                            onBack = { route = "program-editor" },
+                            ::pickExercise,
+                            onBack = ::back,
                             onCustom = ::openCustom,
                             picking = true,
                             gyms = data.gyms,
                             equipmentCatalog = vm.equipmentCatalog,
                         )
                     }
-                    "gyms" ->
-                        GymProfilesScreen(data, vm, { route = gymsReturn }) {
-                            detailId = it
-                            route = "gym"
+                    is AppScreen.Gyms ->
+                        GymProfilesScreen(data, vm, ::back) {
+                            go(AppScreen.Gym(it, screen))
                         }
-                    "gym" ->
+                    is AppScreen.Gym ->
                         data.gyms
-                            .firstOrNull { it.id == shownId }
+                            .firstOrNull { it.id == screen.gymId }
                             ?.let { gym ->
-                                GymEditorScreen(gym, data, vm, { route = "gyms" }) { detailId = it }
+                                GymEditorScreen(gym, data, vm, ::back) { go(screen.copy(gymId = it)) }
                             }
-                    "levels" -> routeState.SaveableStateProvider("levels") {
-                        LevelsScreen(data, exercises, { route = "" }, onExercise = {
+                    AppScreen.Levels -> routeState.SaveableStateProvider("levels") {
+                        LevelsScreen(data, exercises, { go(navigator.root) }, onExercise = {
                             openExercise(it)
                         })
                     }
-                    "exercise-settings" -> exercises.firstOrNull { it.id == shownId }?.let { e ->
+                    is AppScreen.ExerciseSettings -> exercises.firstOrNull { it.id == screen.exerciseId }?.let { e ->
                         ExerciseSettingsScreen(
                             e, data.exerciseDefaults[e.id] ?: ExerciseDefaults(), data.preferences.restSeconds,
-                            { route = exerciseSettingsReturnRoute }, { vm.saveExerciseDefaults(e.id, it) }, { exerciseInfo = true },
-                            { duplicateId = e.id; customReturnRoute = route; route = "custom" },
-                            { vm.archiveExercise(e.id, it) },
+                            ::back, { value -> vm.commands.saveExerciseDefaults(e.id, value) }, { exerciseInfo = true },
+                            { navigator.openCustom(screen, e.id) },
+                            { value -> vm.commands.archiveExercise(e.id, value) },
                         )
                         if (exerciseInfo) ModalBottomSheet(
                             onDismissRequest = { exerciseInfo = false },
@@ -537,48 +472,44 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             }
                         }
                     }
-                    "exercise" ->
+                    is AppScreen.Exercise ->
                         exercises
-                            .firstOrNull { it.id == shownId }
+                            .firstOrNull { it.id == screen.exerciseId }
                             ?.let { e ->
                                 ExerciseDetail(
                                     e,
                                     data,
                                     vm,
-                                    { route = previousRoute },
-                                    { pickExercise(e.id, previousRoute) },
+                                    ::back,
+                                    { navigator.pickExercise(e.id, screen, navigationWorkouts) },
                                     onSettings = {
-                                        exerciseSettingsReturnRoute = "exercise"
-                                        route = "exercise-settings"
+                                        go(AppScreen.ExerciseSettings(e.id, screen))
                                     },
-                                    onOpenWorkout = { detailId = it; route = "history-detail" },
+                                    onOpenWorkout = { go(AppScreen.HistoryDetail(it, screen)) },
                                 )
                             }
-                    "picker" -> routeState.SaveableStateProvider("picker") {
+                    AppScreen.SessionPicker -> routeState.SaveableStateProvider("picker") {
                         ExerciseLibrary(
                             exercises,
                             data.favorites,
-                            vm::favorite,
+                            vm.commands::favorite,
                             ::openExercise,
-                            {
-                                vm.addExercise(it)
-                                route = "session"
-                            },
-                            onBack = { route = "session" },
+                            ::pickExercise,
+                            onBack = { go(AppScreen.Session()) },
                             onCustom = ::openCustom,
                             picking = true,
                             gyms = data.gyms,
                             equipmentCatalog = vm.equipmentCatalog,
                         )
                     }
-                    "swap-picker" -> routeState.SaveableStateProvider("swap-picker") {
+                    is AppScreen.SwapPicker -> routeState.SaveableStateProvider("swap-picker:${screen.entryId}") {
                         ExerciseLibrary(
                             exercises,
                             data.favorites,
-                            vm::favorite,
+                            vm.commands::favorite,
                             ::openExercise,
-                            { id -> pickExercise(id, "swap-picker") },
-                            onBack = { route = "session" },
+                            ::pickExercise,
+                            onBack = { go(AppScreen.Session()) },
                             onCustom = ::openCustom,
                             picking = true,
                             gyms = data.gyms,
@@ -586,9 +517,9 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                             pickTitle = "Swap exercise",
                         )
                     }
-                    "custom" -> {
-                        val initial = remember(duplicateId) {
-                            exercises.find { it.id == duplicateId }?.let { e ->
+                    is AppScreen.CustomExercise -> {
+                        val initial = remember(screen.duplicateExerciseId) {
+                            exercises.find { it.id == screen.duplicateExerciseId }?.let { e ->
                                 val (resistance, support) = vm.equipmentCatalog.requirementsFor(e)
                                 val instructions = if (e.instructions.startsWith("reference/"))
                                     runCatching { context.assets.open(e.instructions).bufferedReader().use { it.readText() } }.getOrDefault("")
@@ -596,178 +527,178 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                 e.duplicateDraft(resistance, support, instructions)
                             }
                         }
-                        CustomExercise(data, vm.equipmentCatalog, { route = customReturnRoute }, initial) { draft ->
-                            val id = vm.addCustom(draft)
-                            previousRoute = customReturnRoute
-                            detailId = id
-                            route = "exercise"
+                        CustomExercise(data, vm.equipmentCatalog, ::back, initial) { draft ->
+                            val id = vm.commands.addCustom(draft)
+                            navigator.customCreated(id, screen)
                         }
                     }
-                    "draft-picker" -> routeState.SaveableStateProvider("draft-picker") {
+                    AppScreen.DraftPicker -> routeState.SaveableStateProvider("draft-picker") {
                         ExerciseLibrary(
                             exercises,
                             data.favorites,
-                            vm::favorite,
+                            vm.commands::favorite,
                             ::openExercise,
-                            { id -> pickExercise(id, "draft-picker") },
-                            onBack = { route = "workout-draft" },
+                            ::pickExercise,
+                            onBack = { go(AppScreen.WorkoutDraft) },
                             onCustom = ::openCustom,
                             picking = true,
                             gyms = data.gyms,
                             equipmentCatalog = vm.equipmentCatalog,
                         )
                     }
-                    "workout-draft" ->
+                    AppScreen.WorkoutDraft ->
                         data.workoutDraft?.let { draft ->
                             WorkoutComposition(
                                 draft,
                                 exercises,
                                 data.gyms,
-                                vm::editWorkoutDraft,
-                                onBack = { route = "" },
-                                onAdd = { route = "draft-picker" },
+                                vm.commands::editWorkoutDraft,
+                                onBack = { go(navigator.root) },
+                                onAdd = { go(AppScreen.DraftPicker) },
                                 onDetail = ::openExercise,
                                 onStart = {
-                                    if (vm.startWorkoutDraft()) route = "session"
+                                    runPersistenceAction { if (vm.commands.startWorkoutDraft()) go(AppScreen.Session()) }
                                 },
-                                onDiscard = { vm.discardWorkoutDraft(); route = "" },
+                                onDiscard = { runPersistenceAction { vm.commands.discardWorkoutDraft(); go(navigator.root) } },
                                 canStart = data.active == null,
                             )
-                        } ?: run { LaunchedEffect(Unit) { leave("") } }
-                    "session" ->
+                        } ?: run { LaunchedEffect(Unit) { go(navigator.root) } }
+                    is AppScreen.Session ->
                         WorkoutSession(
                             data,
                             exercises,
                             vm,
-                            onBack = { route = "" },
-                            onAdd = { route = "picker" },
+                            onBack = { go(navigator.root) },
+                            onAdd = { go(AppScreen.SessionPicker) },
                             onExercise = ::openExercise,
                             onWorkoutSettings = { workoutSettings = true },
                             onGymSettings = {
-                                gymsReturn = "session"
-                                route = "gyms"
+                                go(AppScreen.Gyms(screen))
                             },
-                            onOpenWorkout = { detailId = it; route = "history-detail" },
-                            onFinished = {
-                                detailId = it
-                                route = "history-detail"
-                            },
-                            onSwapSearch = { swapEntryId = it; swapPickId = ""; route = "swap-picker" },
-                            swapPick = (swapEntryId to swapPickId).takeIf { swapEntryId.isNotEmpty() && swapPickId.isNotEmpty() },
-                            onSwapPickHandled = { swapEntryId = ""; swapPickId = "" },
+                            onOpenWorkout = { go(AppScreen.HistoryDetail(it, screen)) },
+                            onSwapSearch = { navigator.openSwapPicker(it, screen) },
+                            swapPick = screen.swap?.let { it.entryId to it.exerciseId },
+                            onSwapPickHandled = { screen.swap?.let(navigator::consumeSwap) },
                             onExerciseSwapped = { undo, title ->
-                                offerUndo("Swapped for $title", { it.canUndoExerciseSwap(undo) }) { vm.undoExerciseSwap(undo) }
+                                offerUndo("Swapped for $title", { it.canUndoExerciseSwap(undo) }) { runPersistenceAction { vm.commands.undoExerciseSwap(undo) } }
                             },
                             undoOffered = snackbar.currentSnackbarData != null,
                             onKeypadInset = { keypadInset = it },
                             onSetRemoved = { undo, label ->
-                                offerUndo("$label removed", { it.canUndoSetRemoval(undo) }) { vm.undoSetRemoval(undo) }
+                                offerUndo("$label removed", { it.canUndoSetRemoval(undo) }) { runPersistenceAction { vm.commands.undoSetRemoval(undo) } }
                             },
                         )
-                    "history" ->
+                    AppScreen.History ->
                         HistoryScreen(
-                            data.history, exercises, { route = "" },
-                            onDetail = { detailId = it; route = "history-detail" },
+                            data.history, exercises, { go(navigator.root) },
+                            onDetail = { go(AppScreen.HistoryDetail(it, screen)) },
                             prefs = data.preferences,
                             onRepeat = if (data.active == null) ({ id ->
                                 data.history.find { it.id == id }?.let { workout ->
-                                    vm.start(workout.name, workout.exercises.map { it.exerciseId })
-                                    route = "session"
+                                    runPersistenceAction {
+                                        vm.commands.start(workout.name, workout.exercises.map { it.exerciseId })
+                                        go(AppScreen.Session())
+                                    }
                                 }
                             }) else null,
                             onStart = {
-                                if (data.active != null) route = "session"
-                                else { vm.prepareWorkout(); route = "workout-draft" }
+                                runPersistenceAction { navigator.prepareOrResumeWorkout(navigationWorkouts, screen) }
                             },
                         )
-                    "history-detail" ->
+                    is AppScreen.HistoryDetail ->
                         data.history
-                            .firstOrNull { it.id == shownId }
+                            .firstOrNull { it.id == screen.workoutId }
                             ?.let { w ->
                                 WorkoutSummary(
                                     w,
                                     exercises,
                                     data.preferences,
-                                    { route = "history" },
+                                    ::back,
                                     {
-                                        vm.start(w.name, w.exercises.map { it.exerciseId })
-                                        route = "session"
+                                        runPersistenceAction {
+                                            vm.commands.start(w.name, w.exercises.map { it.exerciseId })
+                                            go(AppScreen.Session())
+                                        }
                                     },
                                     {
-                                        vm.deleteWorkout(w.id)
-                                        route = "history"
+                                        runPersistenceAction {
+                                            vm.commands.deleteWorkout(w.id)
+                                            go(AppScreen.History)
+                                        }
                                     },
                                     repeatLabel = if (data.active != null) "Resume active workout" else "Repeat workout",
-                                    onEdit = { vm.beginPastWorkoutEdit(w.id); route = "history-edit" },
+                                    onEdit = { runPersistenceAction { vm.commands.beginPastWorkoutEdit(w.id); go(AppScreen.HistoryEdit(screen)) } },
                                 )
-                            } ?: run { LaunchedEffect(Unit) { leave("history") } }
-                    "history-edit" -> data.pastWorkoutEdit?.let { edit ->
+                            } ?: run { LaunchedEffect(Unit) { go(AppScreen.History) } }
+                    is AppScreen.HistoryEdit -> data.pastWorkoutEdit?.takeIf { it.original.id == screen.workoutId }?.let { edit ->
                         PastWorkoutEditor(edit, exercises, data, vm,
-                            onChange = vm::editPastWorkout,
-                            onDiscard = { detailId = edit.original.id; vm.discardPastWorkoutEdit(); route = "history-detail" },
-                            onSave = vm::savePastWorkoutEdit,
-                            onSaved = { detailId = edit.original.id; route = "history-detail" },
+                            onChange = vm.commands::editPastWorkout,
+                            onDiscard = { runPersistenceAction { vm.commands.discardPastWorkoutEdit(); go(screen.returnTo) } },
+                            onSave = vm.commands::savePastWorkoutEdit,
+                            onSaved = { go(screen.returnTo) },
                         )
-                    } ?: run { LaunchedEffect(Unit) { leave("history") } }
-                    "templates" -> routeState.SaveableStateProvider("template-library") {
-                        TemplateLibraryScreen(data, exercises, { route = "" },
-                            onCreate = { editTemplate(returnRoute = "templates") },
-                            onEdit = { editTemplate(it, "templates") },
-                            onStart = { routine -> vm.startRoutine(routine.id).also { if (it == null) route = "session" } },
-                            onInstall = vm::installStarterSplit, onDelete = vm::deleteRoutine)
+                    } ?: run { LaunchedEffect(Unit) { go(AppScreen.History) } }
+                    AppScreen.Templates -> routeState.SaveableStateProvider("template-library") {
+                        TemplateLibraryScreen(data, exercises, { go(navigator.root) },
+                            onCreate = { editTemplate() },
+                            onEdit = { editTemplate(it) },
+                            onStart = { routine -> vm.commands.startRoutine(routine.id).also { if (it == null) go(AppScreen.Session()) } },
+                            onInstall = vm.commands::installStarterSplit, onDelete = vm.commands::deleteRoutine)
                     }
-                    "routine" -> key(routineDraftKey) {
-                        TemplateEditor(data.routines.find { it.id == routineEditId }, exercises,
-                            onBack = { route = routineReturn },
-                            onSave = { routine -> vm.saveRoutine(routine).also { if (it == null) { route = "templates"; tab = 1 } } },
-                            favorites = data.favorites, onFavorite = vm::favorite,
+                    is AppScreen.RoutineEditor -> key(screen.draftKey) {
+                        TemplateEditor(data.routines.find { it.id == screen.routineId }, exercises,
+                            onBack = ::back,
+                            onSave = { routine -> vm.commands.saveRoutine(routine).also { if (it == null) navigator.templateSaved(screen) } },
+                            favorites = data.favorites, onFavorite = vm.commands::favorite,
                             gyms = data.gyms, equipmentCatalog = vm.equipmentCatalog,
                             preview = { exercise, close, add ->
                                 ExerciseDetail(exercise, data, vm, close, add, closeable = true)
                             })
                     }
-                    else ->
-                        when (shownTab) {
-                            0 ->
+                    is AppScreen.Root ->
+                        when (screen.tab) {
+                            AppTab.DASHBOARD ->
                                 DashboardScreen(
                                     data,
                                     exercises,
                                     vm,
-                                    onWorkout = { tab = 1 },
-                                    onHistory = { route = "history" },
+                                    onWorkout = { go(AppScreen.Root(AppTab.WORKOUT)) },
+                                    onHistory = { go(AppScreen.History) },
                                     onStart = { shortcuts = true },
-                                    onResume = { route = "session" },
+                                    onResume = { go(AppScreen.Session()) },
                                     onBodyData = {
                                         bodyDataTab = 0
-                                        route = "body-data"
+                                        go(AppScreen.BodyData)
                                     },
                                     onLogWeight = { quickWeight = true },
                                     onHealthConnect = { healthConnect = true },
                                 )
-                            1 ->
+                            AppTab.WORKOUT ->
                                 WorkoutHome(
                                     data,
                                     exercises,
-                                    onStart = { vm.start(); route = "picker" },
-                                    onResume = { route = "session" },
+                                    onStart = { runPersistenceAction { navigator.startWorkout(navigationWorkouts, screen) } },
+                                    onResume = { go(AppScreen.Session()) },
                                     onRoutine = { r ->
-                                        val failure = vm.startRoutine(r.id)
-                                        if (failure == null) route = "session"
-                                        else scope.launch { snackbar.showSnackbar(failure) }
+                                        runPersistenceAction {
+                                            val failure = vm.commands.startRoutine(r.id)
+                                            if (failure == null) go(AppScreen.Session())
+                                            else scope.launch { snackbar.showSnackbar(failure) }
+                                        }
                                     },
                                     onNewRoutine = { editTemplate() },
-                                    onTemplates = { route = "templates" },
+                                    onTemplates = { go(AppScreen.Templates) },
                                     onEditRoutine = { editTemplate(it) },
-                                    onDeleteRoutine = vm::deleteRoutine,
-                                    onDraft = { route = "workout-draft" },
-                                    onPrograms = { route = "programs" },
-                                    onHistory = { route = "history" },
+                                    onDeleteRoutine = vm.commands::deleteRoutine,
+                                    onDraft = { go(AppScreen.WorkoutDraft) },
+                                    onPrograms = { go(AppScreen.Programs) },
+                                    onHistory = { go(AppScreen.History) },
                                 )
-                            2 -> routeState.SaveableStateProvider("exercise-library") {
+                            AppTab.EXERCISES -> routeState.SaveableStateProvider("exercise-library") {
                                 ExerciseLibrary(
                                     exercises,
                                     data.favorites,
-                                    vm::favorite,
+                                    vm.commands::favorite,
                                     ::openExercise,
                                     onCustom = ::openCustom,
                                     gyms = data.gyms,
@@ -777,18 +708,17 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                                     modifiedIds = remember(data.exerciseDefaults) { data.exerciseDefaults.filterValues { it.hasOverrides }.keys },
                                 )
                             }
-                            3 ->
+                            AppTab.SETTINGS ->
                                 SettingsScreen(
                                     data.preferences,
                                     vm,
                                     snackbar,
-                                    onProfile = { route = "profile" },
-                                    onExercises = { tab = 2 },
-                                    onHistory = { route = "history" },
-                                    onBodyData = { route = "body-data" },
+                                    onProfile = { go(AppScreen.Profile) },
+                                    onExercises = { go(AppScreen.Root(AppTab.EXERCISES)) },
+                                    onHistory = { go(AppScreen.History) },
+                                    onBodyData = { go(AppScreen.BodyData) },
                                     onGyms = {
-                                        gymsReturn = ""
-                                        route = "gyms"
+                                        go(AppScreen.Gyms(screen))
                                     },
                                     integrationSettings = {
                                         if (healthConnectAvailability(context) != HealthConnectAvailability.UNAVAILABLE)
@@ -802,7 +732,7 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
             // The bar belongs to the root screens, so it rides the same (scrubbable) transition:
             // it sinks away as a screen pushes over it and rises back when that screen pops.
             screenTransition.AnimatedVisibility(
-                { it.route.isBlank() },
+                { it is AppScreen.Root },
                 Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding()),
                 enter = if (!motion) EnterTransition.None else
                     fadeIn(tween(AppMotion.Step, easing = AppMotion.EaseOut)) +
@@ -813,33 +743,36 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
                         slideOutVertically(tween(AppMotion.State, easing = AppMotion.EaseOut)) { it / 3 },
             ) {
                 WorkoutNavigation(
-                    tab,
+                    tab.ordinal,
                     { scrollEnergy },
                     onAdd = {
                         shortcuts = true
                     },
                 ) {
-                    tab = it
+                    navigator.selectTab(AppTab.entries[it])
                 }
             }
         }
     }
-    if (route == "measurement-entry") key(detailId) {
-        BodyMeasurementEditor(
-            data.bodyMeasurements.find { it.id == detailId },
-            { route = bodyEntryReturn },
-            { vm.saveBodyMeasurements(it); bodyDataTab = 1; route = "body-data" },
-            { vm.deleteBodyMeasurements(detailId); bodyDataTab = 1; route = "body-data" },
-            visibility = data.preferences.dataVisibility,
-        )
+    when (val sheet = currentDestination) {
+        is MeasurementEntry -> key(sheet.entryId) {
+            BodyMeasurementEditor(
+                data.bodyMeasurements.find { it.id == sheet.entryId },
+                { navigator.back(sheet) },
+                { vm.commands.saveBodyMeasurements(it); bodyDataTab = 1; navigator.navigate(AppScreen.BodyData) },
+                { vm.commands.deleteBodyMeasurements(sheet.entryId); bodyDataTab = 1; navigator.navigate(AppScreen.BodyData) },
+                visibility = data.preferences.dataVisibility,
+            )
+        }
+        is PhotoEntry -> key(sheet.entryId) {
+            ProgressPhotoEditor(data.progressPhotos.find { it.id == sheet.entryId }, vm,
+                { navigator.back(sheet) }, { bodyDataTab = 2; navigator.navigate(AppScreen.BodyData) })
+        }
+        is AppScreen -> Unit
     }
-    if (route == "photo-entry") key(detailId) {
-        ProgressPhotoEditor(data.progressPhotos.find { it.id == detailId }, vm,
-            { route = bodyEntryReturn }, { bodyDataTab = 2; route = "body-data" })
-    }
-    if (programExit)
+    if (navigator.programExitRequested)
         AlertDialog(
-            onDismissRequest = { programExit = false },
+            onDismissRequest = { navigator.cancelProgramExit() },
             title = { Text("Leave program draft?") },
             text = {
                 Text(
@@ -848,17 +781,17 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
             },
             confirmButton = {
                 TextButton({
-                    programExit = false
-                    route = "programs"
+                    navigator.leaveProgramDraft()
                 }) {
                     Text("Keep Draft")
                 }
             },
             dismissButton = {
                 TextButton({
-                    vm.discardProgramDraft()
-                    programExit = false
-                    route = "programs"
+                    runPersistenceAction {
+                        vm.commands.discardProgramDraft()
+                        navigator.leaveProgramDraft()
+                    }
                 }) {
                     Text("Discard Draft")
                 }
@@ -870,8 +803,10 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
         ModalBottomSheet(onDismissRequest = { configureShortcuts = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = OF.background) {
             ShortcutEditor(data.preferences.shortcuts, { configureShortcuts = false }) { changed ->
-                vm.settings { it.copy(shortcuts = changed) }
-                configureShortcuts = false
+                runPersistenceAction {
+                    vm.commands.settings { it.copy(shortcuts = changed) }
+                    configureShortcuts = false
+                }
             }
         }
     if (shortcuts)
@@ -883,18 +818,17 @@ fun OpenFactorApp(vm: WorkoutViewModel = viewModel(), workoutOpenRequest: Int = 
             when (shortcut) {
                 WorkoutShortcut.WEIGHT -> { quickWeight = true }
                 WorkoutShortcut.MEASUREMENTS -> {
-                    detailId = ""; bodyDataTab = 1; bodyEntryReturn = route; route = "measurement-entry"
+                    bodyDataTab = 1; navigator.navigate(MeasurementEntry("", navigator.contentScreen))
                 }
                 WorkoutShortcut.PHOTOS -> {
-                    detailId = ""; bodyDataTab = 2; bodyEntryReturn = route; route = "photo-entry"
+                    bodyDataTab = 2; navigator.navigate(PhotoEntry("", navigator.contentScreen))
                 }
-                WorkoutShortcut.HISTORY -> route = "history"
+                WorkoutShortcut.HISTORY -> navigator.navigate(AppScreen.History)
                 WorkoutShortcut.EMPTY_WORKOUT -> {
-                    if (data.active != null) route = "session"
-                    else { vm.prepareWorkout(); route = "workout-draft" }
+                    runPersistenceAction { navigator.prepareOrResumeWorkout(navigationWorkouts) }
                 }
-                WorkoutShortcut.NEW_PROGRAM -> editTemplate()
-                WorkoutShortcut.NEW_WORKOUT -> editTemplate()
+                WorkoutShortcut.NEW_PROGRAM -> navigator.editTemplate(null, newId())
+                WorkoutShortcut.NEW_WORKOUT -> navigator.editTemplate(null, newId())
             }
         }
 }

@@ -416,7 +416,7 @@ fun ProgressPhotoEditor(
                                         ?.let { position to it }
                                 }
                                 .toMap()
-                        vm.saveProgressPhotos(
+                        vm.commands.saveProgressPhotos(
                             ProgressPhotoRecord(id, LocalDate.parse(date), photos, notes.trim())
                         )
                         onSaved()
@@ -452,7 +452,7 @@ fun ProgressPhotoEditor(
             { deleting = false },
             {
                 runCatching {
-                        vm.deleteProgressPhotos(id)
+                        vm.commands.deleteProgressPhotos(id)
                         onSaved()
                     }
                     .onFailure { error = it.message ?: "Could not delete photos" }

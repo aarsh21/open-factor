@@ -17,6 +17,7 @@ import org.json.JSONObject
 class ProgressPhotoStore(private val context: Context) {
     private val directory = File(context.noBackupFilesDir, "progress-photos").apply { mkdirs() }
     private val staging = File(context.noBackupFilesDir, "photo-restore").apply { mkdirs() }
+    private val readers = snapshotReaders.computeIfAbsent(directory.canonicalPath) { PhotoReadRetentions() }
 
     private val captures = File(context.cacheDir, "photo-captures").apply { mkdirs() }
 
@@ -91,8 +92,19 @@ class ProgressPhotoStore(private val context: Context) {
         }
     }
 
-    fun clean(retained: Set<String>) {
-        directory.listFiles()?.filter { it.name !in retained }?.forEach { it.delete() }
+    /** Pin an immutable export's originals without holding the command monitor during provider I/O. */
+    fun retainForExport(data: AppData): Closeable {
+        val references = data.photoReferences()
+        references.forEach { file(it) }
+        val token = Any()
+        synchronized(readers) { readers.references[token] = references }
+        return Closeable { synchronized(readers) { readers.references.remove(token) } }
+    }
+
+    fun clean(retained: Set<String>) = synchronized(readers) {
+        val live = retained + readers.references.values.flatten()
+        directory.listFiles()?.filter { it.name !in live && !it.name.startsWith("import-") }?.forEach { it.delete() }
+        Unit
     }
 
     /** Stream one workout and one photo at a time; never duplicate the whole history as JSON trees. */
@@ -195,6 +207,7 @@ class ProgressPhotoStore(private val context: Context) {
     }
 
     companion object {
+        private val snapshotReaders = java.util.concurrent.ConcurrentHashMap<String, PhotoReadRetentions>()
         const val MAX_PHOTO_BYTES = 20 * 1024 * 1024
         const val MAX_BACKUP_BYTES = 1024L * 1024 * 1024
         // Includes per-node overhead, not just JSON bytes: multi-year set histories need headroom.
@@ -228,6 +241,10 @@ class ProgressPhotoStore(private val context: Context) {
             bitmap.recycle()
         }
     }
+}
+
+private class PhotoReadRetentions {
+    val references = mutableMapOf<Any, Set<String>>()
 }
 
 class PreparedPhotoBackup

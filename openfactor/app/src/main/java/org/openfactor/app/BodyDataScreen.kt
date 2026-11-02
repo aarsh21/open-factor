@@ -257,7 +257,7 @@ fun ScaleWeightEditor(
                         if (fat.isBlank()) null
                         else if (
                             record?.bodyFatPercent != null &&
-                                fat == record.bodyFatPercent.bodyNumber(6)
+                                fat == record.bodyFatPercent?.bodyNumber(6)
                         )
                             record.bodyFatPercent
                         else fat.bodyDecimal()
@@ -448,7 +448,7 @@ fun BodyMeasurementEditor(
                             if (visualFat.isBlank()) null
                             else if (
                                 record?.visualBodyFatPercent != null &&
-                                    visualFat == record.visualBodyFatPercent.bodyNumber(6)
+                                    visualFat == record.visualBodyFatPercent?.bodyNumber(6)
                             )
                                 record.visualBodyFatPercent
                             else visualFat.bodyDecimal()

@@ -316,10 +316,13 @@ fun ExerciseLibrary(
                             if (picking && e.id in selectedIds) "Remove ${e.name} from selection"
                             else if (picking) "Add ${e.name}" else "Favorite ${e.name}",
                         ) {
-                            if (picking && onSelectionChange != null) onSelectionChange(e.id)
+                            if (picking && onSelectionChange != null) runPersistenceAction { onSelectionChange(e.id) }
                             else if (picking && onPick != null) {
-                                if (!pickInFlight) { pickInFlight = true; onPick(e.id) }
-                            } else onFavorite(e.id)
+                                if (!pickInFlight) {
+                                    pickInFlight = true
+                                    if (!runPersistenceAction { onPick(e.id) }) pickInFlight = false
+                                }
+                            } else runPersistenceAction { onFavorite(e.id) }
                         }
                     }
                     HorizontalDivider(Modifier.padding(start = 60.dp), color = OF.line.copy(alpha = 0.5f))
@@ -451,7 +454,7 @@ fun ExerciseDetail(
             actions = {
                 if (closeable) IconButton(onBack) { Icon(Icons.Rounded.Close, "Close Info") }
                 if (onSettings != null) IconButton(onSettings) { Icon(Icons.Rounded.Tune, "Exercise settings") }
-                IconButton({ vm.favorite(e.id) }) {
+                IconButton({ runPersistenceAction { vm.commands.favorite(e.id) } }) {
                     Icon(
                         if (e.id in data.favorites) Icons.Rounded.Star
                         else Icons.Rounded.StarOutline,
@@ -568,7 +571,7 @@ fun ExerciseDetail(
         if (onAdd != null) Box(Modifier.padding(18.dp)) {
             PrimaryAction(
                 "Add Exercise",
-                onAdd,
+                { runPersistenceAction { onAdd() } },
                 icon = Icons.Rounded.Add,
             )
         }

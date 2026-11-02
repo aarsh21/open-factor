@@ -16,29 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
-data class WorkoutDraft(
-    val name: String = "Workout",
-    val exercises: List<SessionExercise> = emptyList(),
-    val gymId: String? = null,
-    val notes: String = "",
-)
-
-fun AppData.startWorkoutDraft(now: Long): AppData {
-    val draft = workoutDraft ?: return this
-    if (active != null) return this
-    return copy(
-        active = Workout(
-            name = draft.name,
-            startedAt = now,
-            exercises = draft.exercises,
-            selectedExerciseId = draft.exercises.firstOrNull()?.id,
-            gymId = draft.gymId,
-            notes = draft.notes,
-        ),
-        workoutDraft = null,
-    )
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutComposition(
@@ -152,7 +129,7 @@ fun WorkoutComposition(
                                     Text(entry.logicalSets().size.let { "$it ${if (it == 1) "Set" else "Sets"}" }, color = OF.muted)
                                 }
                             }
-                            IconButton({ onEdit { it.copy(exercises = it.exercises.filterNot { e -> e.id == entry.id }) } }) {
+                            IconButton({ runPersistenceAction { onEdit { it.copy(exercises = it.exercises.filterNot { e -> e.id == entry.id }) } } }) {
                                 Icon(Icons.Rounded.Close, "Remove ${exercise?.title ?: "exercise"}")
                             }
                         }
@@ -162,13 +139,15 @@ fun WorkoutComposition(
                                 listOf(-1 to Icons.Rounded.ArrowUpward, 1 to Icons.Rounded.ArrowDownward).forEach { (delta, icon) ->
                                     IconButton(
                                         onClick = {
-                                            onEdit { current ->
-                                                val from = current.exercises.indexOfFirst { it.id == entry.id }
-                                                val to = from + delta
-                                                if (from < 0 || to !in current.exercises.indices) current
-                                                else current.copy(exercises = current.exercises.toMutableList().apply {
-                                                    java.util.Collections.swap(this, from, to)
-                                                })
+                                            runPersistenceAction {
+                                                onEdit { current ->
+                                                    val from = current.exercises.indexOfFirst { it.id == entry.id }
+                                                    val to = from + delta
+                                                    if (from < 0 || to !in current.exercises.indices) current
+                                                    else current.copy(exercises = current.exercises.toMutableList().apply {
+                                                        java.util.Collections.swap(this, from, to)
+                                                    })
+                                                }
                                             }
                                         },
                                         enabled = index + delta in draft.exercises.indices,
@@ -182,11 +161,13 @@ fun WorkoutComposition(
                 }
             }
         }
-        Box(Modifier.padding(18.dp)) { PrimaryAction("Start Workout", onStart, enabled = canStart) }
+        Box(Modifier.padding(18.dp)) { PrimaryAction("Start Workout", { runPersistenceAction { onStart() } }, enabled = canStart) }
     }
     if (rename) NameDialog("Rename Workout", draft.name, { rename = false }) { name ->
-        onEdit { it.copy(name = name.trim()) }
-        rename = false
+        runPersistenceAction {
+            onEdit { it.copy(name = name.trim()) }
+            rename = false
+        }
     }
     if (gymPicker) AlertDialog(
         onDismissRequest = { gymPicker = false },
@@ -195,8 +176,10 @@ fun WorkoutComposition(
             LazyColumn {
                 items(gyms, key = { it.id }) { gym ->
                     TextButton({
-                        onEdit { it.copy(gymId = gym.id) }
-                        gymPicker = false
+                        runPersistenceAction {
+                            onEdit { it.copy(gymId = gym.id) }
+                            gymPicker = false
+                        }
                     }) { Text(gym.name) }
                 }
             }
@@ -208,6 +191,6 @@ fun WorkoutComposition(
         "This removes this composition. Saved workouts, programs and history stay unchanged.",
         "Discard",
         { discard = false },
-        { discard = false; onDiscard() },
+        { runPersistenceAction { onDiscard(); discard = false } },
     )
 }

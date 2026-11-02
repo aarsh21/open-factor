@@ -146,13 +146,13 @@ class ProgressPhotoStorageTest {
                     date = LocalDate.of(2026, 10, 19),
                     photos = PhotoPosition.entries.zip(references).toMap(),
                 )
-            vm.saveProgressPhotos(record)
+            vm.commands.saveProgressPhotos(record)
             val shared =
                 ProgressPhotoRecord(
                     date = record.date,
                     photos = mapOf(PhotoPosition.FRONT to references.first()),
                 )
-            vm.saveProgressPhotos(shared)
+            vm.commands.saveProgressPhotos(shared)
             val saved = vm.data.value
             val reopened = WorkoutViewModel(context.applicationContext as Application)
             assertEquals(saved, reopened.data.value)
@@ -183,14 +183,14 @@ class ProgressPhotoStorageTest {
                 assertEquals(reopened.data.value, WorkoutStore(context).load())
                 reopened.cleanPhotos()
             }
-            reopened.deleteProgressPhotos(record.id)
+            reopened.commands.deleteProgressPhotos(record.id)
             // The startup checkpoint must remain photo-complete until a later load advances it.
             assertTrue(references.all { reopened.photoStore.file(it).exists() })
             refreshCheckpointAndClean()
             assertTrue(reopened.photoStore.file(references.first()).exists())
             assertFalse(reopened.photoStore.file(references[1]).exists())
             assertFalse(reopened.photoStore.file(references[2]).exists())
-            reopened.deleteProgressPhotos(shared.id)
+            reopened.commands.deleteProgressPhotos(shared.id)
             assertEquals(training, reopened.data.value)
             assertTrue(reopened.photoStore.file(references.first()).exists())
             refreshCheckpointAndClean()
@@ -211,7 +211,7 @@ class ProgressPhotoStorageTest {
                     date = record.date.minusDays(2),
                     photos = record.photos - PhotoPosition.SIDE,
                 )
-            reopened.saveProgressPhotos(edited)
+            reopened.commands.saveProgressPhotos(edited)
             assertEquals(listOf(edited, shared), reopened.data.value.progressPhotos)
             assertTrue(reopened.photoStore.file(references[1]).exists())
             refreshCheckpointAndClean()

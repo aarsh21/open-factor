@@ -31,7 +31,10 @@ jobs:
           packages: platform-tools
       - uses: gradle/actions/setup-gradle@v4
       - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
-      - run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug -PopenfactorMediaMode=source
+      - name: Verify native architecture ownership
+        working-directory: .
+        run: python3 -I tooling/verify_android_architecture.py
+      - run: ./gradlew :core:test :coreConsumer:test :app:assembleDebug :app:testDebugUnitTest :app:lintDebug -PopenfactorMediaMode=source
       - name: Test synthetic fixtures and storage snapshot resolver
         working-directory: .
         run: python3 -I -m unittest discover -s tooling -p 'test_*.py' -v
@@ -49,6 +52,10 @@ jobs:
           path: |
             openfactor/app/build/reports/
             openfactor/app/build/test-results/
+            openfactor/core/build/reports/tests/
+            openfactor/core/build/test-results/
+            openfactor/coreConsumer/build/reports/tests/
+            openfactor/coreConsumer/build/test-results/
   device-tests:
     name: Android API ${{ matrix.api }} device tests
     runs-on: ubuntu-latest

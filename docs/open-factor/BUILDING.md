@@ -78,6 +78,10 @@ Then use the default/static build above, or explicitly select `-PopenfactorMedia
 
 Source-only builds retain [44 attributed Everkinetic illustrations covering 21 reviewed variants](LICENSED-MEDIA.md), DM Sans under OFL, Material icons and descriptive catalog metadata. Missing original media uses the available preview/fallback or an explicit unavailable state. Recovered media retains its original ownership; neither the code's MIT license nor local import grants redistribution rights.
 
+## Architecture and headless acceptance
+
+The native product core, Android host ownership, typed navigation, durability contracts, and required architecture checks are documented in [ARCHITECTURE.md](ARCHITECTURE.md). `:core:test` tests reusable policy, while `:coreConsumer:test` consumes the real public Kotlin commands without Android or Compose. Android CI runs these alongside the app tests and the native ownership gate.
+
 ## Performance and test data
 
 Dashboard customization uses cached options and background exercise search. Weekly summaries aggregate dates once; seven-day weight means use a sliding window. Unchanged workout history is stored in a separate atomic archive, so logger edits rewrite only a small live snapshot. Full exported backups remain self-contained and old inline storage migrates on the next save. See [performance checks, synthetic datasets, and storage details](PERFORMANCE.md). No universal device/frame-time claim is implied.

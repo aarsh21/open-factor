@@ -131,7 +131,7 @@ private fun StepBars(history: StepHistory, selected: LocalDate, onSelect: (Local
                     day.count == null -> drawLine(muted, Offset(x - width.coerceAtMost(8.dp.toPx()) / 2, bottom - 1.dp.toPx()), Offset(x + width.coerceAtMost(8.dp.toPx()) / 2, bottom - 1.dp.toPx()), 1.5.dp.toPx())
                     day.count == 0L -> drawCircle(color, 2.5.dp.toPx(), Offset(x, bottom - 3.dp.toPx()), style = Stroke(1.5.dp.toPx()))
                     else -> {
-                        val height = (day.count.toDouble() / ceiling * plotHeight).toFloat().coerceAtLeast(3.dp.toPx())
+                        val height = (requireNotNull(day.count).toDouble() / ceiling * plotHeight).toFloat().coerceAtLeast(3.dp.toPx())
                         drawRoundRect(color, Offset(x - width / 2, bottom - height), Size(width, height), CornerRadius(3.dp.toPx()))
                     }
                 }
