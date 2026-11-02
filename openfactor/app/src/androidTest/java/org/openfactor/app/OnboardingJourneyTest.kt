@@ -2,6 +2,8 @@ package org.openfactor.app
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -15,8 +17,26 @@ import java.time.LocalDate
 class OnboardingJourneyTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
-    private fun await(text: String) = compose.waitUntil(15_000) {
-        runCatching { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }.getOrDefault(false)
+    private fun await(text: String) {
+        try {
+            compose.waitUntil(15_000) {
+                runCatching { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }.getOrDefault(false)
+            }
+        } catch (failure: androidx.compose.ui.test.ComposeTimeoutException) {
+            throw AssertionError("Waiting for $text; saved setup=${WorkoutStore(context).load().onboarding}\n${compose.onRoot().printToString()}", failure)
+        }
+    }
+
+    private fun awaitKeyboardHidden(activity: ActivityScenario<MainActivity>) {
+        // Gender selection clears focus. Wait for the real IME inset before touching the
+        // pinned Continue button, whose position changes while the keyboard is closing.
+        compose.waitUntil(15_000) {
+            var hidden = false
+            activity.onActivity { hidden = ViewCompat.getRootWindowInsets(it.window.decorView)
+                ?.isVisible(WindowInsetsCompat.Type.ime()) == false }
+            hidden
+        }
+        compose.waitForIdle()
     }
 
     @Test fun profileMeasurementsUnitsAndTrainingChoicesSurviveRecreationAndApplyOnce() {
@@ -33,6 +53,7 @@ class OnboardingJourneyTest {
             compose.onNodeWithText("Continue").assertIsNotEnabled()
             compose.onNodeWithContentDescription("Profile name").performTextInput("Taylor")
             compose.onNodeWithContentDescription("Gender Woman").performScrollTo().performClick()
+            awaitKeyboardHidden(activity)
             compose.onNodeWithText("Continue").assertIsEnabled().performClick()
             await("Your starting point")
             compose.onNodeWithText("Health Connect").assertExists()

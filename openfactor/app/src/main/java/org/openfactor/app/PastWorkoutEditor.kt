@@ -44,13 +44,22 @@ fun PastWorkoutEditor(
     }
     fun leave() { if (edit.edited != edit.original) discard = true else onDiscard() }
     BackHandler { if (guide != null) guide = null else if (picker) picker = false else leave() }
-    fun change(block: (Workout) -> Workout) { saveError = null; onChange(block) }
+    fun change(block: (Workout) -> Workout): Boolean {
+        val saved = runPersistenceAction { saveError = null; onChange(block) }
+        if (!saved) saveError = "Couldn't save the workout draft. Free up storage and try again."
+        return saved
+    }
     fun entry(id: String, block: (SessionExercise) -> SessionExercise) = change { w ->
         w.copy(exercises = w.exercises.map { if (it.id == id) block(it) else it })
     }
     Column(Modifier.fillMaxSize().imePadding()) {
         PageHeading("Edit Workout", ::leave, actions = {
-            TextButton({ saveError = onSave(); if (saveError == null) onSaved() }, enabled = error == null) { Text("Save") }
+            TextButton({
+                if (!runPersistenceAction {
+                    saveError = onSave()
+                    if (saveError == null) onSaved()
+                }) saveError = "Couldn't save the workout. Free up storage and try again."
+            }, enabled = error == null) { Text("Save") }
         })
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             item {
@@ -106,8 +115,8 @@ fun PastWorkoutEditor(
                     }
                 }
                 if (remove) ConfirmDialog("Remove exercise?", "This removes its sets from this edit. The saved workout changes only after Save.", "Remove", { remove = false }) {
-                    change { it.copy(exercises = it.exercises.filterNot { e -> e.id == session.id }).normalizeSupersets() }
-                    remove = false
+                    if (change { it.copy(exercises = it.exercises.filterNot { e -> e.id == session.id }).normalizeSupersets() })
+                        remove = false
                 }
             }
             item { OutlinedButton({ picker = true }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
@@ -121,13 +130,15 @@ fun PastWorkoutEditor(
     if (picker) ModalBottomSheet(onDismissRequest = { picker = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = OF.background) {
         Box(Modifier.fillMaxHeight(.94f)) {
             val pick: (String) -> Unit = { id ->
-                change { it.copy(exercises = it.exercises + SessionExercise(exerciseId = id)) }
+                // The library/detail owns this action boundary (and resets its in-flight latch).
+                saveError = null
+                onChange { it.copy(exercises = it.exercises + SessionExercise(exerciseId = id)) }
                 picker = false
                 guide = null
             }
             val exercise = catalog.find { it.id == guide }
             if (exercise != null) ExerciseDetail(exercise, data, vm, { guide = null }, { pick(exercise.id) }, closeable = true)
-            else ExerciseLibrary(catalog, data.favorites, vm::favorite, onDetail = { guide = it }, onPick = pick,
+            else ExerciseLibrary(catalog, data.favorites, { id -> runPersistenceAction { vm.commands.favorite(id) } }, onDetail = { guide = it }, onPick = pick,
                 onBack = { picker = false }, onCustom = {}, picking = true, allowCustom = false)
         }
     }

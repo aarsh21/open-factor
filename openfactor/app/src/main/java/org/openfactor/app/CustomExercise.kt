@@ -173,7 +173,7 @@ fun CustomExercise(data: AppData, catalog: EquipmentCatalog, onBack: () -> Unit,
             ) { Text(if (draft.resistance.isEmpty()) "Add Resistance" else "Add Alternate Resistance") }
             PrimaryAction(
                 if (step == 4) "Create" else if (step == 1 && draft.primary.isEmpty() && draft.secondary.isEmpty()) "Skip" else "Next",
-                { if (step == 4) onSave(draft) else step++ },
+                { if (step == 4) runPersistenceAction { onSave(draft) } else step++ },
                 enabled = when (step) { 0 -> draft.validBasics; 2 -> draft.resistance.isNotEmpty(); 3 -> draft.validDetails; 4 -> draft.validBasics && draft.validDetails; else -> true },
             )
         }

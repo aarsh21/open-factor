@@ -62,7 +62,6 @@ fun WorkoutSession(
     onBack: () -> Unit,
     onAdd: () -> Unit,
     onExercise: (String) -> Unit,
-    onFinished: (String) -> Unit,
     onWorkoutSettings: () -> Unit,
     onGymSettings: () -> Unit,
     onOpenWorkout: ((String) -> Unit)? = null,
@@ -81,10 +80,14 @@ fun WorkoutSession(
     val haptics = LocalHapticFeedback.current
     val motion = LocalAppMotionEnabled.current
     val scope = rememberCoroutineScope()
-    var finishing by remember { mutableStateOf(false) }
-    var finishError by remember { mutableStateOf<String?>(null) }
-    var timerSettingsError by remember { mutableStateOf(false) }
     val workout = data.active
+    val finishState by vm.finishWorkout.state.collectAsState()
+    // The root navigation owner handles success, even when this animated screen is absent/outgoing.
+    // A prior workout's submission/failure must not disable or label a replacement session.
+    val finishing = (finishState as? WorkoutFinishState.Saving)?.workoutId == workout?.id && workout != null
+    val finishError = (finishState as? WorkoutFinishState.Failed)?.takeIf { it.workoutId == workout?.id }
+        ?.let { "Could not save workout. Please try again." }
+    var timerSettingsError by remember { mutableStateOf(false) }
     if (workout == null) {
         Column {
             PageHeading("Workout", onBack)
@@ -107,7 +110,9 @@ fun WorkoutSession(
     var rateExerciseId by rememberSaveable(workout.id) { mutableStateOf<String?>(null) }
     // Finish leaves the current exercise too: ask what is owed first, then continue to the confirmation.
     var finishAfterEffort by rememberSaveable(workout.id) { mutableStateOf(false) }
-    val requestFinish = { if (vm.askEffortBeforeFinish()) finishAfterEffort = true else confirm = "finish" }
+    val requestFinish = { runPersistenceAction {
+        if (vm.commands.askEffortBeforeFinish()) finishAfterEffort = true else confirm = "finish"
+    }; Unit }
     var swapEntryId by rememberSaveable(workout.id) { mutableStateOf<String?>(null) }
     val selected =
         workout.exercises.find { it.id == workout.selectedExerciseId }
@@ -158,7 +163,7 @@ fun WorkoutSession(
                         },
                         onClick = {
                             menu = false
-                            vm.pauseWorkout(workout.pausedAt == null)
+                            runPersistenceAction { vm.commands.pauseWorkout(workout.pausedAt == null) }
                         },
                     )
                     DropdownMenuItem(
@@ -192,7 +197,7 @@ fun WorkoutSession(
                         text = { Text("Save as Workout Template") },
                         onClick = {
                             menu = false
-                            vm.saveRoutine(workout.name, workout.exercises.map { it.exerciseId })
+                            runPersistenceAction { vm.commands.saveRoutine(workout.name, workout.exercises.map { it.exerciseId }) }
                         },
                     )
                     DropdownMenuItem(
@@ -240,9 +245,9 @@ fun WorkoutSession(
                         }
                     }
                     val extend = remember { MutableInteractionSource() }
-                    TextButton({ vm.extendRest(30) }, Modifier.pressFeedback(extend), interactionSource = extend) { Text("+30s") }
+                    TextButton({ runPersistenceAction { vm.commands.extendRest(30) } }, Modifier.pressFeedback(extend), interactionSource = extend) { Text("+30s") }
                     val skip = remember { MutableInteractionSource() }
-                    TextButton({ vm.clearRest() }, Modifier.pressFeedback(skip), interactionSource = skip) { Text("Skip") }
+                    TextButton({ runPersistenceAction { vm.commands.clearRest() } }, Modifier.pressFeedback(skip), interactionSource = skip) { Text("Skip") }
                 } else TextButton({ restSettings = true }) {
                     Icon(Icons.Rounded.Timer, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
@@ -252,7 +257,7 @@ fun WorkoutSession(
         }
         WorkoutExerciseSelector(
             workout, exercises, selected,
-            onSelect = { focus.clearFocus(); vm.selectExercise(it) },
+            onSelect = { focus.clearFocus(); runPersistenceAction { vm.commands.selectExercise(it) } },
             onAdd = { focus.clearFocus(); onAdd() },
         )
         LazyColumn(
@@ -316,18 +321,18 @@ fun WorkoutSession(
                                     DropdownMenuItem(text = { Text("Targets & rest") }, onClick = { exerciseMenu = false; targets = true })
                                     if (metrics.any { it.isReps }) DropdownMenuItem(
                                         text = { Text(if (data.preferences.rateEffortAfterExercise) "Turn off effort prompt" else "Ask effort after exercise") },
-                                        onClick = { exerciseMenu = false; vm.settings { it.copy(rateEffortAfterExercise = !it.rateEffortAfterExercise) } },
+                                        onClick = { exerciseMenu = false; runPersistenceAction { vm.commands.settings { it.copy(rateEffortAfterExercise = !it.rateEffortAfterExercise) } } },
                                     )
                                     DropdownMenuItem(text = { Text("Exercise notes") }, onClick = { exerciseMenu = false; exerciseNotes = true })
                                     if (sourceRoutine != null) DropdownMenuItem(text = { Text("Template note") }, onClick = { exerciseMenu = false; templateNote = true })
                                     DropdownMenuItem(text = { Text(if (se.sets.any { it.side != null }) "Use left logs only…" else "Log left and right separately") }, onClick = {
                                         exerciseMenu = false
-                                        if (se.sets.any { it.side != null }) mergeSides = true else vm.splitSides(se.id)
+                                        if (se.sets.any { it.side != null }) mergeSides = true else runPersistenceAction { vm.commands.splitSides(se.id) }
                                     }, enabled = se.sets.isNotEmpty())
                                     DropdownMenuItem(text = { Text("Create superset…") }, enabled = workout.exercises.size > 1, onClick = { exerciseMenu = false; superset = true })
-                                    if (se.supersetId != null) DropdownMenuItem(text = { Text("Leave superset") }, onClick = { exerciseMenu = false; vm.leaveSuperset(se.id) })
-                                    DropdownMenuItem(text = { Text("Move earlier") }, enabled = workout.exercises.first().id != se.id, onClick = { exerciseMenu = false; vm.moveSessionExercise(se.id, -1) })
-                                    DropdownMenuItem(text = { Text("Move later") }, enabled = workout.exercises.last().id != se.id, onClick = { exerciseMenu = false; vm.moveSessionExercise(se.id, 1) })
+                                    if (se.supersetId != null) DropdownMenuItem(text = { Text("Leave superset") }, onClick = { exerciseMenu = false; runPersistenceAction { vm.commands.leaveSuperset(se.id) } })
+                                    DropdownMenuItem(text = { Text("Move earlier") }, enabled = workout.exercises.first().id != se.id, onClick = { exerciseMenu = false; runPersistenceAction { vm.commands.moveSessionExercise(se.id, -1) } })
+                                    DropdownMenuItem(text = { Text("Move later") }, enabled = workout.exercises.last().id != se.id, onClick = { exerciseMenu = false; runPersistenceAction { vm.commands.moveSessionExercise(se.id, 1) } })
                                     DropdownMenuItem(text = { Text("Remove Exercise") }, onClick = { exerciseMenu = false; remove = true })
                                 }
                             }
@@ -341,11 +346,11 @@ fun WorkoutSession(
                             se, pinned = data.exerciseDefaults[e.id]?.note.orEmpty(), templateName = sourceRoutine?.name,
                             templateNote = sourceRoutine?.prescriptions?.find { it.exerciseId == se.exerciseId }?.note.orEmpty(),
                             last = lastNote, onEditSession = { exerciseNotes = true }, onEditTemplate = { templateNote = true },
-                            onDismissLast = { vm.dismissLastNote(se.id) },
+                            onDismissLast = { runPersistenceAction { vm.commands.dismissLastNote(se.id) } },
                         )
                         if (targets)
                             WorkoutTargetsDialog(se, workout.targetRirLimit, { targets = false }) { values, rest ->
-                                vm.saveExerciseTargets(se.id, values, rest)
+                                vm.commands.saveExerciseTargets(se.id, values, rest)
                                 targets = false
                             }
                         Row(
@@ -384,21 +389,21 @@ fun WorkoutSession(
                                         index, s, data.preferences, metrics,
                                         exerciseName = e.title + (s.side?.let { " ${it.label.lowercase()}" } ?: "") +
                                             (if (componentIndex > 0) " Myo component $componentIndex" else ""),
-                                        onChange = { changed -> vm.editSet(seId, setId) { changed } },
-                                        onComplete = {
+                                        onChange = { changed -> runPersistenceAction { vm.commands.editSet(seId, setId) { changed } } },
+                                        onComplete = { runPersistenceAction {
                                             if (keypad?.logging != true) focus.clearFocus()
                                             val before = vm.data.value.active?.takeIf { it.id == workoutId }
                                                 ?.exercises?.find { it.id == seId }?.sets?.find { it.id == setId }
-                                            vm.toggleSetCompletion(seId, setId)
+                                            vm.commands.toggleSetCompletion(seId, setId)
                                             val after = vm.data.value.active?.takeIf { it.id == workoutId }
                                                 ?.exercises?.find { it.id == seId }?.sets?.find { it.id == setId }
                                             // Acknowledge a committed log, never undo, validation or restoration.
                                             if (before?.completed == false && after?.completed == true)
                                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        },
-                                        onRemove = { vm.removeSet(seId, setId) },
-                                        onDelete = { vm.removeSetWithUndo(seId, setId)?.let { onSetRemoved(it, removedLabel) } },
-                                        onKind = { kind, isWarmup -> vm.setKind(seId, setId, kind, isWarmup) },
+                                        } },
+                                        onRemove = { runPersistenceAction { vm.commands.removeSet(seId, setId) } },
+                                        onDelete = { runPersistenceAction { vm.commands.removeSetWithUndo(seId, setId)?.let { onSetRemoved(it, removedLabel) } } },
+                                        onKind = { kind, isWarmup -> runPersistenceAction { vm.commands.setKind(seId, setId, kind, isWarmup) } },
                                         hasExtras = group.components.size > 1,
                                         showTargets = showTargets,
                                         displayNumber = displayNumber,
@@ -406,7 +411,7 @@ fun WorkoutSession(
                                     )
                                 } } }
                             }
-                            if (group.root.kind == SetKind.MYO && !group.root.warmup) TextButton({ vm.addMyoComponent(se.id, group.root.id) }) {
+                            if (group.root.kind == SetKind.MYO && !group.root.warmup) TextButton({ runPersistenceAction { vm.commands.addMyoComponent(se.id, group.root.id) } }) {
                                 Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
                                 Text("Add Myo component", Modifier.padding(start = 6.dp))
                             }
@@ -416,17 +421,17 @@ fun WorkoutSession(
                             val canLogAll = se.canLogAllSets(metrics)
                             PrimaryAction(
                                 "Log all sets",
-                                {
+                                { runPersistenceAction {
                                     focus.clearFocus()
                                     val before = vm.data.value.active?.takeIf { it.id == workout.id }
                                         ?.exercises?.find { it.id == se.id }
                                     val pending = before?.sets?.filterNot { it.completed }?.map { it.id }.orEmpty()
-                                    vm.logAllSets(se.id)
+                                    vm.commands.logAllSets(se.id)
                                     val after = vm.data.value.active?.takeIf { it.id == workout.id }
                                         ?.exercises?.find { it.id == se.id }
                                     if (pending.isNotEmpty() && after != null && pending.all { id -> after.sets.any { it.id == id && it.completed } })
                                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                },
+                                } },
                                 Modifier.padding(top = 16.dp),
                                 enabled = canLogAll,
                                 icon = Icons.Rounded.DoneAll,
@@ -451,20 +456,20 @@ fun WorkoutSession(
                         if (done) workout.upNextExercise(se.id)?.let { next ->
                             NextExerciseAction(
                                 next, exercises.find { it.id == next.exerciseId }, fresh = !doneOnArrival,
-                                onClick = { focus.clearFocus(); vm.selectExercise(next.id) },
+                                onClick = { focus.clearFocus(); runPersistenceAction { vm.commands.selectExercise(next.id) } },
                                 modifier = Modifier.padding(top = 12.dp),
                             )
                         }
                         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             val warmupPress = remember { MutableInteractionSource() }
                             val addPress = remember { MutableInteractionSource() }
-                            OutlinedButton({ focus.clearFocus(); vm.addWarmupSet(se.id) },
+                            OutlinedButton({ focus.clearFocus(); runPersistenceAction { vm.commands.addWarmupSet(se.id) } },
                                 Modifier.weight(1f).heightIn(min = 48.dp).pressFeedback(warmupPress), interactionSource = warmupPress) {
                                 Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))
                                 Text("Warmup")
                             }
-                            FilledTonalButton({ focus.clearFocus(); vm.addSet(se.id) },
+                            FilledTonalButton({ focus.clearFocus(); runPersistenceAction { vm.commands.addSet(se.id) } },
                                 Modifier.weight(1f).heightIn(min = 48.dp).pressFeedback(addPress), interactionSource = addPress) {
                                 Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))
@@ -475,22 +480,24 @@ fun WorkoutSession(
                 }
                 // Starts empty: last time's note is a reference, not today's words to re-save.
                 if (exerciseNotes) NoteDialog("Exercise notes", se.notes, { exerciseNotes = false }, {
-                    vm.exerciseNotes(se.id, it)
+                    vm.commands.exerciseNotes(se.id, it)
                     exerciseNotes = false
                     null
                 }, placeholder = lastNote?.takeIf { se.notes.isBlank() }?.text,
                     supporting = lastNote?.takeIf { se.notes.isBlank() }?.let { "Starts empty. Last time's note stays with that workout." })
                 if (templateNote && sourceRoutine != null) NoteDialog("Template note",
                     sourceRoutine.prescriptions.find { it.exerciseId == se.exerciseId }?.note.orEmpty(), { templateNote = false }, {
-                        vm.saveTemplateNote(sourceRoutine.id, se.exerciseId, it).also { error -> if (error == null) templateNote = false }
+                        vm.commands.saveTemplateNote(sourceRoutine.id, se.exerciseId, it).also { error -> if (error == null) templateNote = false }
                     }, supporting = "Saved to ${sourceRoutine.name}; shows each time you start it.", limit = TEMPLATE_NOTE_LIMIT)
                 if (superset) SupersetDialog(workout, se.id, exercises, { superset = false }) { ids ->
-                    vm.groupSuperset(ids)
+                    vm.commands.groupSuperset(ids)
                     superset = false
                 }
                 if (mergeSides) ConfirmDialog("Use left logs only?", "Right-side values and completion will be removed. Left-side values stay unchanged.", "Keep left logs", { mergeSides = false }) {
-                    vm.keepLeftSide(se.id)
-                    mergeSides = false
+                    runPersistenceAction {
+                        vm.commands.keepLeftSide(se.id)
+                        mergeSides = false
+                    }
                 }
                 if (remove) {
                     ConfirmDialog(
@@ -499,8 +506,10 @@ fun WorkoutSession(
                         "Remove",
                         { remove = false },
                         {
-                            vm.removeExercise(se.id)
-                            remove = false
+                            runPersistenceAction {
+                                vm.commands.removeExercise(se.id)
+                                remove = false
+                            }
                         },
                     )
                 }
@@ -543,8 +552,8 @@ fun WorkoutSession(
         val set = entry.lastEffortSet(loggingMetricsOf(exercise))
         if (exercise != null && set != null) ExerciseEffortSheet(
             exercise, set,
-            onDismiss = { vm.reviewExerciseEffort(entry.id, set.id, set.rir); rateExerciseId = null },
-            onSave = { vm.reviewExerciseEffort(entry.id, set.id, it); rateExerciseId = null },
+            onDismiss = { runPersistenceAction { vm.commands.reviewExerciseEffort(entry.id, set.id, set.rir); rateExerciseId = null } },
+            onSave = { value -> runPersistenceAction { vm.commands.reviewExerciseEffort(entry.id, set.id, value); rateExerciseId = null } },
         )
     }
     ExerciseSwapHost(
@@ -586,7 +595,7 @@ fun WorkoutSession(
                         seconds,
                         { value ->
                             seconds = value
-                            value.toIntOrNull()?.takeIf { it in 0..1800 }?.let { valid -> vm.settings { it.copy(restSeconds = valid) } }
+                            value.toIntOrNull()?.takeIf { it in 0..1800 }?.let { valid -> runPersistenceAction { vm.commands.settings { it.copy(restSeconds = valid) } } }
                         },
                         Modifier.fillMaxWidth(),
                         label = { Text("Rest duration (seconds)") },
@@ -604,13 +613,13 @@ fun WorkoutSession(
                         if (timerSettingsError) Text("Open Android Settings → Apps → Open Factor → Alarms & reminders.", color = MaterialTheme.colorScheme.error)
                     }
                     listOf(
-                        Triple("Use Rest Timers", data.preferences.autoRest, { checked: Boolean -> vm.settings { it.copy(autoRest = checked) } }),
-                        Triple("Rest After Last Warm-up Set", data.preferences.restAfterLastWarmupSet, { checked: Boolean -> vm.settings { it.copy(restAfterLastWarmupSet = checked) } }),
-                        Triple("Rest Between Exercises", data.preferences.restBetweenExercises, { checked: Boolean -> vm.settings { it.copy(restBetweenExercises = checked) } }),
-                        Triple("Advance within supersets", data.preferences.supersetAutoNext, { checked: Boolean -> vm.settings { it.copy(supersetAutoNext = checked) } }),
+                        Triple("Use Rest Timers", data.preferences.autoRest, { checked: Boolean -> runPersistenceAction { vm.commands.settings { it.copy(autoRest = checked) } } }),
+                        Triple("Rest After Last Warm-up Set", data.preferences.restAfterLastWarmupSet, { checked: Boolean -> runPersistenceAction { vm.commands.settings { it.copy(restAfterLastWarmupSet = checked) } } }),
+                        Triple("Rest Between Exercises", data.preferences.restBetweenExercises, { checked: Boolean -> runPersistenceAction { vm.commands.settings { it.copy(restBetweenExercises = checked) } } }),
+                        Triple("Advance within supersets", data.preferences.supersetAutoNext, { checked: Boolean -> runPersistenceAction { vm.commands.settings { it.copy(supersetAutoNext = checked) } } }),
                     ).forEach { (label, checked, change) ->
                         Row(
-                            Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = change),
+                            Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = { change(it); Unit }),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
@@ -621,7 +630,7 @@ fun WorkoutSession(
                     Text("Rest between sides · ${data.preferences.restBetweenSidesPercent}%")
                     Slider(
                         value = data.preferences.restBetweenSidesPercent.toFloat(),
-                        onValueChange = { value -> vm.settings { it.copy(restBetweenSidesPercent = value.toInt()) } },
+                        onValueChange = { value -> runPersistenceAction { vm.commands.settings { it.copy(restBetweenSidesPercent = value.toInt()) } } },
                         valueRange = 0f..100f,
                         modifier = Modifier.semantics { contentDescription = "Rest between sides percentage" },
                     )
@@ -631,7 +640,7 @@ fun WorkoutSession(
             confirmButton = { TextButton({ restSettings = false }) { Text("Done") } },
         )
     if (workoutNotes) SessionNotesDialog("Workout notes", workout.notes, { workoutNotes = false }) {
-        vm.workoutNotes(it)
+        vm.commands.workoutNotes(it)
         workoutNotes = false
     }
     if (rename)
@@ -640,8 +649,10 @@ fun WorkoutSession(
             workout.name,
             { rename = false },
             {
-                vm.renameActive(it)
-                rename = false
+                runPersistenceAction {
+                    vm.commands.renameActive(it)
+                    rename = false
+                }
             },
         )
     if (confirm == "discard")
@@ -651,9 +662,11 @@ fun WorkoutSession(
             "Discard",
             { confirm = "" },
             {
-                vm.discard()
-                confirm = ""
-                onBack()
+                runPersistenceAction {
+                    vm.commands.discard()
+                    confirm = ""
+                    onBack()
+                }
             },
         )
     if (confirm == "finish")
@@ -673,22 +686,7 @@ fun WorkoutSession(
             },
             confirmButton = {
                 TextButton({
-                    finishing = true
-                    finishError = null
-                    val id = workout.id
-                    val includeTemplate = saveTemplate
-                    scope.launch {
-                        try {
-                            withContext(Dispatchers.IO) { vm.finish(includeTemplate) }
-                            confirm = ""
-                            onFinished(id)
-                        } catch (failure: Exception) {
-                            if (failure is CancellationException) throw failure
-                            finishError = "Could not save workout. Please try again."
-                        } finally {
-                            finishing = false
-                        }
-                    }
+                    vm.finishWorkout.submit(workout.id, saveTemplate)
                 }, enabled = !finishing) {
                     Text(if (finishing) "Saving…" else "Finish")
                 }
@@ -714,7 +712,7 @@ private fun SupersetDialog(workout: Workout, currentId: String, catalog: List<Ex
                 }
             }
         } },
-        confirmButton = { TextButton({ onSave(selected) }, enabled = selected.size >= 2) { Text("Create") } },
+        confirmButton = { TextButton({ runPersistenceAction { onSave(selected) } }, enabled = selected.size >= 2) { Text("Create") } },
         dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
     )
 }
@@ -726,7 +724,7 @@ private fun SessionNotesDialog(title: String, initial: String, onDismiss: () -> 
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { OutlinedTextField(notes, { notes = it }, Modifier.fillMaxWidth(), label = { Text(title) }, minLines = 3) },
-        confirmButton = { TextButton({ onSave(notes) }) { Text("Save") } },
+        confirmButton = { TextButton({ runPersistenceAction { onSave(notes) } }) { Text("Save") } },
         dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
     )
 }
@@ -790,7 +788,7 @@ private fun WorkoutTargetsDialog(
             }
         },
         confirmButton = {
-            TextButton({ onSave(parsed, rest.toIntOrNull()) }, enabled = valid) { Text("Save") }
+            TextButton({ runPersistenceAction { onSave(parsed, rest.toIntOrNull()) } }, enabled = valid) { Text("Save") }
         },
         dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
     )

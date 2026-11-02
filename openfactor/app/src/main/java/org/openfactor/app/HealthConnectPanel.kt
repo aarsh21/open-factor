@@ -212,11 +212,11 @@ fun HealthConnectPanel(
                         enabled = !pending && availability != HealthConnectAvailability.UNAVAILABLE,
                     )
                     if (pending) LinearProgressIndicator(Modifier.fillMaxWidth())
-                    if (state.lastSyncedAtMillis != null) {
+                    state.lastSyncedAtMillis?.let { syncedAt ->
                         Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
                             HealthSyncValue("Last synced", android.text.format.DateFormat.getMediumDateFormat(context)
-                                .format(Date(state.lastSyncedAtMillis)) + " · " + android.text.format.DateFormat.getTimeFormat(context)
-                                .format(Date(state.lastSyncedAtMillis)))
+                                .format(Date(syncedAt)) + " · " + android.text.format.DateFormat.getTimeFormat(context)
+                                .format(Date(syncedAt)))
                             HealthSyncValue("Weight readings", if (state.weightAccess) state.weightReadings.toString() else "No access")
                             val stepsToday = state.dailySteps.firstOrNull { it.date == LocalDate.now() }?.count
                             HealthSyncValue("Steps today", when {

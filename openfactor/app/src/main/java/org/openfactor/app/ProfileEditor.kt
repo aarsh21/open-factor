@@ -36,7 +36,7 @@ internal fun ProfileEditor(data: AppData, vm: WorkoutViewModel, onClose: () -> U
     fun leave(action: String) {
         focus.clearFocus()
         if (dirty) pendingExit = action
-        else if (action == "review") { vm.restartOnboarding(); onClose() } else onClose()
+        else if (action == "review") { runPersistenceAction { vm.commands.restartOnboarding(); onClose() } } else onClose()
     }
     BackHandler { leave("close") }
     LaunchedEffect(data.scaleWeights) {
@@ -47,8 +47,10 @@ internal fun ProfileEditor(data: AppData, vm: WorkoutViewModel, onClose: () -> U
         PageHeading("Profile", { leave("close") }, actions = {
             TextButton({
                 focus.clearFocus()
-                saveError = vm.saveProfile(draft)
-                if (saveError == null) onClose()
+                runPersistenceAction {
+                    saveError = vm.commands.saveProfile(draft)
+                    if (saveError == null) onClose()
+                }
             }, enabled = draft.validationError() == null) { Text("Save") }
         })
         Column(
@@ -66,9 +68,11 @@ internal fun ProfileEditor(data: AppData, vm: WorkoutViewModel, onClose: () -> U
     }
     if (pendingExit.isNotEmpty()) ConfirmDialog(
         "Discard profile changes?", "Your saved profile will stay as it is.", "Discard", { pendingExit = "" }, {
-            val action = pendingExit
-            pendingExit = ""
-            if (action == "review") { vm.restartOnboarding(); onClose() } else onClose()
+            runPersistenceAction {
+                if (pendingExit == "review") vm.commands.restartOnboarding()
+                pendingExit = ""
+                onClose()
+            }
         },
     )
 }

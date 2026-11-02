@@ -43,14 +43,16 @@ fun DashboardScreen(
     }
     if (customize) {
         DashboardCustomization(data, exercises, { customize = false }) { selected ->
-            vm.settings { it.copy(dashboard = selected, showWeeklyWorkouts = true, showInsights = true, showHabits = true) }
-            customize = false
+            runPersistenceAction {
+                vm.commands.settings { it.copy(dashboard = selected, showWeeklyWorkouts = true, showInsights = true, showHabits = true) }
+                customize = false
+            }
         }
         return
     }
     chart?.let { key ->
         BodyChartScreen(data, key, range, { chart = it }, { range = it }, { chart = null },
-            onDismissTutorial = { vm.settings { it.copy(dismissedTutorials = it.dismissedTutorials + "bodyCharts") } }, onLogWeight = onLogWeight)
+            onDismissTutorial = { runPersistenceAction { vm.commands.settings { it.copy(dismissedTutorials = it.dismissedTutorials + "bodyCharts") } } }, onLogWeight = onLogWeight)
         return
     }
     val training = remember(data.active, data.history, exercises, trainingPeriod, periodOffset, today) {
@@ -75,9 +77,9 @@ fun DashboardScreen(
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 112.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item { PageHeading("Dashboard", actions = { RoundAction(Icons.Rounded.Tune, "Customize Dashboard", { customize = true }) }) }
-        if (data.active != null) item {
-            Box(Modifier.padding(horizontal = 18.dp)) { PrimaryAction("Resume ${data.active.name}", onResume, icon = Icons.Rounded.PlayArrow) }
-        }
+        data.active?.let { active -> item {
+            Box(Modifier.padding(horizontal = 18.dp)) { PrimaryAction("Resume ${active.name}", onResume, icon = Icons.Rounded.PlayArrow) }
+        } }
         if (data.preferences.showWeeklyWorkouts && "weekly" in selection.focuses) item {
             Column(Modifier.padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 TrainingPeriodPanel(training, trainingPeriod, periodOffset,

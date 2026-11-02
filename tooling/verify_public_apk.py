@@ -9,6 +9,9 @@ import hashlib
 import json
 from pathlib import Path
 import zipfile
+import runpy
+
+_FONT_PROFILE = runpy.run_path(str(Path(__file__).with_name("verify_font_assets.py")))
 
 
 def verify(path: Path) -> dict:
@@ -22,10 +25,11 @@ def verify(path: Path) -> dict:
         for required in (
             "AndroidManifest.xml", "classes.dex", "assets/catalog.json",
             "assets/exercise-previews.json", "assets/licenses/CC-BY-SA-3.0.txt",
-            "assets/fonts/DM-Sans.ttf", "assets/fonts/OFL.txt",
+            "assets/fonts/OFL-Geist.txt", "assets/fonts/geist-provenance.json",
         ):
             if required not in names:
                 raise ValueError(f"Missing APK entry: {required}")
+        _FONT_PROFILE["verify_fonts"](apk)
         corrupt = apk.testzip()
         if corrupt:
             raise ValueError(f"Corrupt APK entry: {corrupt}")
@@ -39,7 +43,7 @@ def verify(path: Path) -> dict:
         allowed_assets = {
             "assets/catalog.json", "assets/catalog-provenance.json", "assets/equipment.json",
             "assets/exercise-previews.json", "assets/licenses/CC-BY-SA-3.0.txt",
-            "assets/fonts/DM-Sans.ttf", "assets/fonts/OFL.txt",
+            "assets/fonts/OFL-Geist.txt", "assets/fonts/geist-provenance.json",
             "assets/dexopt/baseline.prof", "assets/dexopt/baseline.profm",
             "assets/media-pack.json",
         }

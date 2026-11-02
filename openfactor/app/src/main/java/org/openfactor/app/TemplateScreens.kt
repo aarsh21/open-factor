@@ -215,8 +215,10 @@ fun TemplateEditor(
         Box(Modifier.padding(horizontal = 18.dp, vertical = 12.dp)) {
             PrimaryAction("Save template", {
                 val routine = Routine(draft.id, draft.name.trim(), draft.targets.map { it.exerciseId }, targets.filterNotNull())
-                error = onSave(routine)
-                if (error == null) baseline = raw
+                if (!runPersistenceAction {
+                    error = onSave(routine)
+                    if (error == null) baseline = raw
+                }) error = "Couldn't save the template. Free up storage and try again."
             }, enabled = valid)
         }
     }
@@ -349,7 +351,10 @@ fun TemplateLibraryScreen(
                                 }
                                 Text(routine.exerciseIds.size.let { "$it ${if (it == 1) "exercise" else "exercises"}" } + " · " +
                                     routine.effectivePrescriptions().sumOf { it.sets }.let { "$it ${if (it == 1) "set" else "sets"}" }, color = OF.muted)
-                                OutlinedButton({ error = onStart(routine) }, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = data.active == null) { Text("Start ${routine.name}") }
+                                OutlinedButton({
+                                    if (!runPersistenceAction { error = onStart(routine) })
+                                        error = "Couldn't start the template. Free up storage and try again."
+                                }, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = data.active == null) { Text("Start ${routine.name}") }
                             }
                         }
                     }
@@ -366,19 +371,30 @@ fun TemplateLibraryScreen(
             if (error != null) item { Text(error.orEmpty(), color = MaterialTheme.colorScheme.error) }
         }
         if (selectedRoutine != null) Box(Modifier.padding(18.dp)) {
-            PrimaryAction("Start ${selectedRoutine.name}", { error = onStart(selectedRoutine) }, enabled = data.active == null)
+            PrimaryAction("Start ${selectedRoutine.name}", {
+                if (!runPersistenceAction { error = onStart(selectedRoutine) })
+                    error = "Couldn't start the template. Free up storage and try again."
+            }, enabled = data.active == null)
         }
         if (starter != null) Box(Modifier.padding(18.dp)) {
             PrimaryAction(if (installing) "Adding templates" else "Use split", {
                 if (!installing) {
                     installing = true
-                    error = onInstall(starter.id)
-                    if (error == null) pendingName = starter.name else installing = false
+                    if (!runPersistenceAction {
+                        error = onInstall(starter.id)
+                        if (error == null) pendingName = starter.name else installing = false
+                    }) {
+                        error = "Couldn't add the templates. Free up storage and try again."
+                        installing = false
+                    }
                 }
             }, enabled = !installing)
         }
     }
-    delete?.let { routine -> ConfirmDialog("Delete ${routine.name}?", "Your saved workouts stay in History.", "Delete", { delete = null }, { onDelete(routine.id); delete = null }) }
+    delete?.let { routine -> ConfirmDialog("Delete ${routine.name}?", "Your saved workouts stay in History.", "Delete", { delete = null }, {
+        if (!runPersistenceAction { onDelete(routine.id); delete = null })
+            error = "Couldn't delete the template. Free up storage and try again."
+    }) }
 }
 @Composable private fun TemplateSplitRow(name: String, days: List<String?>, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

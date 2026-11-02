@@ -57,7 +57,7 @@ class EffortPromptOnLeaveJourneyTest {
     )
 
     private fun ActivityScenario<MainActivity>.select(id: String) =
-        onActivity { ViewModelProvider(it)[WorkoutViewModel::class.java].selectExercise(id) }
+        onActivity { ViewModelProvider(it)[WorkoutViewModel::class.java].commands.selectExercise(id) }
 
     private fun benchLast(store: WorkoutStore) = store.load().active!!.exercises.first { it.id == "leave-a" }.sets.last()
 

@@ -61,6 +61,7 @@ class SetRowSwipeJourneyTest {
         ))
         activity = ActivityScenario.launch(MainActivity::class.java)
         awaitText("Warmup")
+        weight(3).performScrollTo().assertIsDisplayed()
         compose.waitForIdle()
         return workout
     }
@@ -79,18 +80,25 @@ class SetRowSwipeJourneyTest {
     private fun reps(n: Int) = compose.onNodeWithContentDescription("$name set $n reps (Reps)")
     private fun left(n: Int) = options(n).fetchSemanticsNode().boundsInRoot.left
     private fun top(n: Int) = options(n).fetchSemanticsNode().boundsInRoot.top
-    private val rowWidth get() = compose.onNodeWithContentDescription("Complete set 3 for $name", substring = true)
-        .fetchSemanticsNode().boundsInRoot.right - options(3).fetchSemanticsNode().boundsInRoot.left
+    // A below-viewport row has zero clipped bounds, especially with the keypad open.
+    // Gesture distance is a property of the layout, not how much of row 3 is visible.
+    private val rowWidth get() = (compose.onNodeWithContentDescription("Complete set 3 for $name", substring = true)
+        .getUnclippedBoundsInRoot().right - options(3).getUnclippedBoundsInRoot().left).value * pxPerMs
     private val pxPerMs get() = compose.density.density
 
-    /** Starts on the weight field, so swiping also proves fields do not swallow horizontal drags. */
-    private fun drag(n: Int, dx: Float, speedDpPerMs: Float, release: Boolean = true) = weight(n).performTouchInput {
-        val step = 8L
-        val perStep = speedDpPerMs * pxPerMs * step * kotlin.math.sign(dx)
-        down(center)
-        var moved = 0f
-        while (kotlin.math.abs(moved) < kotlin.math.abs(dx)) { moveBy(Offset(perStep, 0f), step); moved += perStep }
-        if (release) up()
+    /** Start on a metric field with room in the swipe direction, never outside the window. */
+    private fun drag(n: Int, dx: Float, speedDpPerMs: Float, release: Boolean = true) {
+        // Android 8 cancels a pointer that leaves its compact window. Starting long leftward
+        // swipes on reps still tests a real text field without crossing the system edge.
+        val target = if (dx < 0f) reps(n) else weight(n)
+        target.performScrollTo().assertIsDisplayed().performTouchInput {
+            val step = 8L
+            val perStep = speedDpPerMs * pxPerMs * step * kotlin.math.sign(dx)
+            down(center)
+            var moved = 0f
+            while (kotlin.math.abs(moved) < kotlin.math.abs(dx)) { moveBy(Offset(perStep, 0f), step); moved += perStep }
+            if (release) up()
+        }
     }
 
     private fun frame(name: String) {

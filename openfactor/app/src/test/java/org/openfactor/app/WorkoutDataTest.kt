@@ -221,11 +221,11 @@ class WorkoutDataTest {
         val restored = DataCodec.decode(DataCodec.encode(source))
         assertEquals(source, restored)
         assertNull(restored.active!!.exercises.single().sets.first().weightKg)
-        assertNull(restored.active.exercises.single().sets.first().reps)
+        assertNull(requireNotNull(restored.active).exercises.single().sets.first().reps)
         assertEquals(0.0, workout.volumeKg(), 0.0)
         val old = DataCodec.decode("""{"schemaVersion":1,"active":{"id":"old","name":"Old","startedAt":1000,"exercises":[{"id":"e","exerciseId":"press","sets":[{"id":"s","completed":true}]}]}}""")
         assertEquals(8, old.active!!.exercises.single().sets.single().reps)
-        assertEquals(0.0, old.active.exercises.single().sets.single().weightKg!!, 0.0)
+        assertEquals(0.0, requireNotNull(old.active).exercises.single().sets.single().weightKg!!, 0.0)
     }
 
     @Test

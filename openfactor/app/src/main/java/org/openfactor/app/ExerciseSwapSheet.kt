@@ -58,12 +58,14 @@ internal fun ExerciseSwapHost(
     val closing = sheetEntryId == null && lingering != null
     fun title(id: String) = exercises.find { it.id == id }?.title ?: "Exercise"
     fun commit(entryId: String, replacementId: String, scope: SwapScope) {
-        choiceEntry = null
-        choiceReplacement = null
-        val undo = vm.swapExercise(entryId, replacementId, scope)
-        // The sheet slides away over the new block instead of vanishing.
-        if (sheetEntryId != null) { lingering = sheetEntryId; onCloseSheet() }
-        if (undo != null) onSwapped(undo, title(replacementId))
+        runPersistenceAction {
+            val undo = vm.commands.swapExercise(entryId, replacementId, scope)
+            choiceEntry = null
+            choiceReplacement = null
+            // The sheet slides away over the new block instead of vanishing.
+            if (sheetEntryId != null) { lingering = sheetEntryId; onCloseSheet() }
+            if (undo != null) onSwapped(undo, title(replacementId))
+        }
     }
     fun request(entryId: String, replacementId: String) {
         if (vm.data.value.swapPlanFor(entryId, replacementId) == null) commit(entryId, replacementId, SwapScope.TODAY)

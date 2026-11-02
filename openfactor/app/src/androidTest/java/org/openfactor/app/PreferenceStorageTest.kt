@@ -18,7 +18,7 @@ class PreferenceStorageTest {
         try {
             val vm = WorkoutViewModel(context.applicationContext as Application)
             val initialized = vm.data.value
-            vm.settings { it.copy(
+            vm.commands.settings { it.copy(
                 keepAlive = true, showWorkoutTimer = false, showBodyweightContribution = false,
                 heightInFeet = true, clock24Hour = true, distanceImperial = true, theme = AppTheme.LIGHT, palette = AppPalette.MOSS,
                 shortcuts = ShortcutPreferences(listOf(WorkoutShortcut.HISTORY, WorkoutShortcut.WEIGHT),
@@ -29,7 +29,7 @@ class PreferenceStorageTest {
             val reopened = WorkoutViewModel(context.applicationContext as Application)
             assertEquals(saved, reopened.data.value)
             val backup = reopened.export()
-            reopened.settings { Preferences() }
+            reopened.commands.settings { Preferences() }
             reopened.restore(backup)
             assertEquals(saved, reopened.data.value)
             assertEquals(saved, WorkoutStore(context).load())

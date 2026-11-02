@@ -35,6 +35,7 @@ val referenceMedia = tasks.register<Exec>("prepareReferenceMediaPack") {
         inputs.file(mediaPackApk)
         inputs.file(reusedMediaScript)
         inputs.file(rootProject.file("../tooling/verify_media_apk.py"))
+        inputs.file(rootProject.file("../tooling/verify_font_assets.py"))
         inputs.file(rootProject.file("../backend/media/video-index.json"))
         inputs.property("baselineSha256", mediaPackSha256!!)
         commandLine("python3", "-I", reusedMediaScript.absolutePath,
@@ -64,8 +65,8 @@ android {
         applicationId = "org.openfactor.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 19
-        versionName = "0.9.1"
+        versionCode = 20
+        versionName = "0.10.0"
         resValue("string", "app_name", "Open Factor")
         val mediaBaseUrl = providers.gradleProperty("exerciseMediaBaseUrl").getOrElse("https://factor-media.zabimaru.me/v1/")
         buildConfigField("String", "EXERCISE_MEDIA_BASE_URL", "\"${mediaBaseUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
@@ -103,6 +104,7 @@ if (providers.gradleProperty("openfactorComposeReports").orNull == "true") compo
 }
 tasks.named("preBuild").configure { dependsOn(bundledAssets) }
 dependencies {
+    implementation(project(":core"))
     implementation(platform("androidx.compose:compose-bom:2025.04.01"))
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.compose.material3:material3")

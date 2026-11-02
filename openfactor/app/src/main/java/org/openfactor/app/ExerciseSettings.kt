@@ -59,7 +59,7 @@ fun ExerciseSettingsScreen(
                             leadingContent = { Icon(Icons.Rounded.Block, null) },
                             trailingContent = { Switch(defaults.doNotRecommend, null) },
                             modifier = Modifier.toggleable(defaults.doNotRecommend, role = Role.Switch) {
-                                onSave(defaults.copy(doNotRecommend = it))
+                                runPersistenceAction { onSave(defaults.copy(doNotRecommend = it)) }
                             },
                             colors = ListItemDefaults.colors(containerColor = OF.card),
                         )
@@ -82,7 +82,7 @@ fun ExerciseSettingsScreen(
                                     else "Hide this exercise from your custom library and search without changing your history.")
                             },
                             leadingContent = { Icon(if (exercise.archived) Icons.Rounded.Unarchive else Icons.Rounded.Archive, null) },
-                            modifier = Modifier.clickable { onArchive(!exercise.archived) },
+                            modifier = Modifier.clickable { runPersistenceAction { onArchive(!exercise.archived) } },
                             colors = ListItemDefaults.colors(containerColor = OF.card),
                         )
                     }
@@ -101,7 +101,7 @@ fun ExerciseSettingsScreen(
                     )
                 }
                 TextButton(
-                    { onSave(defaults.withoutOverrides()) },
+                    { runPersistenceAction { onSave(defaults.withoutOverrides()) } },
                     enabled = defaults.hasOverrides,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 ) { Text("Remove all exercise level overrides") }
@@ -139,8 +139,10 @@ fun ExerciseSettingsScreen(
             },
             confirmButton = {
                 TextButton({
-                    onSave(if (rest) defaults.copy(restSeconds = text.toIntOrNull()) else defaults.copy(note = text))
-                    editor = ""
+                    runPersistenceAction {
+                        onSave(if (rest) defaults.copy(restSeconds = text.toIntOrNull()) else defaults.copy(note = text))
+                        editor = ""
+                    }
                 }, enabled = valid) { Text("Save") }
             },
             dismissButton = { TextButton({ editor = "" }) { Text("Cancel") } },

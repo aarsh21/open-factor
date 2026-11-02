@@ -167,8 +167,8 @@ class AdvancedLoggerTest {
         rejected(LoggedSet(id = "x"), LoggedSet(id = "x"))
         val old = DataCodec.decode("""{"schemaVersion":1,"active":{"id":"w","name":"Old","startedAt":1,"exercises":[{"id":"e","exerciseId":"row","sets":[{"id":"s","warmup":true}]}]}}""")
         assertEquals(1, old.active!!.exercises.single().logicalSets().size)
-        assertTrue(old.active.exercises.single().sets.single().warmup)
-        assertNull(old.active.exercises.single().sets.single().side)
+        assertTrue(requireNotNull(old.active).exercises.single().sets.single().warmup)
+        assertNull(requireNotNull(old.active).exercises.single().sets.single().side)
         for (invalid in listOf("-1", "101", "4294967296", "37.5", "\"37\"")) {
             assertThrows(IllegalArgumentException::class.java) {
                 DataCodec.decode("""{"schemaVersion":1,"preferences":{"restBetweenSidesPercent":$invalid}}""")

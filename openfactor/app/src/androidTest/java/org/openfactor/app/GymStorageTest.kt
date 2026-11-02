@@ -40,17 +40,17 @@ class GymStorageTest {
             val bytes = ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
             bitmap.recycle()
             val reference = reopened.photoStore.attach(ByteArrayInputStream(bytes))
-            reopened.saveProgressPhotos(ProgressPhotoRecord(photos = mapOf(PhotoPosition.FRONT to reference)))
+            reopened.commands.saveProgressPhotos(ProgressPhotoRecord(photos = mapOf(PhotoPosition.FRONT to reference)))
             val withPhoto = reopened.data.value
             val gym = legacyGym.copy(icon = "cottage", equipmentIds = setOf("unknown", "bar"),
                 weightSelectionsKg = mapOf("bar" to listOf(EquipmentWeight(0.0, false, 1), EquipmentWeight(7.25, true, 3))),
                 weightSelectionsLb = mapOf("bar" to listOf(EquipmentWeight(33.0, true)), "unknown" to emptyList()))
-            reopened.saveGym(gym)
+            reopened.commands.saveGym(gym)
             val expected = withPhoto.copy(gyms = listOf(gym))
             assertEquals(expected, WorkoutStore(context).load())
             assertEquals(expected, WorkoutViewModel(application).data.value)
             val backup = reopened.export()
-            reopened.saveGym(legacyGym)
+            reopened.commands.saveGym(legacyGym)
             reopened.restore(backup)
             assertEquals(expected, reopened.data.value)
             assertArrayEquals(bytes, reopened.photoStore.file(reference).readBytes())

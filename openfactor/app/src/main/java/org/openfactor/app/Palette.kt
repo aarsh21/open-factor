@@ -18,15 +18,6 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 
-/** Curated color systems. Each defines every role in a dark and a light variant. */
-enum class AppPalette(val label: String, val intent: String) {
-    CHARCOAL("Charcoal", "Neutral graphite with white ink. The original Open Factor look."),
-    MIDNIGHT("Midnight", "Blue-black surfaces with a cool periwinkle action color."),
-    EMBER("Ember", "Warm graphite. Amber marks actions and finished sets."),
-    MOSS("Moss", "Green-grey neutrals with a quiet sage action color."),
-    MONO("Mono", "Pure black and white at the highest contrast."),
-}
-
 /**
  * Every color the app paints with. Screens read these roles (through [OF] or the Material color
  * scheme built from them), never hex values, so switching palettes re-skins the whole app.

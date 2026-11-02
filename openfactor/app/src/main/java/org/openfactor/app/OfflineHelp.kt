@@ -84,9 +84,11 @@ internal fun TutorialsScreen(p: Preferences, vm: WorkoutViewModel, snackbar: Sna
     if (reset) ConfirmDialog(
         "Reset Tutorials?", "The body-chart introduction will appear on your next chart visit. Your saved data and other preferences will not change.",
         "Reset", { reset = false }, {
-            vm.settings { it.copy(dismissedTutorials = it.dismissedTutorials - "bodyCharts") }
-            reset = false
-            scope.launch { snackbar.showSnackbar("Tutorials reset · open Body Charts to see the introduction") }
+            runPersistenceAction {
+                vm.commands.settings { it.copy(dismissedTutorials = it.dismissedTutorials - "bodyCharts") }
+                reset = false
+                scope.launch { snackbar.showSnackbar("Tutorials reset · open Body Charts to see the introduction") }
+            }
         },
     )
 }

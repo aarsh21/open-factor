@@ -199,7 +199,7 @@ private fun VisibilityScreen(p: Preferences, vm: WorkoutViewModel) {
                 val visible = p.dataVisibility.isVisible(key)
                 Row(
                     Modifier.fillMaxWidth().heightIn(min = 56.dp).toggleable(visible, role = Role.Switch, onValueChange = { checked ->
-                        vm.settings { it.copy(dataVisibility = it.dataVisibility.withVisible(key, checked)) }
+                        runPersistenceAction { vm.commands.settings { it.copy(dataVisibility = it.dataVisibility.withVisible(key, checked)) } }
                     }), verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(label, Modifier.weight(1f))

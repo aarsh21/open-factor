@@ -55,7 +55,7 @@ class PersistenceConcurrencyTest {
             val restoreStarted = CountDownLatch(1)
             try {
                 val update = workers.submit {
-                    vm.settings { previous ->
+                    vm.commands.settings { previous ->
                         updateEntered.countDown()
                         check(releaseUpdate.await(10, TimeUnit.SECONDS))
                         previous.copy(displayName = "Update before restore", pounds = true)

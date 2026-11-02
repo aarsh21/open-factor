@@ -42,7 +42,7 @@ import java.util.Date
 @Composable
 fun QuickStartScreen(
     data: AppData,
-    vm: WorkoutViewModel,
+    commands: WorkoutCommands,
     onConnect: () -> Unit = {},
     onReady: () -> Unit,
 ) {
@@ -51,6 +51,12 @@ fun QuickStartScreen(
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     var saveError by remember { mutableStateOf<String?>(null) }
+    fun persist(action: () -> Unit): Boolean {
+        saveError = null
+        return runPersistenceAction(action).also { saved ->
+            if (!saved) saveError = "Couldn't save setup. Free up storage and try again."
+        }
+    }
     val motion = LocalAppMotionEnabled.current
     val windowFocused = LocalWindowInfo.current.isWindowFocused && LocalAppWindowRevealed.current
     val haptic = LocalHapticFeedback.current
@@ -68,19 +74,21 @@ fun QuickStartScreen(
             } else entrance.snapTo(1f)
         } else if (introduced) entrance.snapTo(1f)
     }
-    LaunchedEffect(Unit) { vm.ensureProfileSetup() }
+    LaunchedEffect(Unit) { persist { commands.ensureProfileSetup() } }
     LaunchedEffect(data.healthConnect.lastSyncedAtMillis) {
-        if (data.healthConnect.lastSyncedAtMillis != null) vm.editProfileSetup { it.refreshWeight(data.scaleWeights) }
+        if (data.healthConnect.lastSyncedAtMillis != null) persist { commands.editProfileSetup { it.refreshWeight(data.scaleWeights) } }
     }
-    fun edit(changed: ProfileSetupDraft) { saveError = null; vm.editProfileSetup { changed } }
+    fun edit(changed: ProfileSetupDraft) { persist { saveError = null; commands.editProfileSetup { changed } } }
     fun leave() {
         focus.clearFocus(); keyboard?.hide()
-        vm.skipProfileSetup()
-        onReady()
+        persist {
+            commands.skipProfileSetup()
+            onReady()
+        }
     }
     fun back() {
         focus.clearFocus(); keyboard?.hide()
-        if (stage > 0) vm.editProfileSetup { it.copy(stage = stage - 1) } else leave()
+        if (stage > 0) persist { commands.editProfileSetup { it.copy(stage = stage - 1) } } else leave()
     }
     BackHandler(onBack = ::back)
     val stageError = when (stage) {
@@ -143,14 +151,16 @@ fun QuickStartScreen(
                     if (stage == 2) "Start training" else "Continue",
                     {
                         focus.clearFocus(); keyboard?.hide()
-                        if (stage < 2) {
-                            vm.editProfileSetup { it.copy(stage = stage + 1) }
-                        }
-                        else {
-                            saveError = vm.completeProfileSetup()
-                            if (saveError == null) {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onReady()
+                        persist {
+                            if (stage < 2) {
+                                commands.editProfileSetup { it.copy(stage = stage + 1) }
+                            }
+                            else {
+                                saveError = commands.completeProfileSetup()
+                                if (saveError == null) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onReady()
+                                }
                             }
                         }
                     },
