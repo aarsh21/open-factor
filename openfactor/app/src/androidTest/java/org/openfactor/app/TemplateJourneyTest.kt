@@ -26,10 +26,16 @@ class TemplateJourneyTest {
     }
 
     private fun lazyNode(matcher: SemanticsMatcher): SemanticsNodeInteraction {
-        // IME resizing and recreation can leave a row uncomposed. Scroll the vertical lazy
-        // list to discover it before performScrollTo asks for an existing semantics node.
-        compose.onNode(hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(matcher)
-        return compose.onNode(matcher).performScrollTo()
+        // IME resizing can dispose a row between discovery and performScrollTo. Reacquire
+        // it through the real lazy list until it is composed and visible, without replaying edits.
+        compose.waitUntil(15_000) {
+            runCatching {
+                compose.onNode(hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
+                    .performScrollToNode(matcher)
+                compose.onNode(matcher).performScrollTo().assertIsDisplayed()
+            }.isSuccess
+        }
+        return compose.onNode(matcher)
     }
 
     private fun field(label: String) = lazyNode(hasSetTextAction() and hasText(label))
