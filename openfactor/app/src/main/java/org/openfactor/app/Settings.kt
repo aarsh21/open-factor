@@ -135,11 +135,12 @@ fun SettingsScreen(
     ) {
         Text(
             "Settings",
+            modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.displaySmall,
             fontSize = 40.sp,
-            lineHeight = 46.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = (-1).sp,
+            lineHeight = 58.sp,
+            fontWeight = FontWeight.Normal,
+            letterSpacing = (-.6).sp,
         )
         SettingsSection("YOU") {
             SettingsRow(Icons.Rounded.AccountCircle, "Profile", "") {

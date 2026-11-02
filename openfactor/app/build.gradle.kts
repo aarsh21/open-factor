@@ -35,6 +35,7 @@ val referenceMedia = tasks.register<Exec>("prepareReferenceMediaPack") {
         inputs.file(mediaPackApk)
         inputs.file(reusedMediaScript)
         inputs.file(rootProject.file("../tooling/verify_media_apk.py"))
+        inputs.file(rootProject.file("../tooling/verify_font_assets.py"))
         inputs.file(rootProject.file("../backend/media/video-index.json"))
         inputs.property("baselineSha256", mediaPackSha256!!)
         commandLine("python3", "-I", reusedMediaScript.absolutePath,

@@ -1,0 +1,27 @@
+{
+  "release": "v1.9.0",
+  "repository": "https://github.com/vercel/geist-font",
+  "files": [
+    {
+      "file": "res/font/geist_sans.ttf",
+      "url": "https://raw.githubusercontent.com/vercel/geist-font/v1.9.0/fonts/Geist/variable/Geist%5Bwght%5D.ttf",
+      "bytes": 169056,
+      "git_blob_sha1": "f63f0afc6390323715972b6645115485f37cc9f4",
+      "sha256": "73894e0448cae90a92b6c2f8732b7bb9acb7b94c418bff559dad4a18e1de9659"
+    },
+    {
+      "file": "res/font/geist_serif_regular.ttf",
+      "url": "https://raw.githubusercontent.com/vercel/geist-font/v1.9.0/fonts/GeistSerif/ttf/GeistSerif-Regular.ttf",
+      "bytes": 132452,
+      "git_blob_sha1": "e80f756c22817111353c19566ed6c4c199483fb1",
+      "sha256": "6c33e2138c7544455f7807ee11356d636ab23944fe214d6cefd3fd5b1e45e171"
+    },
+    {
+      "file": "assets/fonts/OFL-Geist.txt",
+      "url": "https://raw.githubusercontent.com/vercel/geist-font/v1.9.0/LICENSE.txt",
+      "bytes": 4368,
+      "git_blob_sha1": "8d003fec6b8a0f9f866ab1038579b6ea20926ac4",
+      "sha256": "930853ee1daa68554d9e35c8a9175affb74f699fad9a5da6ee5ebe76379d9137"
+    }
+  ]
+}

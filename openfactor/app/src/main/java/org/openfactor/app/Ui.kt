@@ -1,7 +1,6 @@
 package org.openfactor.app
 
 import android.content.res.Configuration
-import android.graphics.Typeface
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -30,7 +29,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,7 +62,6 @@ fun OpenFactorTheme(
     palette: AppPalette = AppPalette.CHARCOAL,
     content: @Composable () -> Unit,
 ) {
-    val context = LocalContext.current
     val motionEnabled = rememberAppMotionEnabled()
     val configuration = LocalConfiguration.current
     val dark = when (theme) {
@@ -78,33 +75,12 @@ fun OpenFactorTheme(
                 if (dark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
         }
     }
-    val body = remember { dmSans(context, 400) }
-    val medium = remember {
-        dmSans(context, 500)
-    }
-    val bold = remember { dmSans(context, 700) }
     val colors = rememberCrossfadedPalette(palette.colors(dark), motionEnabled)
     val colorScheme = remember(colors) { colors.colorScheme() }
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography =
-            Typography().let { t ->
-                t.copy(
-                    displaySmall =
-                        t.displaySmall.copy(fontFamily = bold, fontWeight = FontWeight.Bold),
-                    headlineLarge =
-                        t.headlineLarge.copy(fontFamily = bold, fontWeight = FontWeight.Bold),
-                    headlineMedium =
-                        t.headlineMedium.copy(fontFamily = bold, fontWeight = FontWeight.Bold),
-                    titleLarge =
-                        t.titleLarge.copy(fontFamily = bold, fontWeight = FontWeight.SemiBold),
-                    titleMedium = t.titleMedium.copy(fontFamily = medium),
-                    bodyLarge = t.bodyLarge.copy(fontFamily = body),
-                    bodyMedium = t.bodyMedium.copy(fontFamily = body),
-                    labelLarge = t.labelLarge.copy(fontFamily = medium),
-                )
-            },
+        typography = AppTypography,
         content = {
             CompositionLocalProvider(LocalConfiguration provides appConfiguration,
                 LocalAppMotionEnabled provides motionEnabled, LocalPalette provides colors, content = content)
@@ -260,30 +236,6 @@ fun RoundAction(icon: ImageVector, description: String, onClick: () -> Unit) {
     }
 }
 
-private val dmSansFamilies = java.util.concurrent.ConcurrentHashMap<Int, FontFamily>()
-
-/**
- * One parsed DM Sans instance per weight per process. Building a [Typeface] reads the 240 KB
- * variable font, and a new family instance also misses Compose's typeface cache.
- */
-internal fun dmSans(context: android.content.Context, weight: Int): FontFamily = dmSansFamilies.getOrPut(weight) {
-    runCatching {
-            FontFamily(
-                Typeface.Builder(context.applicationContext.assets, "fonts/DM-Sans.ttf")
-                    .setWeight(weight)
-                    .setFontVariationSettings("'wght' $weight")
-                    .build()
-            )
-        }
-        .getOrDefault(FontFamily.SansSerif)
-}
-
-@Composable
-fun workoutDisplayFont(): FontFamily {
-    val context = LocalContext.current
-    return remember { dmSans(context, 700) }
-}
-
 @Composable
 fun PageHeading(
     title: String,
@@ -291,7 +243,7 @@ fun PageHeading(
     displayTitle: Boolean = back == null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    val display = workoutDisplayFont()
+    val display = AppFonts.serif
     Row(
         Modifier.fillMaxWidth().background(OF.top).padding(horizontal = 18.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -301,10 +253,12 @@ fun PageHeading(
         Text(
             title,
             Modifier.weight(1f),
-            fontFamily =
-                if (displayTitle) display else MaterialTheme.typography.titleLarge.fontFamily,
-            fontSize = if (displayTitle) 25.sp else 20.sp,
-            fontWeight = FontWeight.Bold,
+            style = if (displayTitle) MaterialTheme.typography.displaySmall else MaterialTheme.typography.titleLarge,
+            fontFamily = if (displayTitle) display else AppFonts.sans,
+            fontSize = if (displayTitle) 28.sp else 20.sp,
+            lineHeight = if (displayTitle) 40.sp else 26.sp,
+            letterSpacing = if (displayTitle) (-.35).sp else 0.sp,
+            fontWeight = if (displayTitle) FontWeight.Normal else FontWeight.SemiBold,
             maxLines = 3,
             overflow = TextOverflow.Ellipsis,
         )

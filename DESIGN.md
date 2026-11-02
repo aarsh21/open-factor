@@ -37,24 +37,26 @@ colors:
   settings-muted: "#96999F"
 typography:
   display:
-    fontFamily: "DM Sans, sans-serif"
-    fontSize: "25sp"
-    fontWeight: 700
+    fontFamily: "Geist Serif, serif"
+    fontSize: "28sp"
+    fontWeight: 400
+    lineHeight: "40sp"
+    letterSpacing: "-0.35sp"
   headline:
-    fontFamily: "DM Sans, sans-serif"
+    fontFamily: "Geist Serif, serif"
     fontSize: "40sp"
-    fontWeight: 700
-    lineHeight: "46sp"
-    letterSpacing: "-1sp"
+    fontWeight: 400
+    lineHeight: "58sp"
+    letterSpacing: "-0.6sp"
   title:
-    fontFamily: "DM Sans, sans-serif"
+    fontFamily: "Geist Sans, sans-serif"
     fontSize: "20sp"
     fontWeight: 700
   body:
-    fontFamily: "DM Sans, sans-serif"
+    fontFamily: "Geist Sans, sans-serif"
     fontWeight: 400
   label:
-    fontFamily: "DM Sans, sans-serif"
+    fontFamily: "Geist Sans, sans-serif"
     fontSize: "12sp"
     lineHeight: "16sp"
 rounded:
@@ -134,7 +136,7 @@ The floating navigation and grouped Settings remain part of the existing system.
 **Key characteristics:**
 
 - Charcoal tonal grouping, white foreground and restrained completion/error colors.
-- Publicly bundled DM Sans, native Compose controls and scalable type.
+- Publicly bundled Geist Sans and Geist Serif, native Compose controls and scalable type; see the [typography decisions and native captures](docs/open-factor/TYPOGRAPHY.md).
 - Original media, selectable human anatomy, a photo/progress exercise navigator and visible Finish.
 - Device-local training, bundled static guidance, visible-guide muted playback over HTTPS and a bounded cache.
 
@@ -144,7 +146,7 @@ The 0.6.1 extension follows `TemplateScreens.kt`, `TemplateData.kt`, `MainActivi
 
 ## Working-tree dashboard and import update
 
-Dashboard customization now groups ordered tiles into compact section cards with one Edit action, a selected count, and contextual reorder/remove menus. Choice sheets use one checkbox action per row; exercise search runs off the UI thread. Draft changes still apply only on Save. The Workout home weekly card uses one prominent working-set count, an explicit date range, secondary session/muscle totals and a whole-card History action—no invented progress ring or percentage. The charcoal/light surfaces, DM Sans, 18dp page gutter, 16dp card shape and floating navigation are unchanged.
+Dashboard customization now groups ordered tiles into compact section cards with one Edit action, a selected count, and contextual reorder/remove menus. Choice sheets use one checkbox action per row; exercise search runs off the UI thread. Draft changes still apply only on Save. The Workout home weekly card uses one prominent working-set count, an explicit date range, secondary session/muscle totals and a whole-card History action—no invented progress ring or percentage. The charcoal/light surfaces, 18dp page gutter, 16dp card shape and floating navigation are unchanged; typography follows the Geist pairing below.
 
 Spreadsheet import uses the native document picker and a preview with explicit exercise choices, set count, omissions and confirmation. Its pinned actions reserve clearance for floating navigation and system bars. The [performance/verification record](docs/open-factor/PERFORMANCE.md) distinguishes final native checks and large synthetic data from physical-device/frame-time claims; [spreadsheet scope](docs/open-factor/SPREADSHEET-IMPORT.md) records partial-target limitations. These working-tree changes do not extend the published 0.6.2 release evidence.
 
@@ -182,15 +184,15 @@ Changing palette or mode cross-fades every role together in Oklab over `AppMotio
 
 ## Typography
 
-DM Sans is bundled publicly at `openfactor/app/src/main/assets/fonts/DM-Sans.ttf` under the OFL license. `Ui.kt` loads it at 400, 500 and 700; failed loading falls back to Android sans. Display headings also load this public file at 700. Private MacroSans is no longer the current display font.
+Geist Sans and Geist Serif are bundled as unmodified Android font resources under SIL OFL 1.1. `features/appearance/AppTypography.kt` owns every Material type role; Compose's font resolver caches the resource families. The source release, exact hashes and full license are bundled and verified by the APK tooling. No font download or platform-default fallback is required during ordinary offline use. Private MacroSans and the superseded DM Sans asset are not used.
 
-- **Display:** root `PageHeading`, 25sp bold. Detail/back headings use 20sp bold. Shared headings allow three lines before ellipsis and leave room for actions.
-- **Headline:** the frontmatter 40sp/46sp role with −1sp tracking describes the Settings title. Quick setup uses the Material `headlineLarge` role with DM Sans bold.
-- **Title:** exercise/section headings use Material `titleLarge`; this mapping specifies the bold family and semibold weight. Primary-action and compact session titles use `titleMedium` with the medium family. Preserve these distinctions.
-- **Body:** `bodyLarge` and `bodyMedium` use DM Sans regular, retaining Material default sizes, line heights and tracking. Numeric set fields center body-large text. Settings row titles explicitly use 17sp.
-- **Label:** navigation uses 12sp/16sp, bold when selected and regular otherwise. Labels shrink to fit a fixed tab slot when required. Logger column labels explicitly use 12sp.
+- **Display:** root `PageHeading` uses genuine regular Geist Serif at 28sp/40sp with −0.35sp tracking. Settings uses 40sp/58sp with −0.6sp tracking. These are the restrained editorial accents; numbers, buttons, navigation and everyday logging stay sans. Shared headings still allow three lines and reserve room for actions.
+- **Headline:** Material `headlineLarge`, `headlineMedium` and `headlineSmall` use Geist Sans for metric summaries and functional headings. The serif display family is not applied globally to large workout numbers.
+- **Title:** exercise/section headings and detail/back headings use Geist Sans semibold. Primary-action and compact session titles use medium. The detail/back heading retains its compact 20sp size.
+- **Body:** Geist Sans regular retains the Material body sizes and line heights. Numeric set fields use tabular figures so digit changes do not shift the logger's rhythm. Settings row titles retain 17sp.
+- **Label:** every Material label role uses Geist Sans. Navigation retains 12sp/16sp, bold when selected and regular otherwise. Labels shrink within their fixed tab slots as before; logger column labels retain 12sp.
 
-`OpenFactorTheme` maps selected Material roles rather than every role: `headlineSmall`, `bodySmall`, `labelSmall` and other untouched roles retain their library defaults. This is an implementation boundary, not a separate approved display family. No global uppercase transform or new type-scale ratio is specified.
+All 15 Material roles are assigned deliberately; small captions and dialogs no longer fall back to another UI family. Geist Sans supplies real variable weights from 100–900. Geist Serif's four upstream designs are shape variants, not a weight axis; the app uses its neutral Regular drawing without synthetic bold or italics. No decorative animation, global uppercase transform, or extra font selector is added. Font scaling remains native and is checked with mounted workout, home and Settings screens at 1×, 1.35× and 2×.
 
 ## Layout
 
@@ -285,7 +287,7 @@ Active sessions are saved durably after changes and can be resumed after process
 ## Do's and Don'ts
 
 - **Do** keep the default journey focused on exercise selection, set entry, warmups and finishing.
-- **Do** pair theme primary and on-primary colors and use the bundled public DM Sans.
+- **Do** pair theme primary and on-primary colors and use the bundled public Geist font roles.
 - **Do** preserve visible Finish, top picker search, the text-free exercise navigator and native IME handling.
 - **Do** retain system insets, scroll end clearance, labeled actions and durable session state.
 - **Do** keep original guidance prominent, keep active programs visible, and scope media coverage and build modes accurately.

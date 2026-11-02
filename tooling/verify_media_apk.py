@@ -14,7 +14,9 @@ import json
 from pathlib import Path, PurePosixPath
 import re
 import zipfile
+import runpy
 
+_FONT_PROFILE = runpy.run_path(str(Path(__file__).with_name("verify_font_assets.py")))
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"[0-9a-f]{64}")
 VIDEO = re.compile(r"videos/([0-9a-f]{32})_([a-z])[.]mp4")
@@ -175,6 +177,10 @@ def verify(apk_path: Path, index_path: Path | None = None, reference: Path | Non
                    "assets/exercise-previews.json", "assets/fonts/DM-Sans.ttf", "assets/fonts/OFL.txt",
                    "assets/licenses/CC-BY-SA-3.0.txt", "assets/media-pack.json",
                    "assets/dexopt/baseline.prof", "assets/dexopt/baseline.profm"}
+        if any(name in names for name in _FONT_PROFILE["FONT_ASSETS"] | set(_FONT_PROFILE["FONT_HASHES"])):
+            _FONT_PROFILE["verify_fonts"](apk)
+            allowed.update(_FONT_PROFILE["FONT_ASSETS"])
+        # Historic release APKs remain usable as verified media-pack inputs.
         allowed.update("assets/" + path for path in manifest_paths)
         previews = json.loads(apk.read("assets/exercise-previews.json"))
         for entry in previews["entries"]:

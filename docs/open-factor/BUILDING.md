@@ -16,7 +16,7 @@ cd openfactor
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-The default `auto` media mode includes the original static pack when a local `reference/catalog.json` is present. Otherwise it builds the source-only fallback. Source-only builds contain descriptive exercise/equipment data, bundled DM Sans and the limited licensed illustration pack; they do not contain recovered photos, anatomy, instructions or video identities. They are distinct from the intended original-media experience.
+The default `auto` media mode includes the original static pack when a local `reference/catalog.json` is present. Otherwise it builds the source-only fallback. Source-only builds contain descriptive exercise/equipment data, bundled Geist Sans/Geist Serif and the limited licensed illustration pack; they do not contain recovered photos, anatomy, instructions or video identities. They are distinct from the intended original-media experience.
 
 ```sh
 # Explicit source-only build, even with a reference pack on this machine.
@@ -76,7 +76,7 @@ python tooling/import_reference_apk.py /absolute/path/to/Workouts.apk \
 
 Then use the default/static build above, or explicitly select `-PopenfactorMediaMode=full` for a large local offline-video APK. The legacy `-PincludePrivateReference=false` selects source mode; `true` selects full mode. See [packaging modes](MEDIA-PACKAGING.md), [asset provenance](ASSETS.md), and the [original-media return receipt](media-handoff/RECEIPT.md).
 
-Source-only builds retain [44 attributed Everkinetic illustrations covering 21 reviewed variants](LICENSED-MEDIA.md), DM Sans under OFL, Material icons and descriptive catalog metadata. Missing original media uses the available preview/fallback or an explicit unavailable state. Recovered media retains its original ownership; neither the code's MIT license nor local import grants redistribution rights.
+Source-only builds retain [44 attributed Everkinetic illustrations covering 21 reviewed variants](LICENSED-MEDIA.md), Geist Sans and Geist Serif under OFL, Material icons and descriptive catalog metadata. Missing original media uses the available preview/fallback or an explicit unavailable state. Recovered media retains its original ownership; neither the code's MIT license nor local import grants redistribution rights.
 
 ## Architecture and headless acceptance
 

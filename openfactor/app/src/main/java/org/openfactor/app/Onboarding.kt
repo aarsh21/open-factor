@@ -405,11 +405,10 @@ private fun SetupTitle(text: String) {
     Text(
         text,
         Modifier.fillMaxWidth(),
-        style = MaterialTheme.typography.headlineLarge,
-        fontFamily = workoutDisplayFont(),
+        style = MaterialTheme.typography.displaySmall,
         fontSize = 32.sp,
-        lineHeight = 36.sp,
-        fontWeight = FontWeight.Bold,
+        lineHeight = 46.sp,
+        fontWeight = FontWeight.Normal,
         textAlign = TextAlign.Center,
     )
 }
