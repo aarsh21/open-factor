@@ -1,7 +1,9 @@
 import json
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
+from unittest.mock import patch
 
 from prepare_media_pack import prepare
 
@@ -85,6 +87,50 @@ class PrepareMediaPackTest(unittest.TestCase):
             prepare(self.source, self.output, 'source')
         self.assertEqual(b'old generated video', stale.read_bytes())
         self.assertEqual('keep', personal.read_text())
+
+    def test_catalog_paths_cannot_follow_symlinked_source_directories(self):
+        self.source.mkdir()
+        external = self.root / 'private'
+        external.mkdir()
+        (external / 'photo.webp').write_bytes(b'private bytes must not be packaged')
+        # A linked directory can point outside OR inside the source tree. Both
+        # violate the no-source-symlinks contract, even though the leaf is regular.
+        internal = self.source / 'original'
+        internal.mkdir()
+        (internal / 'photo.webp').write_bytes(b'original')
+        for destination in [external, internal]:
+            with self.subTest(destination=destination):
+                linked = self.source / 'linked'
+                linked.symlink_to(destination, target_is_directory=True)
+                (self.source / 'catalog.json').write_text(json.dumps([
+                    dict(frames=['reference/linked/photo.webp'])]))
+                try:
+                    with patch('prepare_media_pack.shutil.which', return_value='/usr/bin/magick'):
+                        with self.assertRaisesRegex(ValueError, 'symlinks'):
+                            prepare(self.source, self.output, 'static')
+                    self.assertFalse((self.output / 'reference/linked/photo.webp').exists())
+                    self.assertEqual(b'private bytes must not be packaged', (external / 'photo.webp').read_bytes())
+                finally:
+                    linked.unlink()
+
+    def test_equipment_conversion_has_a_timeout_and_failure_cannot_complete_the_manifest(self):
+        self.source.mkdir()
+        (self.source / 'catalog.json').write_text('[{}]')
+        equipment = self.source / 'equipment'
+        equipment.mkdir()
+        (equipment / 'image.png').write_bytes(b'original source image')
+        for attempt in ['first generation', 'refresh of completed pack']:
+            with self.subTest(attempt=attempt):
+                if self.output.exists():
+                    (self.output / 'media-pack.json').write_text('{"schema":1,"mode":"static","files":[]}')
+                with patch('prepare_media_pack.shutil.which', return_value='/usr/bin/magick'), patch(
+                    'prepare_media_pack.subprocess.run', side_effect=subprocess.TimeoutExpired(['magick'], 120)
+                ) as converter:
+                    with self.assertRaises(subprocess.TimeoutExpired):
+                        prepare(self.source, self.output, 'static')
+                self.assertEqual(120, converter.call_args.kwargs['timeout'])
+                self.assertTrue(json.loads((self.output / 'media-pack.json').read_text())['preparing'])
+                self.assertEqual(b'original source image', (equipment / 'image.png').read_bytes())
 
     def test_source_and_output_cannot_overlap(self):
         for source, output in [(self.source, self.source),

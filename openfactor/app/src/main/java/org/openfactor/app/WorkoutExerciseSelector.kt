@@ -44,7 +44,6 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import kotlin.math.floor
 
 data class WorkoutExerciseProgress(val complete: Int, val total: Int) {
     val label: String get() = if (total == 0) "No working sets" else "$complete / $total sets"

@@ -18,3 +18,6 @@ keystore/
 inspection/
 openfactor/app/src/main/assets/reference/
 .impeccable/review/
+
+# Local Desloppify scan state and review artifacts.
+.desloppify/

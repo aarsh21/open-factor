@@ -1,10 +1,10 @@
-import { createApp, type VideoIndex } from './app'
+import { createApp, parseVideoIndex } from './app'
 import { createStorage } from './storage'
 import { serve } from '@hono/node-server'
 import { readFile } from 'node:fs/promises'
 import { setTimeout } from 'node:timers/promises'
 
-const index = JSON.parse(await readFile(new URL('../video-index.json', import.meta.url), 'utf8')) as VideoIndex
+const index = parseVideoIndex(await readFile(new URL('../video-index.json', import.meta.url), 'utf8'))
 if (index.count !== 1831) throw new Error('Expected the complete exercise video index')
 const storage = createStorage(process.env)
 const app = createApp(index, storage.store, process.env.MEDIA_ADMIN_TOKEN ?? '')

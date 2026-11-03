@@ -6,7 +6,6 @@ Preserves raw catalog/group metadata and writes a small application projection.
 Imported content retains its own ownership; this script does not grant a license.
 """
 import argparse
-from collections import Counter
 from hashlib import sha256
 import json
 from pathlib import Path, PurePosixPath

@@ -1,0 +1,108 @@
+name: Open Factor Code Health
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'openfactor/**'
+      - 'tooling/**'
+      - 'backend/media/**'
+      - 'docs/open-factor/CODE-HEALTH.md'
+      - '.github/workflows/open-factor-code-health.yml'
+  pull_request:
+    paths:
+      - 'openfactor/**'
+      - 'tooling/**'
+      - 'backend/media/**'
+      - 'docs/open-factor/CODE-HEALTH.md'
+      - '.github/workflows/open-factor-code-health.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: open-factor-code-health-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  scan:
+    # Scanner findings are advisory; Kotlin imports and focused Python lint are
+    # strict. Missing tools, incomplete scans and runner regressions also fail.
+    # There is deliberately no overall-score gate.
+    name: Code health (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [android, tooling, media]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tooling/requirements-code-health.txt
+      - name: Install pinned mechanical scanner and Python lint prerequisites
+        run: python -m pip install -r tooling/requirements-code-health.txt
+      - name: Test scan integrity policy
+        run: python3 -I -m unittest discover -s tooling -p 'test_desloppify_ci.py' -v
+      - name: Enforce Python import and undefined-name checks
+        if: matrix.project == 'tooling'
+        run: ruff check --select F401,F811,F821 tooling backend/media
+      - uses: actions/setup-java@v4
+        if: matrix.project == 'android'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install checksum-pinned ktlint 1.5.0
+        if: matrix.project == 'android'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ktlint-download" "$RUNNER_TEMP/code-health-bin"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://repo.maven.apache.org/maven2/com/pinterest/ktlint/ktlint-cli/1.5.0/ktlint-cli-1.5.0-all.jar \
+            --output "$RUNNER_TEMP/ktlint-download/ktlint.jar"
+          printf '%s  %s\n' a27854622198800f50971a049dcdba38f2105d47e7e7258786c7d28045c5735d \
+            "$RUNNER_TEMP/ktlint-download/ktlint.jar" | sha256sum --check
+          printf '#!/bin/sh\nexec java -jar "%s" "$@"\n' \
+            "$RUNNER_TEMP/ktlint-download/ktlint.jar" > "$RUNNER_TEMP/code-health-bin/ktlint"
+          chmod +x "$RUNNER_TEMP/code-health-bin/ktlint"
+          printf '%s\n' "$RUNNER_TEMP/code-health-bin" >> "$GITHUB_PATH"
+      - name: Check Kotlin lint prerequisite
+        if: matrix.project == 'android'
+        run: ktlint --version
+      - uses: actions/setup-node@v4
+        if: matrix.project == 'media'
+        with:
+          node-version: '22'
+      - uses: oven-sh/setup-bun@v2
+        if: matrix.project == 'media'
+        with:
+          bun-version: '1.4.4'
+      - name: Install locked media compiler dependencies
+        if: matrix.project == 'media'
+        working-directory: backend/media
+        run: bun install --frozen-lockfile
+      - name: Verify adapter against the pinned TypeScript compiler
+        if: matrix.project == 'media'
+        env:
+          OPENFACTOR_REQUIRE_TYPESCRIPT_CONTRACT: '1'
+        run: python3 -I -m unittest discover -s tooling -p 'test_desloppify_ci.py' -v
+      - name: Run fresh advisory mechanical scan
+        run: python3 -I tooling/desloppify_ci.py --project '${{ matrix.project }}'
+      - name: Enforce Kotlin-aware unused-import validation
+        if: ${{ !cancelled() && matrix.project == 'android' }}
+        run: >-
+          ktlint --log-level=none --editorconfig=tooling/kotlin-imports.editorconfig
+          'openfactor/**/*.kt' 'openfactor/**/*.kts' '!openfactor/**/build/**'
+      - name: Upload scan evidence, including failed scans
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: open-factor-code-health-${{ matrix.project }}
+          # Explicit inclusion: upload-artifact otherwise skips .desloppify/.
+          include-hidden-files: true
+          path: .desloppify/ci/${{ matrix.project }}/
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,7 @@
+# Isolated CI environment; do not install into the app/runtime environment.
+# Update deliberately with the runner's schema-contract tests and real scans.
+desloppify[full]==1.0
+ruff==0.14.14
+bandit==1.9.4
+tree-sitter==0.26.0
+tree-sitter-language-pack==1.6.2

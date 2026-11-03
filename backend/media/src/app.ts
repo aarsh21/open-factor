@@ -12,11 +12,32 @@ export type VideoStore = {
   ready(): Promise<boolean>
 }
 
-export function validateIndex(index: VideoIndex): void {
-  if (index.schema !== 1 || index.count !== Object.keys(index.videos).length || index.count < 1) throw new Error('Invalid media index')
-  for (const [name, entry] of Object.entries(index.videos)) {
-    if (!VIDEO_NAME.test(name) || !Number.isSafeInteger(entry.bytes) || entry.bytes < 12 || entry.bytes > MAX_VIDEO_BYTES || !/^[0-9a-f]{64}$/.test(entry.sha256)) throw new Error('Invalid indexed media record')
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function validateVideoRecord(name: string, entry: unknown): asserts entry is VideoRecord {
+  if (!VIDEO_NAME.test(name) || !isRecord(entry) || typeof entry.bytes !== 'number' ||
+      !Number.isSafeInteger(entry.bytes) || entry.bytes < 12 || entry.bytes > MAX_VIDEO_BYTES ||
+      typeof entry.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(entry.sha256)) throw new Error('Invalid indexed media record')
+}
+
+export function validateIndex(index: unknown): asserts index is VideoIndex {
+  if (!isRecord(index) || index.schema !== 1 || !Number.isSafeInteger(index.count) ||
+      typeof index.count !== 'number' || index.count < 1 || !isRecord(index.videos) ||
+      index.count !== Object.keys(index.videos).length) throw new Error('Invalid media index')
+  for (const [name, entry] of Object.entries(index.videos)) validateVideoRecord(name, entry)
+}
+
+export function parseVideoIndex(contents: string): VideoIndex {
+  let index: unknown
+  try {
+    index = JSON.parse(contents)
+  } catch {
+    throw new Error('Invalid media index JSON')
   }
+  validateIndex(index)
+  return index
 }
 
 /** One RFC 9110 byte range; unsafe integers and multipart requests are rejected. */
