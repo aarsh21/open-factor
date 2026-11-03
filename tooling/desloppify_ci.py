@@ -103,10 +103,13 @@ def normalize_unused_diagnostics(diagnostics):
             normalized.append(prefix + "TS6192: " + message)
             continue
         if code in {"6133", "6138", "6196"}:
-            symbol = re.fullmatch(r"(?:Property )?'([^']+)' is declared but(?: its value is never read| never used)\.", message)
-            if not symbol or re.search(r"\s", symbol[1]):
+            symbol = re.fullmatch(r"(?:Property )?'(.*)' is declared but(?: its value is never read| never used)\.", message)
+            if not symbol:
                 return None
-            name = symbol[1]
+            # Quoted property names can contain spaces, quotes or be empty. The
+            # scanner's TS6133 parser cannot represent those spellings; retain the
+            # real name in raw evidence and use a descriptive scanner-safe label.
+            name = symbol[1] if symbol[1] and not re.search(r"\s|['\"]", symbol[1]) else "(unused-symbol)"
         elif code == "6198" and message == "All destructured elements are unused.":
             name = "(destructured-bindings)"
         elif code == "6199" and re.fullmatch(r"All declarations of '.+' are unused\.", message):

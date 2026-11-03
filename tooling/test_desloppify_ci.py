@@ -310,6 +310,9 @@ class TypeScriptAdapterTest(unittest.TestCase):
             ("unused-interface", "export {}; interface Unused { value: number }", True, "6196"),
             ("unused-type", "export {}; type Unused = number;", True, "6196"),
             ("unused-property", "export class Value { constructor(private unused: number) {} }", True, "6138"),
+            ("unused-quoted-property", 'export class Value { private "unused value" = 1; }', True, "6133"),
+            ("unused-quote-in-name", "export class Value { private \"it's unused\" = 1; }", True, "6133"),
+            ("unused-empty-property", 'export class Value { private "" = 1; }', True, "6133"),
             ("unused-destructure", "export {}; const { left, right } = { left: 1, right: 2 };", True, "6198"),
             ("type-error", "export const value: number = 'invalid';", False, "2322"),
             ("mixed", "export const value: number = 'invalid'; const unused = 1;", False, "2322"),
@@ -339,6 +342,9 @@ class TypeScriptAdapterTest(unittest.TestCase):
                     if valid and code:
                         self.assertIn("error TS6133:", output.getvalue())
                         self.assertNotIn("error TS6196:", output.getvalue())
+                        if name in {"unused-quoted-property", "unused-quote-in-name", "unused-empty-property"}:
+                            self.assertIn("'(unused-symbol)'", output.getvalue())
+                            self.assertIn("'(unused-symbol)'", report["normalized_diagnostics"])
 
     def test_adapter_refuses_other_npx_commands(self):
         with self.assertRaises(ValueError):

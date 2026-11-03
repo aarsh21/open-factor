@@ -104,8 +104,10 @@ diagnostics (`TS6133`, `TS6138`, `TS6192`, `TS6196`, `TS6198`, `TS6199`) are acc
 TypeScript 7.0.2 reports these with exit 1; older compilers can use exit 2. The
 adapter validates the diagnostic content, not just the exit status, and normalizes
 unused types/properties and binding groups to the pinned scanner's supported
-format. Grouped unused bindings retain their source location and a descriptive
-group name; the untouched original compiler output stays in the evidence file.
+format. Quoted property names that contain whitespace/quotes or have an empty
+spelling use a scanner-safe descriptive label. These names and grouped unused
+bindings retain their source location; the untouched original compiler output
+stays in the evidence file.
 Missing compiler evidence, configuration errors, unknown diagnostics and mixed
 unused/type errors fail the scan job instead of silently passing.
 

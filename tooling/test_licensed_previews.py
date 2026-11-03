@@ -236,6 +236,62 @@ class LicensedPreviewsTest(unittest.TestCase):
                 with contextlib.redirect_stdout(io.StringIO()):
                     previews.verify()
 
+    def test_interrupt_after_replacement_restores_existing_and_new_destinations(self):
+        for interrupted in ('wger-68.png', 'wger-70.png', 'exercise-previews.json'):
+            with self.subTest(interrupted=interrupted), refresh_fixture() as (root, _):
+                # Exercise rollback of a newly added asset as well as old files.
+                (root / 'previews/wger-70.png').unlink()
+                before = snapshot(root)
+                replace = Path.replace
+
+                def interrupt_after_replace(path, target):
+                    result = replace(path, target)
+                    if path.parent.name != 'backups' and Path(target).name == interrupted:
+                        raise KeyboardInterrupt('SIGINT after successful replacement')
+                    return result
+
+                with patch.object(Path, 'replace', autospec=True, side_effect=interrupt_after_replace):
+                    with self.assertRaises(KeyboardInterrupt):
+                        previews.refresh()
+                self.assertEqual(before, snapshot(root))
+                self.assertFalse(list(root.glob('.licensed-previews-*')))
+
+    def test_interrupt_before_new_file_replacement_does_not_break_rollback(self):
+        with refresh_fixture() as (root, _):
+            (root / 'previews/wger-70.png').unlink()
+            before = snapshot(root)
+            replace = Path.replace
+
+            def interrupt_before_replace(path, target):
+                if path.parent.name != 'backups' and Path(target).name == 'wger-70.png':
+                    raise KeyboardInterrupt('SIGINT before replacement')
+                return replace(path, target)
+
+            with patch.object(Path, 'replace', autospec=True, side_effect=interrupt_before_replace):
+                with self.assertRaises(KeyboardInterrupt):
+                    previews.refresh()
+            self.assertEqual(before, snapshot(root))
+            self.assertFalse(list(root.glob('.licensed-previews-*')))
+
+    def test_second_interrupt_during_rollback_retains_the_original_backup(self):
+        with refresh_fixture() as (root, _):
+            original = (root / 'previews/wger-68.png').read_bytes()
+            replace = Path.replace
+
+            def interrupt_publication_and_recovery(path, target):
+                if path.parent.name == 'backups':
+                    raise KeyboardInterrupt('SIGINT during recovery')
+                result = replace(path, target)
+                if Path(target).name == 'wger-68.png':
+                    raise KeyboardInterrupt('SIGINT after replacement')
+                return result
+
+            with patch.object(Path, 'replace', autospec=True, side_effect=interrupt_publication_and_recovery):
+                with self.assertRaisesRegex(RuntimeError, 'rollback incomplete.*Recovery files retained'):
+                    previews.refresh()
+            staging, = root.glob('.licensed-previews-*')
+            self.assertEqual(original, (staging / 'backups/0').read_bytes())
+
     def test_rollback_failure_is_reported_and_retains_recovery_copies(self):
         with refresh_fixture() as (root, _):
             old_asset = (root / 'previews/wger-68.png').read_bytes()

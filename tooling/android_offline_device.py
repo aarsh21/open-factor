@@ -116,12 +116,56 @@ class Device:
         finally:
             self.adb('shell', 'rm', '-f', remote)
 
+    def _directory_stat(self, name):
+        values = self.adb('shell', 'run-as', PACKAGE, 'stat', '-c', '%u:%g:%a', shlex.quote(name)).strip().split(':')
+        if len(values) != 3:
+            raise ValueError('Cannot inspect recovery directory metadata: ' + name)
+        return dict(uid=int(values[0]), gid=int(values[1]), mode=int(values[2], 8))
+
+    def _directory_recovery_plan(self, current, expected):
+        directories = {name: entry for name, entry in expected.items() if entry['type'] == '5'}
+        missing = []
+        for name, entry in directories.items():
+            actual = current.get(name)
+            if actual is None or actual['type'] != '5':
+                missing.append(name)
+            elif (actual['uid'], actual['gid']) != (entry['uid'], entry['gid']):
+                # run-as cannot safely chown arbitrary app/cache ownership. Do not
+                # delete any current file bytes if exact recovery is impossible.
+                raise ValueError('Cannot safely restore directory ownership: ' + name)
+        if missing:
+            uid = int(self.adb('shell', 'run-as', PACKAGE, 'id', '-u').strip())
+            gid = int(self.adb('shell', 'run-as', PACKAGE, 'id', '-g').strip())
+            root = self._directory_stat('.')
+            for name in missing:
+                parent = str(Path(name).parent)
+                metadata = root if parent == '.' else directories[parent]
+                inherited_gid = metadata['gid'] if metadata['mode'] & 0o2000 else gid
+                entry = directories[name]
+                if entry['uid'] != uid or entry['gid'] != inherited_gid:
+                    raise ValueError('Cannot safely recreate directory ownership: ' + name)
+        return directories, set(missing)
+
     def replace_tree(self, archive, expected, transfer):
         # Android cache directories have a distinct cache GID and setgid bit.
         # Even extracting directory headers over existing directories loses that
         # metadata under run-as. Preserve inodes and extract ONLY files/links.
         check = archive.parent / 'verification.tar'
         current = self.archive(check)
+        directories, missing = self._directory_recovery_plan(current, expected)
+        # Restore ownership-compatible directory modes before file deletion and
+        # extraction. Preserve setgid for inherited file groups, temporarily add
+        # owner access, and verify chmod worked before modifying stored bytes.
+        for name in sorted(directories, key=lambda path: len(Path(path).parts)):
+            if name in missing:
+                continue
+            entry = directories[name]
+            working_mode = entry['mode'] | 0o700
+            if current[name]['mode'] != working_mode:
+                self.adb('shell', 'run-as', PACKAGE, 'chmod', oct(working_mode)[2:], shlex.quote(name))
+                metadata = self._directory_stat(name)
+                if metadata != dict(uid=entry['uid'], gid=entry['gid'], mode=working_mode):
+                    raise ValueError('Cannot restore recovery directory metadata: ' + name)
         members = archive.parent / 'file-members.tar'
         with tarfile.open(archive) as saved, tarfile.open(members, 'w') as output:
             for member in saved:
@@ -133,13 +177,15 @@ class Device:
             self.adb('shell', 'run-as', PACKAGE, 'sh', '-c',
                      shlex.quote('find . -type f -delete && find . -type l -delete'))
             for name in sorted(current, key=lambda p: len(Path(p).parts), reverse=True):
-                if current[name]['type'] == '5' and name not in expected:
+                if current[name]['type'] == '5' and name not in directories:
                     self.adb('shell', 'run-as', PACKAGE, 'rmdir', shlex.quote(name))
-            for name in sorted(expected, key=lambda p: len(Path(p).parts)):
-                entry = expected[name]
-                if entry['type'] == '5' and name not in current:
-                    self.adb('shell', 'run-as', PACKAGE, 'mkdir', '-m', oct(entry['mode'])[2:], shlex.quote(name))
+            for name in sorted(missing, key=lambda path: len(Path(path).parts)):
+                entry = directories[name]
+                self.adb('shell', 'run-as', PACKAGE, 'mkdir', '-m', oct(entry['mode'] | 0o700)[2:], shlex.quote(name))
             self.adb('shell', 'run-as', PACKAGE, 'tar', '-xof', transfer)
+            # Finish children before restoring a restrictive ancestor mode.
+            for name in sorted(directories, key=lambda path: len(Path(path).parts), reverse=True):
+                self.adb('shell', 'run-as', PACKAGE, 'chmod', oct(directories[name]['mode'])[2:], shlex.quote(name))
             assert self.archive(check) == expected, 'Private tree bytes/membership/modes/ownership differ'
         finally:
             self.adb('shell', 'rm', '-f', transfer)

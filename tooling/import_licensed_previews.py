@@ -118,28 +118,37 @@ def publish_staged(staging, files):
                 originals.append(backup)
             else:
                 originals.append(None)
+        # From the first possible mutation until commit/confirmed rollback, an
+        # unexpected interruption must retain recovery files, never discard them.
+        retain_recovery = True
         try:
             for (source, target), backup in zip(files, originals):
                 target.parent.mkdir(parents=True, exist_ok=True)
-                source.replace(target)
+                # Register intent first: SIGINT can arrive after rename succeeds
+                # but before Python executes the next line. Restoring an unchanged
+                # destination is harmless; omitting a changed one loses recovery.
                 published.append((target, backup))
+                source.replace(target)
         except BaseException as error:
             rollback_errors = []
             for target, backup in reversed(published):
                 try:
                     if backup is None:
-                        target.unlink()
+                        target.unlink(missing_ok=True)
                     else:
                         backup.replace(target)
-                except OSError as rollback_error:
-                    rollback_errors.append(f"{target}: {rollback_error}")
+                except BaseException as rollback_error:
+                    rollback_errors.append(f"{target}: {type(rollback_error).__name__}: {rollback_error}")
             if rollback_errors:
                 retain_recovery = True
                 raise RuntimeError(
                     f"Licensed-preview publication failed; rollback incomplete: {rollback_errors}. "
                     f"Recovery files retained at {staging}"
                 ) from error
+            retain_recovery = False
             raise
+        else:
+            retain_recovery = False
     finally:
         if not retain_recovery:
             shutil.rmtree(staging)
