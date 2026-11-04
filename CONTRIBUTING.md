@@ -25,6 +25,8 @@ Keep reusable product behavior in the JVM `:core` module, without Android/Compos
 
 Source mode is reproducible without private media. Static-media packaging has separate checks described in [media packaging](docs/open-factor/MEDIA-PACKAGING.md). Backend commands are documented in [backend/media/README.md](backend/media/README.md).
 
+CI also runs pinned Desloppify mechanical scans, strict Kotlin unused-import validation, and focused Python import/undefined-name checks. Desloppify findings remain advisory; a successful scan does not mean every warning is resolved. See [code-health setup, policy, and limitations](docs/open-factor/CODE-HEALTH.md) for local commands and evidence artifacts.
+
 Test data generation and performance checks are documented in [PERFORMANCE.md](docs/open-factor/PERFORMANCE.md). Use a disposable emulator; backup restoration replaces the destination's data.
 
 ## Pull requests and reports

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { createHash } from 'node:crypto'
-import { createApp, parseRange, type VideoIndex, type VideoStore } from '../src/app'
+import { createApp, MAX_VIDEO_BYTES, parseRange, parseVideoIndex, validateIndex, type VideoIndex, type VideoStore } from '../src/app'
 
 const filename = '0123456789abcdef0123456789abcdef_a.mp4'
 const data = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftyp'), Buffer.from('isom0123456789abcdefghijklmnopqrstuvwxyz')])
@@ -15,12 +15,40 @@ function fixture(present = true) {
   let headOverride: typeof record | undefined
   const store: VideoStore = {
     async head() { return stored ? (headOverride ?? record) : null },
-    async get(_name, start, end) { return new ReadableStream({ start(controller) { controller.enqueue(stored!.subarray(start, end + 1)); controller.close() } }) },
+    async get(_name, start, end) {
+      if (!stored) throw new Error('Cannot read an absent fixture object')
+      const chunk = stored.subarray(start, end + 1)
+      return new ReadableStream({ start(controller) { controller.enqueue(chunk); controller.close() } })
+    },
     async put(_name, bytes) { stored = Buffer.from(bytes); puts++ },
     async ready() { return storageReady },
   }
   return { app: createApp(index, store, token), puts: () => puts, failReady: () => { storageReady = false }, corrupt: () => { headOverride = { ...record, bytes: 9 } } }
 }
+
+describe('media index validation', () => {
+  test('parses valid data and rejects malformed JSON with a deployment diagnostic', () => {
+    expect(parseVideoIndex(JSON.stringify(index))).toEqual(index)
+    expect(() => parseVideoIndex('{')).toThrow('Invalid media index JSON')
+  })
+  test('rejects invalid top-level and videos shapes without leaking TypeErrors', () => {
+    for (const value of [null, [], 1, 'index', {}, { ...index, schema: 2 },
+      { ...index, count: '1' }, { ...index, count: 0 }, { ...index, count: 1.5 },
+      { ...index, count: 2 }, { ...index, videos: null }, { ...index, videos: [] }]) {
+      expect(() => validateIndex(value)).toThrow('Invalid media index')
+    }
+  })
+  test('rejects invalid records, sizes, checksums and filenames', () => {
+    for (const value of [null, [], 'record', {}, { ...record, bytes: '12' },
+      { ...record, bytes: 11 }, { ...record, bytes: MAX_VIDEO_BYTES + 1 },
+      { ...record, bytes: 12.5 }, { ...record, bytes: Number.POSITIVE_INFINITY },
+      { ...record, sha256: null }, { ...record, sha256: 123 },
+      { ...record, sha256: record.sha256.toUpperCase() }]) {
+      expect(() => validateIndex({ ...index, videos: { [filename]: value } })).toThrow('Invalid indexed media record')
+    }
+    expect(() => validateIndex({ ...index, videos: { '../video.mp4': record } })).toThrow('Invalid indexed media record')
+  })
+})
 
 describe('public immutable video HTTP contract', () => {
   test('GET streams exact bytes, SHA ETag, MIME, immutable caching', async () => {

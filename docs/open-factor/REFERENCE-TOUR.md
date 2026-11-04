@@ -32,4 +32,8 @@ python tooling/build_reference_tour.py /private/path/coverage.json \
   --output /private/path/indexed
 ```
 
-`coverage.json` defines chapter clip filenames, observed features and gaps. Exclusions map exact filenames to reviewed second ranges. The tool checks inputs, re-encodes consistent chapter videos, embeds MP4 chapters and writes HTML/JSON/Markdown indexes. It does not identify private content automatically. Review generated media before sharing, and keep provenance distinct from the public code's GPL license.
+`coverage.json` defines chapter clip filenames, observed features and gaps. Exclusions map exact filenames to reviewed second ranges. The tool checks inputs, re-encodes consistent chapter videos, embeds MP4 chapters and writes HTML/JSON/Markdown indexes. It does not identify private content automatically. Review generated media before sharing, and keep provenance distinct from the public code's [MIT license](../../LICENSE).
+
+Every probe is bounded by `--probe-timeout` (default 30 seconds), and every encoding/concatenation command by `--encode-timeout` (default 3,600 seconds). Increase the latter explicitly for longer tours. Timeouts and media durations must be finite and positive.
+
+Rebuilding an existing output directory removes its previous completion indexes before any referenced media can be overwritten. An interrupted, failed or timed-out rebuild may leave partial media, but must not retain a stale successful index. Metadata is replaced atomically per file, with `index.json` published last after every encode/probe and both human-readable indexes succeed. Retry and review failed output before distribution; this is not an atomic multi-file media transaction or automatic privacy certification.

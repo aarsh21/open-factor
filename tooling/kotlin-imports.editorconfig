@@ -1,0 +1,9 @@
+# Focused Kotlin-aware import gate, not the project's formatting policy.
+# Use explicitly with ktlint --editorconfig tooling/kotlin-imports.editorconfig.
+# The full Desloppify scan still reports the other ktlint rules; opting into
+# import validation must not reformat the existing Android UI and test suites.
+root = true
+
+[*.{kt,kts}]
+ktlint_standard = disabled
+ktlint_standard_no-unused-imports = enabled

@@ -60,9 +60,10 @@ def prepare(source: Path, output: Path, mode: str, max_static_bytes: int = STATI
     if marker.is_file() and (not isinstance(previous, dict) or previous.get("schema") != SCHEMA):
         raise ValueError("Unsupported generated pack schema; choose a new output directory")
     output.mkdir(parents=True, exist_ok=True)
-    if not marker.is_file():
-        # A failed first conversion remains recognizable as our output and can be retried safely.
-        write_json(marker, {"schema": SCHEMA, "preparing": True, "files": []})
+    # Mark every attempt, not just the first one: a failed refresh may have
+    # replaced some assets and must not retain an apparently completed receipt.
+    # Keep old per-file receipts so a retry can still verify and reuse its cache.
+    write_json(marker, {**previous, "schema": SCHEMA, "preparing": True})
     manifest: dict = {"schema": SCHEMA, "mode": mode, "files": [], "equipment_edge_px": EQUIPMENT_EDGE}
     expected = {"media-pack.json"}
     if mode == "source":
@@ -108,7 +109,10 @@ def prepare(source: Path, output: Path, mode: str, max_static_bytes: int = STATI
                         raise ValueError(f"Full-video mode is missing a catalog clip: {clip}")
         for relative, transform in sorted(selected.items()):
             original = source / safe_relative(relative)
-            if original.is_symlink():
+            # Checking only the leaf misses catalog paths through a linked directory.
+            # Such a path can otherwise silently package files outside the imported pack.
+            ancestors = original.relative_to(source).parents
+            if original.is_symlink() or any((source / parent).is_symlink() for parent in ancestors):
                 raise ValueError(f"Source assets must not be symlinks: {relative}")
             packaged = f"reference/{relative}"
             target = output / packaged
@@ -123,7 +127,8 @@ def prepare(source: Path, output: Path, mode: str, max_static_bytes: int = STATI
                 temporary = target.with_name(target.stem + ".partial" + target.suffix)
                 if transform == "equipment-thumbnail":
                     subprocess.run([magick, str(original), "-resize", f"{EQUIPMENT_EDGE}x{EQUIPMENT_EDGE}>",
-                                    "-strip", "-define", "png:compression-level=9", str(temporary)], check=True)
+                                    "-strip", "-define", "png:compression-level=9", str(temporary)],
+                                   check=True, timeout=120)
                 else:
                     shutil.copyfile(original, temporary)
                 temporary.replace(target)

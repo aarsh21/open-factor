@@ -25,7 +25,8 @@ def extract_pack(apk_path: Path, output: Path) -> None:
         raise ValueError("Generated output must be separate from the input APK")
     marker = output / "media-pack.json"
     if output.exists() and any(output.iterdir()):
-        if not marker.is_file() or json.loads(marker.read_text()).get("schema") != 1:
+        previous = json.loads(marker.read_text()) if marker.is_file() else None
+        if not isinstance(previous, dict) or previous.get("schema") != 1:
             raise ValueError("Refusing to replace an unmanaged output directory")
         if any(path.is_symlink() for path in output.rglob("*")):
             raise ValueError("Generated output must not contain symlinks")
@@ -83,7 +84,7 @@ def reuse(apk_path: Path, output: Path, expected_sha256: str) -> dict:
             raise ValueError("Baseline APK checksum differs from the reviewed pin")
     verifier = Path(__file__).with_name("verify_media_apk.py")
     receipt = subprocess.run([sys.executable, "-I", str(verifier), str(apk_path)],
-                             check=True, capture_output=True, text=True)
+                             check=True, capture_output=True, text=True, timeout=120)
     result = json.loads(receipt.stdout)
     extract_pack(apk_path, output)
     return {"baseline_sha256": expected_sha256, "manifest_files": result["manifest_files"],

@@ -1,6 +1,5 @@
 package org.openfactor.app
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -468,7 +467,7 @@ fun ProgramEditor(
         }
     }
     if (rename)
-        ProgramNameDialog("Rename Day", day.name, { rename = false }) { name ->
+        NameDialog("Rename Day", day.name, { rename = false }) { name ->
             runPersistenceAction {
                 editDay { it.copy(name = name) }
                 rename = false
@@ -529,27 +528,6 @@ fun ProgramEditor(
             }
         }
     }
-}
-
-@Composable
-private fun ProgramNameDialog(
-    title: String,
-    initial: String,
-    onDismiss: () -> Unit,
-    onSave: (String) -> Unit,
-) {
-    var name by remember { mutableStateOf(initial) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
-        },
-        confirmButton = {
-            TextButton({ onSave(name.trim()) }, enabled = name.isNotBlank()) { Text("Save") }
-        },
-        dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
-    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

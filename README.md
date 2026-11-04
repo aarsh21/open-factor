@@ -6,7 +6,7 @@ Open Factor helps you log your gym sessions without the clutter. Pick an exercis
 
 > **Open Factor is in beta.** It works well for everyday logging, but expect a few rough edges. Your [feedback and bug reports](https://github.com/aarsh21/open-factor/issues) help make it better.
 
-[**⬇️ Download the latest version**](https://github.com/aarsh21/open-factor/releases/latest/download/open-factor.apk) · [What's new in 0.10.0](docs/open-factor/releases/v0.10.0.md)
+[**⬇️ Download the latest version**](https://github.com/aarsh21/open-factor/releases/latest/download/open-factor.apk) · [What's new in 0.10.1](docs/open-factor/releases/v0.10.1.md)
 
 [![Open Factor in 49 seconds: log a set, watch the exercise, see your week](docs/media/open-factor-intro-poster.jpg)](docs/media/open-factor-intro.mp4)
 
@@ -68,6 +68,13 @@ Scan the code with any UPI app (Google Pay, PhonePe, Paytm, BHIM) or enter the U
 - **Everkinetic** for exercise illustrations, and **Vercel / basement.studio** for the Geist Sans and Geist Serif fonts.
 
 See [CREDITS.md](CREDITS.md) for full details.
+
+## Current contributors
+
+- [aarsh21](https://github.com/aarsh21) — creator and maintainer.
+- [Rash419](https://github.com/Rash419) — contributor.
+
+This list refers to the current Open Factor project. GitHub's automatically generated contributor graph also includes inherited repository history, which is preserved.
 
 ## For developers
 

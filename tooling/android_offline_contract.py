@@ -17,7 +17,7 @@ import time
 import xml.etree.ElementTree as ET
 import zlib
 
-PACKAGE = 'org.openfactor.app'
+from android_offline_device import Device, PACKAGE
 
 
 def png(color):
@@ -265,7 +265,6 @@ def contract(device, ui):
 
 
 if __name__ == '__main__':
-    from android_offline_suite import Device
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--serial', required=True)
     parser.add_argument('--output', type=Path, required=True)

@@ -61,6 +61,7 @@ class ReleaseMediaTest(unittest.TestCase):
         self.assertEqual('-I', args[1])
         self.assertEqual('verify_media_apk.py', Path(args[2]).name)
         self.assertEqual(str(self.apk), args[3])
+        self.assertEqual(120, verifier.call_args.kwargs['timeout'])
         self.assertEqual(digest, result['baseline_sha256'])
         self.assertTrue(result['provenance_preserved'])
 
@@ -119,6 +120,28 @@ class ReleaseMediaTest(unittest.TestCase):
         linked.symlink_to(self.output, target_is_directory=True)
         with self.assertRaises(ValueError):
             extract_pack(self.apk, linked)
+
+    def test_non_object_markers_cannot_claim_an_existing_output(self):
+        self.archive()
+        self.output.mkdir()
+        personal = self.output / 'keep.txt'
+        personal.write_text('keep')
+        marker = self.output / 'media-pack.json'
+        for value in [[], None, 1, '']:
+            raw = json.dumps(value)
+            marker.write_text(raw)
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'unmanaged'):
+                extract_pack(self.apk, self.output)
+            self.assertEqual('keep', personal.read_text())
+            self.assertEqual(raw, marker.read_text())
+
+    def test_verifier_timeout_leaves_output_untouched(self):
+        self.archive()
+        digest = hashlib.sha256(self.apk.read_bytes()).hexdigest()
+        with patch('reuse_release_media.subprocess.run', side_effect=subprocess.TimeoutExpired(['verify'], 120)):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                reuse(self.apk, self.output, digest)
+        self.assertFalse(self.output.exists())
 
     def test_old_managed_assets_are_removed_on_mode_change(self):
         self.output.mkdir()
